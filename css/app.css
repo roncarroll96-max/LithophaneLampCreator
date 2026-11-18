@@ -45,6 +45,7 @@ button, input, select { font: inherit; color: inherit; }
   box-shadow: 0 0 14px var(--amber-glow);
 }
 .brand-name { font-weight: 650; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-version { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
 .top-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
 .btn {

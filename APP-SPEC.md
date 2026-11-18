@@ -269,6 +269,9 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
 
+### Version 0.6.1: version number in the header, done (2026-11-18)
+The app's version shows next to its name (from js/version.js; a test keeps it equal to package.json).
+
 ### Version 0.6: several photos per ball, done (2026-11-18)
 Built: up to 6 photos per ball, each with its own picture, tone, cut-out background, position in window, window size and shape, soft edge and projection. New photos go on the next free side (back, left, right, top with the new "Flat" projection, then front-right) and start on top of the list. The Photo tab lists the photos with thumbnails and ↑ / ↓ (front/back order), Hide, Copy and Remove; the selected photo's settings show below, with "Around the ball" and "Up / down" placement sliders and a separate "Plain ball" section. Where photos overlap the one higher in the list is in front and its soft edge fades into the one below (a cut-out set to "Blend in" floats on whatever is behind it). Drag the selected photo on the ball to move it; pressing anywhere else (including other photos) turns the view. Projects and the browser autosave keep every photo; projects saved by earlier versions open with their single photo.
 

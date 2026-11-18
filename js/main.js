@@ -14,6 +14,7 @@ import { TEXT_FONTS, defaultTextItem, placementAt } from './core/textLayer.js';
 import { buildTextMasks, masksCurrent, loadAllFonts } from './text.js';
 import { loadMoon } from './moonData.js';
 import { moonMap } from './core/moon.js';
+import { APP_VERSION } from './version.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
 
@@ -42,6 +43,7 @@ const app = {
 const $ = (id) => document.getElementById(id);
 const isPhone = () => matchMedia('(max-width: 820px)').matches && matchMedia('(pointer: coarse)').matches;
 const preview = new Preview($('viewport'));
+$('appVersion').textContent = `v${APP_VERSION}`;
 
 // ---------- Messages ----------
 let toastTimer;
