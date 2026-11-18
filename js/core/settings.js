@@ -56,6 +56,7 @@ export function defaultSettings() {
       fade: 0.3,              // how much lines fade inside the photo (0..1)
       yaw: 60, pitch: 20, roll: 0,
     },
+    texts: [],                // text items (see core/textLayer.js defaultTextItem)
     bed: { x: 256, y: 256, z: 256 },
     detail: 'standard',
   };

@@ -10,6 +10,8 @@ import {
   bodyAxes, collarDims, markingWidth,
 } from './core/settings.js';
 import { autosave, loadAutosave, saveProjectFile, readProjectFile, download } from './storage.js';
+import { TEXT_FONTS, defaultTextItem, placementAt } from './core/textLayer.js';
+import { buildTextMasks, masksCurrent, loadAllFonts } from './text.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
 
@@ -23,6 +25,8 @@ const app = {
   shape: null,
   collar: null,
   field: null,
+  textMasks: null,   // rendered text masks by item id
+  selectedText: null, // id of the text item being edited
   tab: 'photo',
   exporting: false,
   lastExport: null,
@@ -82,8 +86,9 @@ function update(quick) {
       app.dirty.shape = false; shapeChanged = true;
     }
     if (!app.shape) return;
-    app.field = createField(s, app.shape, app.processed);
-    const raised = s.markings.style === 'raised';
+    ensureTextMasks();
+    app.field = createField(s, app.shape, app.processed, app.textMasks);
+    const raised = app.field.hasRaised;
     if (shapeChanged || raised || !quick || app._wasRaised !== raised) preview.updateGeometry(app.field, !quick);
     app._wasRaised = raised;
     updateThicknessLegend();
@@ -149,6 +154,17 @@ function projectBaseName() {
   const s = app.settings;
   const n = (app.photoName || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
   return `${n}-${s.shape}-${s.diameter}mm`;
+}
+
+// ---------- Text masks (drawn from the fonts in the background, then the preview updates) ----------
+let textBuild = null;
+function ensureTextMasks() {
+  const items = app.settings.texts;
+  if (textBuild || masksCurrent(items, app.textMasks)) return;
+  textBuild = buildTextMasks(items)
+    .then((m) => { app.textMasks = m; changed('field'); })
+    .catch((err) => { console.error(err); toast(`Text could not be drawn: ${err.message || err}`, 'err'); })
+    .finally(() => { textBuild = null; });
 }
 
 // ---------- Panel controls ----------
@@ -227,7 +243,7 @@ const num2 = (v) => (+v).toFixed(2);
 function renderTab() {
   const body = $('tabBody');
   const scroll = body.scrollTop;
-  body.replaceChildren(...({ photo: photoTab, ball: ballTab, markings: markingsTab, export: exportTab }[app.tab])());
+  body.replaceChildren(...({ photo: photoTab, ball: ballTab, markings: markingsTab, text: textTab, export: exportTab }[app.tab])());
   body.scrollTop = scroll;
   if (app.tab === 'photo') drawThumb();
 }
@@ -370,6 +386,84 @@ function markingsTab() {
   ];
 }
 
+function textTab() {
+  const s = app.settings;
+  if (!Array.isArray(s.texts)) s.texts = [];
+  const items = s.texts;
+  if (app.selectedText && !items.some((t) => t.id === app.selectedText)) app.selectedText = null;
+  if (!app.selectedText && items.length) app.selectedText = items[items.length - 1].id;
+  const idx = items.findIndex((t) => t.id === app.selectedText);
+  const it = items[idx];
+
+  const add = () => {
+    const n = defaultTextItem(items.length);
+    items.push(n); app.selectedText = n.id; changed('field'); renderTab();
+  };
+  const list = items.map((t, i) => el('div', { class: 'text-row' + (t.id === app.selectedText ? ' active' : '') },
+    el('button', {
+      class: 'text-pick', title: 'Edit this text',
+      style: `font-family:${TEXT_FONTS[t.font]?.family || 'inherit'};font-weight:${TEXT_FONTS[t.font]?.weight || 400}`,
+      onclick: () => { app.selectedText = t.id; renderTab(); },
+    }, t.text && t.text.trim() ? t.text : '(empty)'),
+    el('button', {
+      class: 'btn small', title: t.hidden ? 'Show on the ball' : 'Hide from the ball',
+      onclick: () => { t.hidden = !t.hidden; changed('field'); renderTab(); },
+    }, t.hidden ? 'Show' : 'Hide'),
+    el('button', {
+      class: 'btn small', title: 'Make a copy just below',
+      onclick: () => {
+        const c = { ...structuredClone(t), id: defaultTextItem().id, up: t.up - t.size * 1.6 };
+        items.splice(i + 1, 0, c); app.selectedText = c.id; changed('field'); renderTab();
+      },
+    }, 'Copy'),
+    el('button', {
+      class: 'btn small', title: 'Remove this text',
+      onclick: () => { items.splice(i, 1); changed('field'); renderTab(); },
+    }, 'Remove'),
+  ));
+
+  const out = [
+    section('Text on the ball',
+      items.length ? el('div', { class: 'text-list' }, list) : note('No text yet. Add a name, number or date.'),
+      el('button', { class: 'btn small', style: 'margin-top:8px', onclick: add }, '+ Add text')),
+  ];
+  if (!it) return out;
+
+  const p = `texts.${idx}`;
+  const font = TEXT_FONTS[it.font] || TEXT_FONTS.varsity;
+  const input = el('input', { type: 'text', value: it.text, maxlength: 40, class: 'text-input', 'aria-label': 'Text' });
+  input.addEventListener('input', () => { it.text = input.value; changed('field'); });
+  input.addEventListener('change', () => renderTab());
+
+  const upMax = app.shape ? Math.floor(app.shape.elev(0.97)) : 60;
+  const upMin = app.shape ? Math.ceil(app.shape.elev(0.03)) : -60;
+  out.push(
+    section('Edit text',
+      input,
+      el('div', { class: 'ctl' }, el('label', {}, 'Font')),
+      segmented(`${p}.font`, Object.entries(TEXT_FONTS).map(([k, f]) => ({ value: k, label: f.label })), 'field', () => renderTab()),
+      el('div', { class: 'ctl' }, el('label', {}, 'Style')),
+      segmented(`${p}.style`, [
+        { value: 'carved', label: 'Carved (dark)', title: 'Thicker plastic: glows dark, outside stays smooth' },
+        { value: 'bright', label: 'Bright', title: 'Thinner plastic: glows lighter than around it' },
+        { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
+      ], 'field', () => renderTab()),
+      it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
+      slider(`${p}.size`, 'Letter height', 4, 60, 0.5, { fmt: mm }),
+      it.size < font.minSize ? note(`Letters under ${font.minSize} mm may not print cleanly in this font.`, 'warn') : null,
+      slider(`${p}.arc`, 'Bend (smile to arch)', -180, 180, 1, { fmt: deg }),
+      checkbox(`${p}.outline`, 'Bright outline around letters (helps over dark photo areas)'),
+    ),
+    section('Place on the ball',
+      note('Click the ball in the preview to move this text there, then fine-tune:'),
+      slider(`${p}.around`, 'Around the ball', -180, 180, 0.5, { fmt: deg }),
+      slider(`${p}.up`, 'Up / down', upMin, upMax, 0.5, { fmt: mm }),
+      slider(`${p}.rotate`, 'Rotate', -180, 180, 1, { fmt: deg }),
+    ),
+  );
+  return out;
+}
+
 function fitCheck(size, diag) {
   const b = app.settings.bed;
   const [x, y, z] = size;
@@ -392,7 +486,7 @@ function exportTab() {
   const estDiag = [2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2), 2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2)];
   const fit = app.lastExport ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
 
-  const raised = s.markings.style === 'raised' && SHAPES[s.shape]?.markings !== 'none';
+  const raised = app.field ? app.field.hasRaised : s.markings.style === 'raised' && SHAPES[s.shape]?.markings !== 'none';
   const opts = Object.entries(DETAIL_PRESETS).map(([k, d]) => {
     let sizeText = '';
     if (app.shape) {
@@ -467,7 +561,7 @@ function exportStl() {
     done();
   };
   const photo = app.processed ? { w: app.processed.w, h: app.processed.h, data: app.processed.data.slice() } : null;
-  worker.postMessage({ settings: structuredClone(s), photo, stepInner: step, stepOuter: OUTER_STEP }, photo ? [photo.data.buffer] : []);
+  worker.postMessage({ settings: structuredClone(s), photo, textMasks: app.textMasks, stepInner: step, stepOuter: OUTER_STEP }, photo ? [photo.data.buffer] : []);
 }
 
 // ---------- Wiring ----------
@@ -502,6 +596,16 @@ preview.onHover = (h) => {
   box.hidden = false;
 };
 $('btnResetView').addEventListener('click', () => preview.frame());
+
+// Click the ball on the Text tab: move the selected text there
+preview.onPick = (h) => {
+  if (app.tab !== 'text' || !app.shape) return;
+  const it = (app.settings.texts || []).find((t) => t.id === app.selectedText);
+  if (!it) return;
+  Object.assign(it, placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v))));
+  changed('field'); renderTab();
+};
+loadAllFonts();
 
 const choosePhoto = () => $('filePhoto').click();
 $('btnChoosePhoto').addEventListener('click', choosePhoto);

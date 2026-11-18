@@ -65,6 +65,18 @@ export class Preview {
       requestAnimationFrame(() => { hoverPending = false; this._hover(lastEvt); });
     });
     el.addEventListener('pointerleave', () => this.onHover && this.onHover(null));
+    // A click (press and release without dragging) on the ball reports where it landed
+    this.onPick = null;
+    let down = null;
+    el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; });
+    el.addEventListener('pointerup', (e) => {
+      if (!down || !this.onPick) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      down = null;
+      if (moved > 5) return;
+      const hit = this._hit(e);
+      if (hit) this.onPick(hit);
+    });
 
     this._resize = () => this.resize();
     new ResizeObserver(this._resize).observe(container);
@@ -94,13 +106,16 @@ export class Preview {
     if (mode !== 'thickness' && this.onHover) this.onHover(null);
   }
 
-  _hover(e) {
+  /** Where a pointer event lands on the ball: { u, v, x, y } or null. */
+  _hit(e) {
     const r = this.renderer.domElement.getBoundingClientRect();
     const p = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.raycaster.setFromCamera(p, this.camera);
     const hit = this.raycaster.intersectObject(this.ball, false)[0];
-    this.onHover(hit && hit.uv ? { u: hit.uv.x, v: hit.uv.y, x: e.clientX - r.left, y: e.clientY - r.top } : null);
+    return hit && hit.uv ? { u: hit.uv.x, v: hit.uv.y, x: e.clientX - r.left, y: e.clientY - r.top } : null;
   }
+
+  _hover(e) { this.onHover(this._hit(e)); }
 
   /** Rebuilds the ball surface (needed when shape, size or raised markings change). */
   updateGeometry(field, fine = true) {

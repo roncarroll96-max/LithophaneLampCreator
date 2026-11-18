@@ -1,5 +1,5 @@
 // Builds the STL in the background so the page stays responsive.
-// Message in:  { settings, photo: { w, h, data } | null, stepInner, stepOuter }
+// Message in:  { settings, photo: { w, h, data } | null, textMasks | null, stepInner, stepOuter }
 // Messages out: { type: 'progress', value } and { type: 'done', stl, stats } or { type: 'error', message }
 
 import { buildEllipsoidShape } from './core/shapes.js';
@@ -9,11 +9,11 @@ import { writeBinarySTL } from './core/stl.js';
 import { bodyAxes, collarDims } from './core/settings.js';
 
 self.onmessage = (e) => {
-  const { settings, photo, stepInner, stepOuter } = e.data;
+  const { settings, photo, textMasks, stepInner, stepOuter } = e.data;
   try {
     const collar = collarDims(settings);
     const shape = buildEllipsoidShape(bodyAxes(settings), collar.ro);
-    const field = createField(settings, shape, photo);
+    const field = createField(settings, shape, photo, textMasks || null);
     const mesh = buildShellMesh({
       shape, field, stepInner, stepOuter: field.hasRaised ? stepInner : stepOuter, collar,
       onProgress: (v) => self.postMessage({ type: 'progress', value: v * 0.9 }),

@@ -8,6 +8,7 @@
 import { THETA_FRONT, wrapAngle } from './shapes.js';
 import { MARKING_TYPES, rotationMatrix } from './markings.js';
 import { SHAPES, markingWidth } from './settings.js';
+import { createTextLayer } from './textLayer.js';
 
 const smooth = (e0, e1, x) => {
   const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
@@ -20,10 +21,11 @@ const MOUNT_BLEND = 6;      // mm to blend from the plain mount band into the de
 
 /**
  * photo: { w, h, data: Float32Array brightness 0..1 } or null
+ * textMasks: rendered text masks by item id (see textLayer.js), or null
  * Returns { eval(theta, s, out) } where out receives:
  *   x,y,z (outer surface), ix,iy,iz (inner surface), t (wall mm), raise (mm), mask (0..1 photo)
  */
-export function createField(settings, shape, photo) {
+export function createField(settings, shape, photo, textMasks = null) {
   const { tMin, tMax } = settings;
   const p = settings.photo;
   const mk = settings.markings;
@@ -52,6 +54,8 @@ export function createField(settings, shape, photo) {
   const raised = mk.style === 'raised';
 
   const tmp = {};
+  const textLayer = createTextLayer(settings, shape, textMasks);
+  const tx = { hits: [], clear: 0 };
 
   function samplePhoto(u, v) { // u,v in 0..1 image space
     const fx = u * photo.w - 0.5, fy = v * photo.h - 0.5;
@@ -102,18 +106,35 @@ export function createField(settings, shape, photo) {
     let t = tMin + (1 - bright) * (tMax - tMin);
     let raise = 0;
 
+    // ---- Text coverage here (needed first: lines stop around text)
+    if (textLayer) textLayer.sample(S.dx, S.dy, S.dz, tx);
+
     // ---- Markings (evaluated on the ball's own rotated frame)
-    if (markFn) {
+    if (markFn && !(textLayer && tx.clear >= 1)) {
       const dx = S.dx, dy = S.dy, dz = S.dz;
       // R^T * d (rotating the markings by R)
       const lx = R[0] * dx + R[3] * dy + R[6] * dz;
       const ly = R[1] * dx + R[4] * dy + R[7] * dz;
       const lz = R[2] * dx + R[5] * dy + R[8] * dz;
-      const m = markFn(lx, ly, lz, markR, lineW);
+      let m = markFn(lx, ly, lz, markR, lineW);
+      if (textLayer) m *= 1 - tx.clear;
       if (m > 0) {
         const k = 1 - mk.fade * mask;
         if (carved) t += (tMax + LINE_EXTRA - t) * m * mk.darkness * k;
         else if (raised) raise = mk.raise * m * k;
+      }
+    }
+
+    // ---- Text: optional bright outline first, then the letters on top
+    if (textLayer) {
+      for (const h of tx.hits) {
+        const ring = Math.max(0, h.halo - h.letters);
+        if (ring > 0) t += (tMin - t) * ring;
+        if (h.letters <= 0) continue;
+        const st = h.item.style;
+        if (st === 'carved') t += (tMax + LINE_EXTRA - t) * h.letters;
+        else if (st === 'bright') t += (tMin - t) * h.letters;
+        else if (st === 'raised') raise = Math.max(raise, (h.item.raise || 1) * h.letters);
       }
     }
 
@@ -132,5 +153,8 @@ export function createField(settings, shape, photo) {
     return out;
   }
 
-  return { eval: evalAt, window: { W, H }, hasRaised: raised && !!markFn, tMount };
+  return {
+    eval: evalAt, window: { W, H }, tMount,
+    hasRaised: (raised && !!markFn) || !!(textLayer && textLayer.hasRaised),
+  };
 }

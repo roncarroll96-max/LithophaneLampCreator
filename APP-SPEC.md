@@ -83,7 +83,14 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 
 **Text**
 
-15. **Add text** (name, number, date): type it, pick from a few bundled fonts, set size, and place it on the ball. Carved in (glows dark) or raised. Several text items per ball.
+15. **Add text** (name, number, date): type it, pick from a few bundled fonts, set size, and place it on the ball. Several text items per ball. *(Details settled 2026-11-18 for version 0.3:)*
+    - **Three styles per text item:** **carved** (thicker plastic, glows dark, smooth outside), **bright** (thinner plastic, glows lighter than around it) or **raised** (sticks out from the outside).
+    - **Placing:** click the ball in the 3D preview to put the selected text there, then fine-tune with sliders: around the ball, up/down, rotate, size.
+    - **Arc:** a bend slider curves the text up or down (like a name over a jersey number). Straight by default.
+    - **Bright outline:** an optional thin glowing outline around each letter, so carved text reads over dark parts of a photo. Off by default.
+    - **Basketball and other lines stop around text**, with a small gap, so text stays readable.
+    - **Four bundled fonts**, one of each kind: varsity/jersey block, bold clean sans, script, classic serif (open-license, included with the app so it works offline).
+    - Text items can be added, edited, duplicated, hidden and removed, and are saved in projects.
 
 **Mounting and base**
 
@@ -164,7 +171,14 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Auto-adjust | Levels/contrast, sharpen, background, face brightening | You |
 | Preview | Toggle lit glow / plain grey | You |
 | Export detail | Draft / Standard / Fine chosen at export | You |
-| Text | In version 1 | You |
+| Text | In version 1 (0.3) | You |
+| Text styles | Carved (dark), bright (thinner) or raised, per text item | You |
+| Text placing | Click the ball, then fine-tune with sliders | You |
+| Text fonts | Varsity block, bold sans, script, serif | You |
+| Text readability | Optional bright outline around letters, off by default | You |
+| Text arc | Bend slider, straight by default | You |
+| Lines under text | Lines stop around text with a small gap | You |
+| Text size default | Letters 15 mm tall; app warns below 6 mm (script below 10 mm) since thin strokes may not print | Assumed (Claude's default) |
 | Football mounting | Lying on its side | You |
 | Overhang | Slicer supports; one-piece shell | You |
 | Base | App generates a base; puck (default), LED ring/strip, bulb socket | You |
@@ -243,6 +257,13 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 0.3: text, done (2026-11-18)
+Built: Text tab with several text items (add, copy, hide, remove); carved, bright or raised style; four bundled fonts (Graduate, Montserrat, Pacifico, Playfair Display, all SIL Open Font License, about 80 KB in vendor/fonts); letter height with a small-size warning; bend slider; optional bright outline; click the ball to place, then around / up-down / rotate sliders; basketball lines stop 1.5 mm from text; text included in the Thickness view, export and saved projects.
+
+Checks passed: 15 automated tests (7 new: each style sets the wall correctly, text faces the right way and rotates the right way, lines stop around text only, hidden or empty text does nothing, raised text gives a watertight shell, click placement round-trips). In the browser: all four fonts load, text appears on the lit ball, clicking the ball moves it, and an export with raised text completed at the estimated size (150 mm ball measured 151 mm front to back with the 1 mm raised letters).
+
+To check on a print: are 15 mm varsity letters crisp, and does the bright outline make carved text readable over a dark photo area?
 
 ### Test print (milestone 1, done)
 Print Medium at Standard detail, opening down, with slicer supports for the curve above the collar. Report back:
