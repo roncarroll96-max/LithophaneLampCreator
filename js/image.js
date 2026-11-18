@@ -1,6 +1,8 @@
 // Photo loading and lithophane adjustments (browser only).
 // Output is a grey "brightness map" (Float32Array, 0 = darkest/thickest .. 1 = brightest/thinnest).
 
+import { boxBlur as blur } from './core/blur.js';
+
 const MAX_SIDE = 2400; // enough for Large balls at Fine detail
 
 const isSvg = (blob) => blob.type === 'image/svg+xml' || /\.svg$/i.test(blob.name || '');
@@ -60,7 +62,12 @@ export async function decodeImage(blob) {
   }
 }
 
-/** Draws the image scaled down to MAX_SIDE and returns its luminance (0..1). */
+/**
+ * Draws the image scaled down to MAX_SIDE and returns its luminance (0..1), plus `alpha`
+ * (0..1 per pixel) when the picture has transparent areas, e.g. a cut-out with its background
+ * removed. Fully transparent pixels get the average brightness of the visible ones, so blurs
+ * and sharpening don't pull a dark fringe in from the empty area.
+ */
 export function extractLuma(image) {
   const iw = image.width || image.naturalWidth, ih = image.height || image.naturalHeight;
   const scale = Math.min(1, MAX_SIDE / Math.max(iw, ih));
@@ -70,11 +77,24 @@ export function extractLuma(image) {
   ctx.drawImage(image, 0, 0, w, h);
   const px = ctx.getImageData(0, 0, w, h).data;
   const lum = new Float32Array(w * h);
+  let transparent = 0;
   for (let i = 0, j = 0; i < lum.length; i++, j += 4) {
     // Rec. 709 luma on gamma-encoded values (matches how people judge brightness)
     lum[i] = (0.2126 * px[j] + 0.7152 * px[j + 1] + 0.0722 * px[j + 2]) / 255;
+    if (px[j + 3] < 250) transparent++;
   }
-  return { w, h, lum, originalW: iw, originalH: ih };
+  let alpha = null;
+  if (transparent > lum.length * 0.001) {
+    alpha = new Float32Array(w * h);
+    let sum = 0, n = 0;
+    for (let i = 0; i < lum.length; i++) {
+      alpha[i] = px[i * 4 + 3] / 255;
+      if (alpha[i] > 0.5) { sum += lum[i]; n++; }
+    }
+    const fill = n ? sum / n : 0.5;
+    for (let i = 0; i < lum.length; i++) if (alpha[i] < 0.02) lum[i] = fill;
+  }
+  return { w, h, lum, alpha, originalW: iw, originalH: ih };
 }
 
 function OffscreenCanvasOr(w, h) {
@@ -85,10 +105,14 @@ function OffscreenCanvasOr(w, h) {
 /** Automatic adjustments: black/white points from the histogram, gamma that centres the midtones. */
 export function autoAdjust(base) {
   const bins = 1024, hist = new Uint32Array(bins);
-  const { lum } = base;
-  for (let i = 0; i < lum.length; i++) hist[Math.min(bins - 1, (lum[i] * bins) | 0)]++;
+  const { lum, alpha } = base;
+  let count = 0; // only the visible part of a cut-out photo counts
+  for (let i = 0; i < lum.length; i++) {
+    if (alpha && alpha[i] < 0.5) continue;
+    hist[Math.min(bins - 1, (lum[i] * bins) | 0)]++; count++;
+  }
   const pct = (q) => {
-    const target = q * lum.length; let acc = 0;
+    const target = q * count; let acc = 0;
     for (let b = 0; b < bins; b++) { acc += hist[b]; if (acc >= target) return b / (bins - 1); }
     return 1;
   };
@@ -101,29 +125,6 @@ export function autoAdjust(base) {
     blackPoint: +blackPoint.toFixed(3), whitePoint: +whitePoint.toFixed(3),
     gamma: +gamma.toFixed(2), brightness: 0, contrast: 1, sharpen: 0.6,
   };
-}
-
-/** Separable box blur, 3 passes ≈ Gaussian. */
-function blur(src, w, h, r) {
-  if (r < 1) return src.slice();
-  const a = src.slice(), b = new Float32Array(src.length);
-  const pass = (from, to, horizontal) => {
-    const n = horizontal ? w : h, m = horizontal ? h : w;
-    const step = horizontal ? 1 : w, lineStep = horizontal ? w : 1;
-    const inv = 1 / (2 * r + 1);
-    for (let l = 0; l < m; l++) {
-      const o = l * lineStep;
-      let acc = 0;
-      for (let k = -r; k <= r; k++) acc += from[o + Math.min(n - 1, Math.max(0, k)) * step];
-      for (let i = 0; i < n; i++) {
-        to[o + i * step] = acc * inv;
-        const add = Math.min(n - 1, i + r + 1), sub = Math.max(0, i - r);
-        acc += from[o + add * step] - from[o + sub * step];
-      }
-    }
-  };
-  for (let it = 0; it < 3; it++) { pass(a, b, true); pass(b, a, false); }
-  return a;
 }
 
 /** Applies the tone settings and sharpening. Returns { w, h, data }. */
@@ -149,11 +150,14 @@ export function processPhoto(base, p) {
     v = v < 0 ? 0 : v > 1 ? 1 : v;
     out[i] = p.invert ? 1 - v : v;
   }
-  return { w, h, data: out };
+  return { w, h, data: out, alpha: base.alpha || null };
 }
 
-/** Draws a 0..1 grey map into a canvas (for the photo panel). */
-export function drawGray(canvas, map, maxW = 640) {
+/**
+ * Draws a 0..1 grey map into a canvas (for the photo panel). For a cut-out photo the
+ * transparent area shows as `bg` (the brightness it will have on the ball).
+ */
+export function drawGray(canvas, map, maxW = 640, bg = 0.5) {
   const scale = Math.min(1, maxW / map.w);
   const w = Math.max(1, Math.round(map.w * scale)), h = Math.max(1, Math.round(map.h * scale));
   canvas.width = w; canvas.height = h;
@@ -163,7 +167,9 @@ export function drawGray(canvas, map, maxW = 640) {
   for (let y = 0; y < h; y++) {
     const sy = Math.min(map.h - 1, Math.floor(y / scale));
     for (let x = 0; x < w; x++) {
-      const v = src[sy * map.w + Math.min(map.w - 1, Math.floor(x / scale))] * 255;
+      const k = sy * map.w + Math.min(map.w - 1, Math.floor(x / scale));
+      const a = map.alpha ? map.alpha[k] : 1;
+      const v = (src[k] * a + bg * (1 - a)) * 255;
       const o = (y * w + x) * 4;
       img.data[o] = img.data[o + 1] = img.data[o + 2] = v; img.data[o + 3] = 255;
     }

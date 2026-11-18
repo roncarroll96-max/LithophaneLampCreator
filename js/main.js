@@ -109,10 +109,11 @@ function update(quick) {
 }
 
 // ---------- Photo loading ----------
-async function normalizedJpeg(image, w, h) {
+/** Re-encodes the photo at working size: JPEG, or PNG when it has transparency to keep. */
+async function normalizedBlob(image, w, h, keepAlpha) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   c.getContext('2d').drawImage(image, 0, 0, w, h);
-  return new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.92));
+  return new Promise((resolve) => (keepAlpha ? c.toBlob(resolve, 'image/png') : c.toBlob(resolve, 'image/jpeg', 0.92)));
 }
 
 async function loadPhoto(blob, name, { fresh = true } = {}) {
@@ -120,7 +121,7 @@ async function loadPhoto(blob, name, { fresh = true } = {}) {
   try {
     const image = await decodeImage(blob);
     const base = extractLuma(image);
-    app.photoBlob = fresh ? await normalizedJpeg(image, base.w, base.h) : blob;
+    app.photoBlob = fresh ? await normalizedBlob(image, base.w, base.h, !!base.alpha) : blob;
     app.photoName = name || 'photo';
     app.base = base;
     if (fresh) {
@@ -145,7 +146,9 @@ function drawThumb() {
   const c = document.getElementById('thumb');
   if (!c) return;
   const src = app.showOriginal ? app.base : app.processed;
-  if (src) drawGray(c, src);
+  const p = app.settings.photo;
+  const bg = p.background === 'bright' ? 1 : p.background === 'dark' ? 0 : p.surround;
+  if (src) drawGray(c, src, 640, bg);
 }
 
 // ---------- Saving ----------
@@ -304,6 +307,15 @@ function photoTab() {
         ? note('The Moon is set to "Moon only", so the photo is not used. Choose "Photo + Moon" on the Ball tab to show it.', 'warn')
         : null,
     ),
+    app.base && app.base.alpha ? section('Background (cut-out photo)',
+      note('This photo has a transparent background. Choose what shows there:'),
+      segmented('photo.background', [
+        { value: 'blend', label: 'Blend into ball', title: 'The subject floats on the plain ball (or the Moon)' },
+        { value: 'bright', label: 'Bright', title: 'A glowing halo behind the subject' },
+        { value: 'dark', label: 'Dark', title: 'A dark background so the subject stands out' },
+      ], 'field', () => { drawThumb(); renderTab(); }),
+      slider('photo.edgeSoft', 'Edge softness', 0, 10, 0.5, { fmt: mm }),
+    ) : null,
     section('Tone',
       slider('photo.blackPoint', 'Black point', 0, 0.6, 0.005, { fmt: num2, group: 'tone' }),
       slider('photo.whitePoint', 'White point', 0.4, 1, 0.005, { fmt: num2, group: 'tone' }),
@@ -604,9 +616,10 @@ function exportStl() {
     }
     done();
   };
-  const photo = app.processed ? { w: app.processed.w, h: app.processed.h, data: app.processed.data.slice() } : null;
+  const pr = app.processed;
+  const photo = pr ? { w: pr.w, h: pr.h, data: pr.data.slice(), alpha: pr.alpha ? pr.alpha.slice() : null } : null;
   const moon = isMoonShape() ? app.moonMap : null;
-  worker.postMessage({ settings: structuredClone(s), photo, textMasks: app.textMasks, moon, stepInner: step, stepOuter: OUTER_STEP }, photo ? [photo.data.buffer] : []);
+  worker.postMessage({ settings: structuredClone(s), photo, textMasks: app.textMasks, moon, stepInner: step, stepOuter: OUTER_STEP }, photo ? [photo.data.buffer, ...(photo.alpha ? [photo.alpha.buffer] : [])] : []);
 }
 
 // ---------- Wiring ----------

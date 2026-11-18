@@ -144,6 +144,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Cube printing:** one piece printed upside down (top face on the bed), no supports. Thicknesses on the top face are built from flat layers, so very fine shading there is limited by layer height.
 - **Cube even glow:** thinning for distance from the light never goes below the minimum thickness, so it can only brighten dim areas up to the brightest setting; with strength at 0 the cube is shaded by the photos alone.
 - **Printing assumption:** one piece printed opening-down. The steep curve just above the opening needs slicer supports, so the app doesn't add any.
+- **Cut-out photos** (PNG/WebP with a transparent background, e.g. from a phone's "lift subject" or Windows Photos' background removal): the transparent area shows as the chosen **Background**: **blend into the ball** (default; the plain ball or Moon carries on behind the subject, so no window edge shows), **bright** or **dark**, with an **edge softness** slider (default 2 mm). Automatic adjustments look only at the visible subject. The photo is kept as PNG so the transparency survives saving and reopening. *(0.4.1)*
 - **SVG files** have no fixed pixel size, so they are always drawn at full working resolution (2400 px on the long side), whatever size the file lists. *(0.2)*
 - **Very large or tiny photos:** large photos are scaled down to what the chosen detail level can use. Tiny photos show a "low resolution, may look blurry" warning.
 - **AI features failing** (older browser, model won't load): the photo still works without them and a banner says which feature is unavailable.
@@ -182,6 +183,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Baseball / softball | Curved seam plus V-shaped stitches on both sides | You (2026-11-18) |
 | Volleyball | Classic 18-panel: six groups of three strips, neighbours turned 90° | You (2026-11-18) |
 | Moon look | NASA surface brightness map (dark maria, bright craters, as seen from Earth) plus a crater-depth slider from NASA's height map | You (2026-11-18) |
+| Cut-out photo background | Blend into the ball by default; bright and dark also offered; edge softness slider | You chose to add it (2026-11-18); default assumed (Claude's) |
 | Text size default | Letters 15 mm tall; app warns below 6 mm (script below 10 mm) since thin strokes may not print | Assumed (Claude's default) |
 | Football mounting | Lying on its side | You |
 | Overhang | Slicer supports; one-piece shell | You |
@@ -261,6 +263,11 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 0.4.1: cut-out photos, done (2026-11-18)
+Built: photos with transparent backgrounds are recognised; a "Background (cut-out photo)" section on the Photo tab chooses blend into ball / bright / dark plus edge softness; auto adjustments ignore the empty area; the grey map shows the background as it will print; the photo is stored as PNG when it has transparency.
+
+Checks passed: 28 automated tests (4 new: each background choice, blend matching the plain ball with no window edge, edge softness, unchanged behaviour for normal photos). In the browser with your cut-out baby photo: transparency detected (46% of the picture), stored as PNG, background prints at the plain-ball thickness (1.79 mm) and the basketball lines carry on behind her; the Dark option darkens the area around her.
 
 ### Version 0.4: soccer, baseball/softball, volleyball, Moon, done (2026-11-18)
 Built: soccer ball (32 panels from a true truncated icosahedron; seams plus darker pentagons with a "Pentagon darkness" slider); baseball/softball (the classic seam curve with 108 V-shaped stitches on both sides); classic 18-panel volleyball; Moon from two NASA maps (vendor/moon, about 570 KB, credited in vendor/moon/CREDIT.txt): "Moon only" or "Photo + Moon", crater depth and turn sliders, near side facing front with east to the right as seen from Earth. A Moon-only lamp needs no photo, so the "choose a photo" card is hidden for it. Lines on all shapes use the existing carved / raised / off, width, darkness, fade and turn settings, and stop around text.

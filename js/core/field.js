@@ -9,6 +9,17 @@ import { THETA_FRONT, wrapAngle } from './shapes.js';
 import { MARKING_TYPES, rotationMatrix } from './markings.js';
 import { SHAPES, markingWidth } from './settings.js';
 import { createTextLayer } from './textLayer.js';
+import { boxBlur } from './blur.js';
+
+// Softened copies of cut-out photo transparency, reused while the softness stays the same
+const softAlphaCache = new WeakMap();
+function softAlpha(alpha, w, h, r) {
+  const hit = softAlphaCache.get(alpha);
+  if (hit && hit.r === r) return hit.soft;
+  const soft = r >= 1 ? boxBlur(alpha, w, h, r) : alpha;
+  softAlphaCache.set(alpha, { r, soft });
+  return soft;
+}
 
 const smooth = (e0, e1, x) => {
   const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
@@ -20,7 +31,8 @@ const MOUNT_ARC = 4;        // mm above the opening edge kept plain (no photo/ma
 const MOUNT_BLEND = 6;      // mm to blend from the plain mount band into the design
 
 /**
- * photo: { w, h, data: Float32Array brightness 0..1 } or null
+ * photo: { w, h, data: Float32Array brightness 0..1, alpha?: Float32Array 0..1 } or null
+ *        (alpha = transparency of a cut-out photo; see settings.photo.background)
  * textMasks: rendered text masks by item id (see textLayer.js), or null
  * moon: { w, h, data: Float32Array brightness 0..1 } equirectangular Moon map (see moon.js), or null
  * Returns { eval(theta, s, out) } where out receives:
@@ -52,6 +64,14 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
   const moonSpin = ((settings.moon?.spin || 0) * Math.PI) / 180;
   const usePhoto = photo && !moonOnly;
 
+  // Cut-out photos: what shows where the photo is transparent, and how soft its outline is
+  const bgMode = p.background || 'blend'; // 'blend' (the plain ball / Moon) | 'bright' | 'dark'
+  let alphaMap = null;
+  if (usePhoto && photo.alpha) {
+    const mmPerPx = (W * Math.max(0.05, p.zoom) * Math.max(1, aspect / imgAspect)) / photo.w;
+    alphaMap = softAlpha(photo.alpha, photo.w, photo.h, Math.round(Math.max(0, p.edgeSoft ?? 2) / 2 / mmPerPx));
+  }
+
   // Markings
   const markFn = mk.style === 'off' ? null : MARKING_TYPES[SHAPES[settings.shape]?.markings] || null;
   const R = rotationMatrix(mk.yaw, mk.pitch, mk.roll);
@@ -66,14 +86,13 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
   const textLayer = createTextLayer(settings, shape, textMasks);
   const tx = { hits: [], clear: 0 };
 
-  function samplePhoto(u, v) { // u,v in 0..1 image space
+  function samplePhoto(u, v, d = photo.data) { // u,v in 0..1 image space
     const fx = u * photo.w - 0.5, fy = v * photo.h - 0.5;
     const x0 = Math.floor(fx), y0 = Math.floor(fy);
     const wx = fx - x0, wy = fy - y0;
     const W1 = photo.w - 1, H1 = photo.h - 1;
     const xa = x0 < 0 ? 0 : x0 > W1 ? W1 : x0, xb = x0 + 1 > W1 ? W1 : x0 + 1 < 0 ? 0 : x0 + 1;
     const ya = y0 < 0 ? 0 : y0 > H1 ? H1 : y0, yb = y0 + 1 > H1 ? H1 : y0 + 1 < 0 ? 0 : y0 + 1;
-    const d = photo.data;
     const a = d[ya * photo.w + xa] * (1 - wx) + d[ya * photo.w + xb] * wx;
     const b = d[yb * photo.w + xa] * (1 - wx) + d[yb * photo.w + xb] * wx;
     return a * (1 - wy) + b * wy;
@@ -123,7 +142,16 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
         const u = 0.5 + p.panX + qx / cover;
         const v = 0.5 + p.panY + qy / (cover * imgAspect);
         if (u >= 0 && u <= 1 && v >= 0 && v <= 1) {
-          bright = base + (samplePhoto(u, v) - base) * mask;
+          let val = samplePhoto(u, v);
+          let a = 1;
+          if (alphaMap) {
+            a = samplePhoto(u, v, alphaMap);
+            const bg = bgMode === 'bright' ? 1 : bgMode === 'dark' ? 0 : base;
+            val = val * a + bg * (1 - a);
+          }
+          bright = base + (val - base) * mask;
+          // Blend: lines and the plain ball carry on behind the subject, so they no longer count as photo
+          if (alphaMap && bgMode === 'blend') mask *= a;
         } else {
           mask = 0;
         }

@@ -47,6 +47,8 @@ export function defaultSettings() {
       windowShape: 'rect',    // 'rect' | 'oval'
       projection: 'natural',  // 'natural' (no squeeze) | 'wrap' (fills 360°)
       surround: 0.55,         // brightness of the plain ball outside the photo (0 dark .. 1 bright)
+      background: 'blend',    // cut-out photos: transparent areas 'blend' into the ball | 'bright' | 'dark'
+      edgeSoft: 2,            // cut-out photos: how gently the subject's outline fades (mm)
     },
     markings: {
       style: 'carved',        // 'carved' | 'raised' | 'off'
