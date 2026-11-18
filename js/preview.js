@@ -193,7 +193,7 @@ export class Preview {
     this.collar = new THREE.Mesh(collarGeom, this.mode === 'plain' ? this.plainMat : this.collarGlow);
     this.group.add(this.collar);
 
-    // A simple round base below the collar (stand-in until the base generator exists)
+    // A simple round base below the collar until the real one (setBase) has been built
     const baseR = collar.ro + 22, baseH = 22;
     const base = new THREE.Mesh(new THREE.CylinderGeometry(baseR, baseR + 4, baseH, 96), this.baseMat);
     base.rotation.x = Math.PI / 2;
@@ -212,10 +212,40 @@ export class Preview {
     }));
     pool.position.z = zBot - baseH + 0.2;
     this.group.add(pool);
+    Object.assign(this, { _zBot: zBot, _standBase: base, _ring: ring, _floor: floor, _pool: pool, _lampTop: shape.c, _lampW: shape.a });
 
     // Frame the ball + base: fit the taller of (height, width/aspect) into the vertical field of view
     this._frameBox = { w: Math.max(shape.a, baseR) * 2, h: shape.c - (zBot - baseH) };
     this.controls.target.set(0, 0, (zBot - baseH + shape.c) / 2);
+    if (this._baseMesh) this._placeBase();
+  }
+
+  /**
+   * Shows the real base (a mesh in base coordinates: standing at z = 0) under the lamp, with its
+   * seat floor where the collar's bottom is. info: { seatFloor, width }.
+   */
+  setBase(positions, indices, info) {
+    if (this._baseMesh) { this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose(); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    g.setIndex(new THREE.BufferAttribute(indices, 1));
+    g.computeVertexNormals();
+    this._baseMesh = new THREE.Mesh(g, this.baseMat);
+    this._baseInfo = info;
+    this.group.add(this._baseMesh);
+    this._placeBase();
+  }
+
+  _placeBase() {
+    if (this._zBot == null) return;
+    const bottom = this._zBot - this._baseInfo.seatFloor;
+    this._baseMesh.position.z = bottom;
+    if (this._standBase) this._standBase.visible = false;
+    if (this._ring) this._ring.visible = false;
+    if (this._floor) this._floor.position.z = bottom;
+    if (this._pool) this._pool.position.z = bottom + 0.2;
+    this._frameBox = { w: Math.max(this._lampW, this._baseInfo.width / 2) * 2, h: this._lampTop - bottom };
+    this.controls.target.set(0, 0, (bottom + this._lampTop) / 2);
   }
 
   frame() {

@@ -15,6 +15,8 @@ import { buildTextMasks, masksCurrent, loadAllFonts } from './text.js';
 import { loadMoon } from './moonData.js';
 import { moonMap } from './core/moon.js';
 import { APP_VERSION } from './version.js';
+import { buildBase, SOCKETS } from './core/base.js';
+import { meshSdf } from './core/sdf.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
 
@@ -36,6 +38,9 @@ const app = {
   tab: 'photo',
   exporting: false,
   lastExport: null,
+  lastBaseExport: null,
+  baseInfo: null,    // sizes of the current base (see core/base.js)
+  baseKey: null,     // settings the preview base was last built from
   showOriginal: false,
   dirty: { tone: false, shape: true, field: true },
 };
@@ -104,7 +109,7 @@ function update(quick) {
     updateThicknessLegend();
     if (quick) preview.updateTexture(app.field, s, 560, 280); // fast while dragging; sharp pass follows
     else preview.updateTexture(app.field, s, 1600, 800);
-    if (!quick) { app.dirty.field = false; if (app.tab === 'export') renderTab(); }
+    if (!quick) { app.dirty.field = false; refreshBasePreview(); if (app.tab === 'export') renderTab(); }
   } catch (err) {
     console.error(err);
     toast(err.message || String(err), 'err');
@@ -212,6 +217,25 @@ function projectBaseName() {
   const size = s.shape === 'football' ? `${s.footballLength}x${s.footballWidth}mm`
     : isCube() ? `${s.cube.size}mm` : `${s.diameter}mm`;
   return `${n}-${s.shape}-${size}`;
+}
+
+// ---------- Base preview (a quick, coarse version of the base under the lamp) ----------
+function refreshBasePreview() {
+  const s = app.settings;
+  if (!app.shape) return;
+  const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening]);
+  if (key === app.baseKey) return;
+  app.baseKey = key;
+  try {
+    const base = buildBase(s, app.shape);
+    app.baseInfo = base.info;
+    const mesh = meshSdf(base.sdf, base.bounds, 1.2);
+    preview.setBase(mesh.positions, mesh.indices, base.info);
+    app.lastBaseExport = null;
+    if (app.tab === 'base') renderTab();
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 // ---------- Moon maps (loaded the first time the Moon shape is chosen) ----------
@@ -334,7 +358,7 @@ function renderTab() {
   const body = $('tabBody');
   const scroll = body.scrollTop;
   // Sections can be left out with null; skip those (replaceChildren would show them as "null")
-  body.replaceChildren(...({ photo: photoTab, ball: ballTab, markings: markingsTab, text: textTab, export: exportTab }[app.tab])().filter(Boolean));
+  body.replaceChildren(...({ photo: photoTab, ball: ballTab, markings: markingsTab, text: textTab, base: baseTab, export: exportTab }[app.tab])().filter(Boolean));
   body.scrollTop = scroll;
   if (app.tab === 'photo') { drawThumb(); drawRowThumbs(); }
 }
@@ -668,6 +692,77 @@ function textTab() {
   return out;
 }
 
+function numberInput(path, label, lo, hi) {
+  const s = app.settings;
+  const i = el('input', { type: 'number', min: lo, max: hi, step: 0.5, value: getPath(s, path), style: 'width:76px', 'aria-label': label });
+  i.addEventListener('change', () => {
+    const v = Math.min(hi, Math.max(lo, parseFloat(i.value) || getPath(s, path)));
+    i.value = v; setPath(s, path, v); changed('field'); renderTab();
+  });
+  return el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, label), i);
+}
+
+function baseTab() {
+  const s = app.settings, b = s.base, info = app.baseInfo;
+  const col = collarDims(s);
+  const kind = b.light;
+  const lightSection = section('Light',
+    segmented('base.light', [
+      { value: 'puck', label: 'LED puck', title: 'The puck sits inside the base and shines up through the opening' },
+      { value: 'strip', label: 'LED strip on a riser', title: 'A hollow post rises into the lamp; wrap an LED strip around it' },
+      { value: 'bulb', label: 'Bulb socket', title: 'Holds an E12 or E26 lamp socket on a threaded nipple' },
+    ], 'field', () => renderTab()),
+    kind === 'puck' ? [
+      numberInput('base.puckD', 'Puck diameter (mm)', 30, 160),
+      numberInput('base.puckH', 'Puck height (mm)', 5, 60),
+      note('Measure your puck with calipers. The base leaves a little room around it.'),
+    ] : null,
+    kind === 'strip' ? [
+      slider('base.riserD', 'Riser diameter', 16, Math.floor(col.ri * 2 - 3), 0.5, { fmt: mm }),
+      slider('base.riserH', 'Riser height', 0, 200, 1, { fmt: (v) => (+v > 0 ? mm(v) : 'Auto (middle of the lamp)') }),
+      note('Wrap the LED strip around the riser. Its wire goes in through the hole near the top and down to the notch.'),
+    ] : null,
+    kind === 'bulb' ? [
+      segmented('base.socket', Object.entries(SOCKETS).map(([k, v]) => ({ value: k, label: v.label })), 'field', () => renderTab()),
+      note(`The socket screws onto a 1/8" threaded lamp nipple through the top. The bulb must fit through the ${(col.ri * 2).toFixed(0)} mm opening.`),
+      info && info.socketFits === false ? note('This socket is wider than the opening. Use a smaller socket or a bigger opening (Ball tab).', 'warn') : null,
+    ] : null,
+  );
+  const shapeOpts = segmented('base.shape', [
+    { value: 'auto', label: 'Match the lamp', title: 'Round under balls, square under the cube' },
+    { value: 'round', label: 'Round' },
+    { value: 'square', label: 'Square' },
+  ], 'field', () => renderTab());
+  const progress = el('div', { class: 'progress', hidden: !app.exporting }, el('div', { id: 'exportBar' }));
+  const st = app.lastBaseExport;
+  return [
+    lightSection,
+    section('Fit and size',
+      slider('base.clearance', 'Collar fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm }),
+      note('Too tight? Add room. Too loose? Take some away.'),
+      el('div', { class: 'ctl' }, el('label', {}, 'Base shape')), shapeOpts,
+      slider('base.extra', 'Extra width', 0, 40, 1, { fmt: mm }),
+      slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }),
+      slider('base.cableH', 'Cable notch height', 3, 20, 0.5, { fmt: mm }),
+    ),
+    section('Export base',
+      info ? note(`Base: ${info.width.toFixed(0)} mm ${info.square ? 'square' : 'across'}, ${info.height.toFixed(0)} mm tall`
+        + (info.riserHeight ? `, riser ${info.riserHeight.toFixed(0)} mm above it.` : '.')) : null,
+      info ? note(info.flip
+        ? 'Prints upside down (top on the bed): the STL is already turned. No supports needed.'
+        : 'Prints standing up, as it sits on the table. No supports needed.') : null,
+      el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: exportBaseStl },
+        app.exporting ? 'Building…' : 'Export base STL'),
+      progress,
+      st ? el('div', { class: 'stats' },
+        'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
+        'Size', el('b', {}, `${st.size.map((v) => v.toFixed(1)).join(' × ')} mm`),
+        'Plastic', el('b', {}, `≈ ${Math.round(st.volumeCm3 * 1.24)} g PLA (${st.volumeCm3.toFixed(0)} cm³)`),
+      ) : null,
+    ),
+  ];
+}
+
 function fitCheck(size, diag) {
   const b = app.settings.bed;
   const [x, y, z] = size;
@@ -727,11 +822,43 @@ function exportTab() {
       isCube()
         ? note('The cube STL is already turned upside down: top face on the bed. No supports needed.')
         : note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
-      !hasPhotos() ? note('No photo yet: this exports a plain ball with markings.', 'warn') : null),
+      !hasPhotos() ? note('No photo yet: this exports a plain ball with markings.', 'warn') : null,
+      note('The base is a separate file: Base tab, Export base STL.')),
   ];
 }
 
 // ---------- Export ----------
+function exportBaseStl() {
+  if (app.exporting || !app.shape) return;
+  const s = app.settings;
+  app.exporting = true; renderTab();
+  const workerUrl = new URL('./exportWorker.js', import.meta.url);
+  const worker = new Worker(workerUrl, { type: 'module' });
+  const done = () => { app.exporting = false; worker.terminate(); renderTab(); };
+  worker.onmessage = (e) => {
+    const msg = e.data;
+    if (msg.type === 'progress') {
+      const bar = document.getElementById('exportBar');
+      if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
+    } else if (msg.type === 'done') {
+      const fileName = `${projectBaseName()}-base-${s.base.light}.stl`;
+      download(new Blob([msg.stl], { type: 'model/stl' }), fileName);
+      app.lastBaseExport = { ...msg.stats, fileName };
+      toast(`Saved ${fileName}`);
+      done();
+    } else if (msg.type === 'error') {
+      toast(`Base export failed: ${msg.message}`, 'err');
+      done();
+    }
+  };
+  worker.onerror = async () => {
+    const serverUp = await fetch(workerUrl, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok, () => false);
+    toast(serverUp ? 'Base export failed.' : 'Export could not start: the app\'s local server is not running. Run start.bat again, then export.', 'err');
+    done();
+  };
+  worker.postMessage({ kind: 'base', settings: structuredClone(s) });
+}
+
 function exportStl() {
   if (app.exporting || !app.shape) return;
   const s = app.settings;

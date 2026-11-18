@@ -219,7 +219,11 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Sizes | Small / Medium / Large presets (100 / 150 / 200 mm balls), Medium default, plus custom | You |
 | Printer bed | 256 × 256 × 256 mm, with a fit warning | You |
 | Large football | 280 × 175 mm, printed diagonally on the bed | Assumed (Claude's default) |
-| Light riser | Optional in the base, on by default for Large | Assumed (Claude's default) |
+| Light riser | Part of the "LED strip on a riser" base: a hollow post you wrap an LED strip around, rising toward the middle of the lamp (a puck can't pass through the 50 mm opening) | You chose the three light types (2026-11-18); riser design assumed (Claude's) |
+| Base light types | LED puck (default), LED strip on a riser, bulb socket (E12 / E26) | You (2026-11-18) |
+| Base shape | Matches the lamp: round under balls and the Moon, square under the cube | You (2026-11-18) |
+| Base openings | A cable notch only (your puck's button is on the cable or remote) | You (2026-11-18) |
+| Puck size (until measured) | 70 × 20 mm | You (measure later) |
 | Print time | Not a concern; quality over speed | You |
 | Opening / collar | 50 mm opening, 5 mm collar | You |
 | Printing | White PLA, 0.4 mm nozzle, opening-down | Assumed (you accepted defaults) |
@@ -236,7 +240,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 
 ## Open questions
 - **Your current process and tools:** not yet described. Knowing which software and settings give you good prints today would help tune the defaults. (You)
-- **Your puck light:** its diameter and height, so the default base fits it. (You, ideally with calipers)
+- **Your puck light:** its diameter and height. The base uses 70 × 20 mm until you measure it (the Base tab has boxes for both). (You, ideally with calipers)
 - **Football shape:** the default tip shape (60%) is a guess at a real football; check it against a real ball on the first football print and adjust the default if needed. (You, after first football print)
 - **Cube underside:** the 45° funnel under the cube hangs about 20 mm below the bottom of the walls on the Medium cube (total height 125 mm with the collar). Check on the first cube print that it looks right sitting on your base. (You, at the cube test print)
 - **Even glow for balls too?** The same distance correction could help Large balls. Decide after seeing it on the cube. (You, after 0.7)
@@ -268,6 +272,17 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 0.8: base generator, done (2026-11-18)
+Built: a Base tab and a separate "Export base STL". Three light types:
+- **LED puck** (default 70 × 20 mm until you measure yours): the puck goes in from below, light shines up through a hole nearly as wide as the opening. Prints upside down (top on the bed); the STL is already turned.
+- **LED strip on a riser**: a hollow 30 mm post (adjustable, always narrower than the opening) rising to about the middle of the lamp, with a wire hole near its top; underneath, room for the strip's controller under a 45° ceiling. Prints standing up.
+- **Bulb socket (E12 / E26)**: a 1/8" threaded-nipple hole through the top and room below for the nut and wiring; warns if the socket is wider than the opening. Prints upside down.
+Every base has the collar seat (collar fit adjustable, 0.4 mm extra room by default), a cable notch at the back (width and height adjustable), extra width, and a shape that matches the lamp (round under balls and the Moon, square under the cube) or is set to round or square. The 3D preview now shows the real base under the lamp. Bases are built from solid shapes (new core/sdf.js) and meshed closed.
+
+Checks passed: 56 automated tests (11 new: the mesher's size and volume; every light type under a ball, the cube and the football is a closed solid and turns over correctly; the collar seat, clearance and floor; puck cavity, light path and notch; riser width and height; round vs square). In the browser: the square base under the cube and the round base with the riser under the ball draw correctly; a bulb-base export took about half a second (84 × 84 × 36 mm, 16 MB).
+
+To check on a print: the collar fit in the seat (tighter or looser), and your puck's real size.
 
 ### Version 0.7: cube, done (2026-11-18)
 Built: "Cube (5 photos)" shape: 80 / 100 / 130 mm presets plus custom size, adjustable edge rounding (5 mm default), same 50 mm opening and collar. Underneath, a 45° funnel runs from the rounded bottom edges down to the opening; its slices are rounded squares that match the cube where they meet, so there are no flat ceilings to print. (Only about 1 mm of each bottom corner's rounding shows past the funnel: patches of 1-2 mm.) Photos on the cube use the new "Straight-on" (planar) projection, so they sit on the flat faces without distortion; new photos go front, back, left, right, top, each filling its face minus the "Photo border" (5 mm default), and "Fit photos to faces" re-places them in list order. The top photo is upright seen from the front. Even glow (on by default, strength 50%) thins the wall where less light from the base arrives and thickens it where more does; the lit preview uses the same light model for the cube. The exported cube STL is already turned upside down (top face on the bed).

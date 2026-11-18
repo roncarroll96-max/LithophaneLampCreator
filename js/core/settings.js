@@ -57,6 +57,10 @@ export function defaultSettings() {
       border: 5,              // plain border around each face photo, mm
     },
     evenGlow: { on: true, strength: 0.5 }, // cube: thinner plastic farther from the light
+    base: {
+      light: 'puck', puckD: 70, puckH: 20, socket: 'E12', riserD: 30, riserH: 0,
+      clearance: 0.4, shape: 'auto', extra: 0, cableW: 10, cableH: 8,
+    },                        // the lamp base (see core/base.js)
     moon: {
       mode: 'moon',           // 'moon' (Moon only) | 'photo' (photo in a front window, fading into the Moon)
       craters: 0.4,           // how strongly NASA's height map deepens craters (0..1)
