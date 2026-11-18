@@ -5,6 +5,10 @@ photos never leave your computer.
 
 See [APP-SPEC.md](APP-SPEC.md) for the full specification.
 
+## Use it online
+Open **<https://roncarroll96-max.github.io/LithophaneLampCreator/>** on a computer, tablet or phone.
+Nothing to install, and your photos stay on your device.
+
 ## Run it on this PC
 Double-click **start.bat**. It starts a tiny local web server and opens
 <http://localhost:5178> in your browser. Close the black window to stop it.
