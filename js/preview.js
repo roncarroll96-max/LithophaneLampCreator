@@ -1,5 +1,5 @@
-// 3D preview (Three.js): the ball on its lighted base, shown either glowing (simulated backlight)
-// or as a plain grey model for checking shape and raised markings.
+// 3D preview (Three.js): the ball on its lighted base, shown glowing (simulated backlight),
+// as a plain grey model for checking shape and raised markings, or as a thickness map.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
@@ -41,6 +41,9 @@ export class Preview {
     this.texture.minFilter = THREE.LinearMipmapLinearFilter;
     this.texture.generateMipmaps = true;
     this.glowMat = new THREE.MeshBasicMaterial({ map: this.texture, color: AMBER });
+    this.raycaster = new THREE.Raycaster();
+    this.onHover = null; // (u, v) on the ball surface, or null when the pointer is off the ball
+    this._last = null;   // last field/settings/size, so switching views can redraw the texture
     this.plainMat = new THREE.MeshStandardMaterial({ color: 0xd9d4ca, roughness: 0.65, metalness: 0 });
     this.ballGeom = new THREE.BufferGeometry();
     this.ball = new THREE.Mesh(this.ballGeom, this.glowMat);
@@ -52,6 +55,16 @@ export class Preview {
     this.collarGlow = new THREE.MeshBasicMaterial({ color: AMBER.clone().multiplyScalar(0.55) });
     this.baseMat = new THREE.MeshStandardMaterial({ color: 0x1b171d, roughness: 0.35, metalness: 0.2 });
     this.floorMat = new THREE.MeshStandardMaterial({ color: 0x120e13, roughness: 0.9 });
+
+    const el = this.renderer.domElement;
+    let hoverPending = false, lastEvt = null;
+    el.addEventListener('pointermove', (e) => {
+      lastEvt = e;
+      if (hoverPending || !this.onHover || this.mode !== 'thickness') return;
+      hoverPending = true;
+      requestAnimationFrame(() => { hoverPending = false; this._hover(lastEvt); });
+    });
+    el.addEventListener('pointerleave', () => this.onHover && this.onHover(null));
 
     this._resize = () => this.resize();
     new ResizeObserver(this._resize).observe(container);
@@ -68,10 +81,25 @@ export class Preview {
   }
 
   setMode(mode) {
+    const wasThickness = this.mode === 'thickness';
     this.mode = mode;
     this.ball.material = mode === 'plain' ? this.plainMat : this.glowMat;
+    this.glowMat.color.copy(mode === 'thickness' ? new THREE.Color(1, 1, 1) : AMBER);
     this.collar && (this.collar.material = mode === 'plain' ? this.plainMat : this.collarGlow);
-    this.scene.background.set(mode === 'plain' ? 0x1d1a20 : 0x0d0a0f);
+    this.scene.background.set(mode === 'glow' ? 0x0d0a0f : 0x1d1a20);
+    if ((mode === 'thickness') !== wasThickness && this._last) {
+      const { field, settings } = this._last;
+      this.updateTexture(field, settings, 1600, 800);
+    }
+    if (mode !== 'thickness' && this.onHover) this.onHover(null);
+  }
+
+  _hover(e) {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const p = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    this.raycaster.setFromCamera(p, this.camera);
+    const hit = this.raycaster.intersectObject(this.ball, false)[0];
+    this.onHover(hit && hit.uv ? { u: hit.uv.x, v: hit.uv.y, x: e.clientX - r.left, y: e.clientY - r.top } : null);
   }
 
   /** Rebuilds the ball surface (needed when shape, size or raised markings change). */
@@ -88,7 +116,8 @@ export class Preview {
 
   /** Recomputes the glow texture. Width/height control sharpness vs speed. */
   updateTexture(field, settings, TW, TH) {
-    const data = buildGlowTexture(field, settings, TW, TH, 'glow');
+    this._last = { field, settings };
+    const data = buildGlowTexture(field, settings, TW, TH, this.mode === 'thickness' ? 'thickness' : 'glow');
     const old = this.texture;
     const tex = new THREE.DataTexture(data, TW, TH, THREE.RGBAFormat);
     tex.colorSpace = THREE.SRGBColorSpace;

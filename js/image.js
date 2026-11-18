@@ -3,8 +3,44 @@
 
 const MAX_SIDE = 2400; // enough for Large balls at Fine detail
 
-/** Decodes an image file (JPG/PNG/WebP, HEIC where the browser supports it). */
+const isSvg = (blob) => blob.type === 'image/svg+xml' || /\.svg$/i.test(blob.name || '');
+
+/**
+ * SVGs have no fixed pixel size: browsers draw them at whatever width/height the file lists,
+ * which can be tiny. Draw them at MAX_SIDE on the long side instead, keeping their shape.
+ */
+async function rasterizeSvg(blob) {
+  const doc = new DOMParser().parseFromString(await blob.text(), 'image/svg+xml');
+  const svg = doc.documentElement;
+  if (!svg || svg.nodeName.toLowerCase() !== 'svg') throw new Error('That SVG file could not be read.');
+  let w = 0, h = 0;
+  const vb = (svg.getAttribute('viewBox') || '').trim().split(/[\s,]+/).map(Number);
+  if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) { w = vb[2]; h = vb[3]; }
+  else { w = parseFloat(svg.getAttribute('width')) || 0; h = parseFloat(svg.getAttribute('height')) || 0; }
+  if (!(w > 0 && h > 0)) { w = 1; h = 1; }
+  if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const scale = MAX_SIDE / Math.max(w, h);
+  const W = Math.max(1, Math.round(w * scale)), H = Math.max(1, Math.round(h * scale));
+  svg.setAttribute('width', W); svg.setAttribute('height', H);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }));
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    c.getContext('2d').drawImage(img, 0, 0, W, H);
+    return c;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Decodes an image file (JPG/PNG/WebP/SVG, HEIC where the browser supports it). */
 export async function decodeImage(blob) {
+  if (isSvg(blob)) {
+    try { return await rasterizeSvg(blob); } catch { /* fall through to the normal path */ }
+  }
   try {
     return await createImageBitmap(blob, { imageOrientation: 'from-image' });
   } catch {

@@ -81,6 +81,20 @@ button, input, select { font: inherit; color: inherit; }
 }
 .seg.active { background: var(--panel-2); color: var(--amber); box-shadow: inset 0 0 0 1px #4a3a2a; }
 .view-reset { position: absolute; top: 12px; right: 12px; z-index: 2; background: rgba(20, 16, 22, .85); }
+.thick-legend {
+  position: absolute; left: 12px; bottom: 12px; z-index: 2; width: 220px; max-width: calc(100% - 24px);
+  background: rgba(20, 16, 22, .85); border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px;
+  backdrop-filter: blur(6px); font-size: 12px; pointer-events: none;
+}
+.thick-bar { height: 12px; border-radius: 3px; background: linear-gradient(90deg, #fff, #000); border: 1px solid var(--line); }
+.thick-labels { display: flex; justify-content: space-between; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.thick-hint { color: var(--muted); margin-top: 4px; }
+.thick-readout {
+  position: absolute; z-index: 3; pointer-events: none; transform: translate(14px, -50%);
+  background: rgba(20, 16, 22, .92); border: 1px solid #4a3a2a; color: var(--amber);
+  border-radius: 6px; padding: 3px 8px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 
 .empty-state {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;

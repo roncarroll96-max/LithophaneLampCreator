@@ -34,7 +34,14 @@
       <div class="view-toggle" role="group" aria-label="Preview style">
         <button class="seg active" data-view="glow">Lit</button>
         <button class="seg" data-view="plain">Plain</button>
+        <button class="seg" data-view="thickness" title="Grey map of wall thickness: white = thinnest, black = thickest">Thickness</button>
       </div>
+      <div class="thick-legend" id="thickLegend" hidden>
+        <div class="thick-bar"></div>
+        <div class="thick-labels"><span id="thickMin"></span><span id="thickMax"></span></div>
+        <div class="thick-hint">Point at the ball to read the wall thickness.</div>
+      </div>
+      <div class="thick-readout" id="thickReadout" hidden></div>
       <button class="btn ghost small view-reset" id="btnResetView">Reset view</button>
       <div class="empty-state" id="emptyState">
         <div class="empty-card">

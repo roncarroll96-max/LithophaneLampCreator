@@ -3,7 +3,10 @@
 // so what you see is what gets printed.
 //
 // Brighter photo pixel -> thinner wall (tMin) -> more light gets through.
-// The photo relief is on the INSIDE; the outside stays smooth except raised markings.
+// By default the photo relief is on the INSIDE and the outside stays smooth except raised
+// markings. With reliefSide 'outside' the inner surface stays smooth instead and the outer
+// surface sinks in where the wall is thinner (the wall thickness itself is the same).
+// Next to the opening the shell always uses the inside layout, so the collar is unchanged.
 
 import { THETA_FRONT, wrapAngle } from './shapes.js';
 import { MARKING_TYPES, rotationMatrix } from './markings.js';
@@ -28,6 +31,8 @@ export function createField(settings, shape, photo) {
   const p = settings.photo;
   const mk = settings.markings;
   const tMount = Math.min(Math.max(settings.opening.collarWall, tMin), tMax);
+  const reliefOutside = settings.reliefSide === 'outside';
+  const tRef = tMax + LINE_EXTRA; // deepest possible wall: the smooth inner surface sits this far in
 
   // Photo window (mm on the surface)
   const W = (p.coverage / 360) * shape.eqPerimeter;
@@ -118,19 +123,24 @@ export function createField(settings, shape, photo) {
     }
 
     // ---- Plain band above the opening so the ball seats cleanly on the collar
+    let outsideW = reliefOutside ? 1 : 0;
     const arcE = shape.merArc(theta, s);
     if (arcE < MOUNT_ARC + MOUNT_BLEND) {
       const mz = 1 - smooth(MOUNT_ARC, MOUNT_ARC + MOUNT_BLEND, arcE);
       t += (tMount - t) * mz;
       raise *= 1 - mz;
+      outsideW *= 1 - mz;
     }
 
+    // Outside relief: both surfaces move in by `sink`, so the wall stays t thick
+    const sink = outsideW * (tRef - t);
+    const o = raise - sink, inn = t + sink;
     out.t = t; out.raise = raise; out.mask = mask;
-    out.x = S.x + S.nx * raise; out.y = S.y + S.ny * raise; out.z = S.z + S.nz * raise;
-    out.ix = S.x - S.nx * t; out.iy = S.y - S.ny * t; out.iz = S.z - S.nz * t;
+    out.x = S.x + S.nx * o; out.y = S.y + S.ny * o; out.z = S.z + S.nz * o;
+    out.ix = S.x - S.nx * inn; out.iy = S.y - S.ny * inn; out.iz = S.z - S.nz * inn;
     out.sx = S.x; out.sy = S.y; out.sz = S.z;
     return out;
   }
 
-  return { eval: evalAt, window: { W, H }, hasRaised: raised && !!markFn, tMount };
+  return { eval: evalAt, window: { W, H }, hasRaised: raised && !!markFn, reliefOutside, tMount };
 }

@@ -1,7 +1,22 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18_
 
-**Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, AI photo tools, text, base generator, phone polish.
+**Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
+
+**Version plan** (agreed 2026-11-18; each release gets a test print before the next):
+
+| Version | Contents |
+|---|---|
+| 0.1.0 | Milestone 1 (done, tagged) |
+| 0.2 | Print-quality tools: thickness view in the preview, option to put the photo relief on the outside, SVGs always loaded at full resolution |
+| 0.3 | Text |
+| 0.4 | Soccer ball, baseball/softball, volleyball, Moon |
+| 0.5 | Football |
+| 0.6 | Several photos per ball |
+| 0.7 | Cube with a photo on each of its 5 visible faces |
+| 0.8 | Base generator and light riser |
+| 0.9 | AI photo tools (background, face brightening) |
+| 1.0 | Phone and tablet polish, final check against this spec |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -40,6 +55,19 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 10. **Volleyball**: curved 3-strip panel lines.
 11. **Plain sphere**: no markings.
 12. **Moon**: craters and dark maria from free NASA moon maps bundled with the app. Two modes per project: moon only (classic moon lamp), or photo in a front window that fades into the moon surface.
+12a. **Cube** (version 0.7): a cube lamp that sits on the same base as the balls.
+    - **A photo on each of the 5 visible faces**: front, back, left, right and top. Each face's photo has its own tone, position, zoom and rotation settings (built on the several-photos work in 0.6).
+    - **Plain border with a soft edge** around each photo, about 5 mm and adjustable, so nothing is cut off at a corner.
+    - **A face with no photo** glows plain, using the same plain-brightness setting as the balls.
+    - **Top photo** starts upright as seen from the front, and can be turned in 90° steps.
+    - **Slightly rounded edges and corners** (about 5 mm). Photos stop before the curve.
+    - **Sizes**: Small 80 mm, Medium 100 mm (default), Large 130 mm edge length, plus custom.
+    - **Same opening and collar as the balls** (50 mm opening), so it fits your current base and any base the app makes.
+    - **Even glow**: with one light at the bottom, the lower walls are brightest and the top face dimmest. The app makes the plastic slightly thinner the farther a spot is from the light, so the cube glows evenly. On/off switch and strength slider; the lit preview shows the result.
+    - **Text** (from 0.3) can be placed on cube faces.
+    - **Printed in one piece, upside down**: the top face lies flat on the bed and the four walls print straight up, the best direction for lithophane detail. The underside angles in toward the collar so it prints without supports. The top photo is printed lying flat, so it shows slightly less detail than the four walls.
+    - Wall thickness, detail levels, preview modes, bed check, export and saving work the same as for the balls.
+
 13. **Markings per design**: each marking set (lines, panels, laces, seams) can be **carved in** (thicker plastic, glows dark, smooth outside), **raised** (sticks out from the surface), or **off**. Line width and darkness are adjustable.
 14. **Size presets** plus a custom size field. The football scales with the preset:
 
@@ -49,6 +77,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
     | **Medium (default)** | 150 mm | 240 × 150 mm |
     | Large | 200 mm | 280 × 175 mm |
 
+    The cube has its own presets: Small 80, **Medium 100 (default)**, Large 130 mm edge length.
     The custom size and last-used preset are remembered.
 14a. **Printer bed check**: a setting holds your bed size (default 256 × 256 × 256 mm). The app warns if a part won't fit. If a part only fits placed diagonally (the Large football does), it says "rotate 45° in your slicer".
 
@@ -68,8 +97,8 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 
 **Preview and export**
 
-18. **3D preview** (rotate and zoom) with a toggle between **simulated backlit glow** (roughly how it looks on the base) and **plain grey model** (for checking shape and markings).
-19. **Lithophane thickness settings**: minimum (brightest) and maximum (darkest) wall thickness.
+18. **3D preview** (rotate and zoom) with a toggle between **simulated backlit glow** (roughly how it looks on the base), **plain grey model** (for checking shape and markings) and **thickness map** (white = thinnest, black = thickest, with a legend; pointing at the ball shows the wall thickness there in mm). *(Thickness map added in 0.2.)*
+19. **Lithophane thickness settings**: minimum (brightest) and maximum (darkest) wall thickness, and which side the photo detail is on: **inside** (default, smooth outside) or **outside** (detail faces the viewer and may look sharper; the outside is textured). The wall thickness is the same either way, and the band next to the collar is unchanged. *(Added in 0.2.)*
 20. **STL export** with a detail level chosen at export: **Draft / Standard / Fine**. Detail is the spacing between points on the photo side: Draft 0.5 mm, Standard 0.3 mm, Fine 0.2 mm (same for every size; the smooth outside uses 1 mm unless lines are raised). Measured sizes: Medium Standard ≈ 83 MB, Large Standard ≈ 150 MB, Medium Fine ≈ 178 MB; raised lines roughly double the file. It shows an estimated file size first. The ball and base export as separate files.
 21. **Exported shells are watertight** (no holes or flipped faces), so slicers accept them without repair.
 
@@ -105,7 +134,10 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Photo relief is on the inside** of the shell, so the outside stays smooth like a real ball. Only "raised" markings and text stick out *(assumed)*.
 - **Carved markings and text** use max thickness (or a set darkness) so they show dark when lit, layered over the photo.
 - **Opening and collar** are kept clear of photo relief and markings so the ball seats cleanly.
+- **Cube printing:** one piece printed upside down (top face on the bed), no supports. Thicknesses on the top face are built from flat layers, so very fine shading there is limited by layer height.
+- **Cube even glow:** thinning for distance from the light never goes below the minimum thickness, so it can only brighten dim areas up to the brightest setting; with strength at 0 the cube is shaded by the photos alone.
 - **Printing assumption:** one piece printed opening-down. The steep curve just above the opening needs slicer supports, so the app doesn't add any.
+- **SVG files** have no fixed pixel size, so they are always drawn at full working resolution (2400 px on the long side), whatever size the file lists. *(0.2)*
 - **Very large or tiny photos:** large photos are scaled down to what the chosen detail level can use. Tiny photos show a "low resolution, may look blurry" warning.
 - **AI features failing** (older browser, model won't load): the photo still works without them and a banner says which feature is unavailable.
 - **Export too big for the device:** warn before starting. If the browser runs out of memory, show a clear message suggesting a lower detail level, not a silent crash.
@@ -137,7 +169,19 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Overhang | Slicer supports; one-piece shell | You |
 | Base | App generates a base; puck (default), LED ring/strip, bulb socket | You |
 | Saving | Browser auto-save + project files | You |
-| Shapes | Basketball, soccer, football, baseball, volleyball, plain sphere, Moon | You |
+| Shapes | Basketball, soccer, football, baseball, volleyball, plain sphere, Moon, cube | You (cube added 2026-11-18) |
+| Cube: when | Version 0.7, after several photos per ball | You |
+| Cube: printing | One piece, upside down (top face on the bed), no supports | You |
+| Cube: edges | Slightly rounded, about 5 mm | You |
+| Cube: photo framing | Plain border about 5 mm with a soft edge, adjustable | You |
+| Cube: sizes | 80 / 100 / 130 mm edge, Medium 100 default, plus custom | You |
+| Cube: base fit | Same 50 mm opening and collar as the balls | You |
+| Cube: empty face | Plain glow at the plain-brightness setting | You |
+| Cube: extras | Text on faces only; no wrap-around photo, no copy-to-all button | You |
+| Cube: even glow | On by default, with on/off and strength slider | You |
+| Cube: top photo | Upright as seen from the front, turn in 90° steps | You |
+| Cube: underside | Angles in toward the collar so it prints without supports; exact shape settled during the build | Assumed (Claude's default) |
+| Cube: border and corner sizes | 5 mm border, 5 mm edge rounding | Assumed (Claude's default) |
 | Moon | Moon only or photo blended, per project | You |
 | Photos per ball | Several, placed freely (milestone 2); was one | You (changed 2026-11-18) |
 | Overlapping photos | The photo on top wins, with its soft edge blending into the one below | Assumed (Claude's default) |
@@ -169,6 +213,8 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Your current process and tools:** not yet described. Knowing which software and settings give you good prints today would help tune the defaults. (You)
 - **Your puck light:** its diameter and height, so the default base fits it. (You, ideally with calipers)
 - **Football shape:** a real football is more pointed than a perfect oval. Version 1 has a "tip sharpness" slider; confirm it matches your footballs. (You, after first test print)
+- **Cube underside:** the angled underside hangs a little below the walls. Check on the first cube print that it looks right sitting on your base, or whether the walls should reach further down. (You, at the cube test print)
+- **Even glow for balls too?** The same distance correction could help Large balls. Decide after seeing it on the cube. (You, after 0.7)
 - **File sizes:** measured (see feature 20). Still to confirm: does your slicer handle the Standard file comfortably? (You, at test print)
 
 ## How we'll know it works
@@ -178,6 +224,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 4. Save a project, close the browser, reopen it, and continue exactly where you left off. Send the project file to your friend and it opens the same for them.
 5. The Moon in moon-only mode shows recognisable maria and craters when lit.
 6. On a phone, you can load a photo, adjust it, preview, and export at Standard.
+7. A Medium cube with five different photos exports in one STL, prints upside down with no supports, sits on your current base, and glows evenly from bottom to top.
 
 ## Build progress
 
@@ -188,7 +235,14 @@ Checks passed: 8 automated geometry tests; exported STLs re-read from raw coordi
 
 Not built yet (milestone 2): multiple photos placed freely; soccer ball, football, baseball, volleyball, Moon; background removal and face brightening; text; base generator and light riser.
 
-### Test print (next step)
+### Version 0.2: done (2026-11-18)
+Built: Thickness view in the preview (legend plus a readout of the wall thickness under the pointer); "Photo detail on the inside / outside" option on the Ball tab (outside uses fine detail on the outer surface and a smooth inner surface, same wall thickness, collar band unchanged; file size about the same); SVGs drawn at full resolution.
+
+Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps the wall thickness, leaves the collar edge unchanged and never goes past the ball size); in the browser, a 120 px SVG loaded with no low-resolution warning, the Thickness view showed 0.80 mm on white and 2.54 mm on a grey area, and an outside-relief export completed with the estimated size.
+
+To check on a print: does outside relief look sharper than inside? A Small ball with the same photo, once each way, answers it.
+
+### Test print (milestone 1, done)
 Print Medium at Standard detail, opening down, with slicer supports for the curve above the collar. Report back:
 1. **Brightness:** are faces clear, too dark, or washed out?
 2. **Lines:** too dark, too faint, or right? Is the default angle OK?

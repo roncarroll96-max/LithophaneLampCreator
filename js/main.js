@@ -83,9 +83,11 @@ function update(quick) {
     }
     if (!app.shape) return;
     app.field = createField(s, app.shape, app.processed);
-    const raised = s.markings.style === 'raised';
-    if (shapeChanged || raised || !quick || app._wasRaised !== raised) preview.updateGeometry(app.field, !quick);
-    app._wasRaised = raised;
+    // Raised lines and outside relief change the outer surface, so the preview mesh follows them
+    const bumpy = s.markings.style === 'raised' || s.reliefSide === 'outside';
+    if (shapeChanged || bumpy || !quick || app._wasBumpy !== bumpy) preview.updateGeometry(app.field, !quick);
+    app._wasBumpy = bumpy;
+    updateThicknessLegend();
     if (quick) preview.updateTexture(app.field, s, 560, 280); // fast while dragging; sharp pass follows
     else preview.updateTexture(app.field, s, 1600, 800);
     if (!quick) { app.dirty.field = false; if (app.tab === 'export') renderTab(); }
@@ -321,7 +323,15 @@ function ballTab() {
     section('Wall thickness',
       slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
       slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5) }),
-      note('Typical white PLA: 0.8 mm to 3.0 mm.')),
+      note('Typical white PLA: 0.8 mm to 3.0 mm.'),
+      el('div', { class: 'ctl' }, el('label', {}, 'Photo detail on the')),
+      segmented('reliefSide', [
+        { value: 'inside', label: 'Inside', title: 'Smooth outside, like a real ball' },
+        { value: 'outside', label: 'Outside', title: 'Detail faces you; may look sharper when lit, outside is textured' },
+      ], 'field', () => renderTab()),
+      note(s.reliefSide === 'outside'
+        ? 'Outside: the photo is pressed into the outer surface. It may look sharper when lit, but the ball is no longer smooth.'
+        : 'Inside: the outside stays smooth like a real ball.')),
     section('Opening and collar',
       slider('opening.diameter', 'Opening diameter', 20, 90, 0.5, { fmt: mm, group: 'shape' }),
       slider('opening.collarHeight', 'Collar height', 2, 15, 0.5, { fmt: mm, group: 'shape' }),
@@ -392,7 +402,8 @@ function exportTab() {
   const opts = Object.entries(DETAIL_PRESETS).map(([k, d]) => {
     let sizeText = '';
     if (app.shape) {
-      const tris = estimateTriangles(app.shape, d.step, raised ? d.step : OUTER_STEP);
+      const outside = s.reliefSide === 'outside';
+      const tris = estimateTriangles(app.shape, outside ? OUTER_STEP : d.step, raised || outside ? d.step : OUTER_STEP);
       sizeText = `≈ ${(stlBytes(tris) / 1e6).toFixed(0)} MB`;
     }
     const radio = el('input', { type: 'radio', name: 'detail', value: k });
@@ -476,7 +487,27 @@ document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () 
 document.querySelectorAll('.view-toggle .seg').forEach((b) => b.addEventListener('click', () => {
   document.querySelectorAll('.view-toggle .seg').forEach((x) => x.classList.toggle('active', x === b));
   preview.setMode(b.dataset.view);
+  $('thickLegend').hidden = b.dataset.view !== 'thickness';
+  updateThicknessLegend();
 }));
+
+// ---------- Thickness view: legend and pointer readout ----------
+function updateThicknessLegend() {
+  const s = app.settings;
+  $('thickMin').textContent = `${s.tMin.toFixed(2)} mm`;
+  $('thickMax').textContent = `${s.tMax.toFixed(2)} mm`;
+}
+const hoverEv = {};
+preview.onHover = (h) => {
+  const box = $('thickReadout');
+  if (!h || !app.field) { box.hidden = true; return; }
+  app.field.eval(h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)), hoverEv);
+  box.textContent = hoverEv.raise > 0.01
+    ? `${hoverEv.t.toFixed(2)} mm + ${hoverEv.raise.toFixed(2)} raised`
+    : `${hoverEv.t.toFixed(2)} mm`;
+  box.style.left = `${h.x}px`; box.style.top = `${h.y}px`;
+  box.hidden = false;
+};
 $('btnResetView').addEventListener('click', () => preview.frame());
 
 const choosePhoto = () => $('filePhoto').click();

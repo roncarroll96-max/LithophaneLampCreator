@@ -14,8 +14,13 @@ self.onmessage = (e) => {
     const collar = collarDims(settings);
     const shape = buildEllipsoidShape(bodyAxes(settings), collar.ro);
     const field = createField(settings, shape, photo);
+    // stepInner is the fine (detail) spacing, stepOuter the coarse one for smooth surfaces.
+    // The photo relief needs the fine spacing on whichever side it is on.
+    const fine = stepInner, coarse = stepOuter;
     const mesh = buildShellMesh({
-      shape, field, stepInner, stepOuter: field.hasRaised ? stepInner : stepOuter, collar,
+      shape, field, collar,
+      stepInner: field.reliefOutside ? coarse : fine,
+      stepOuter: field.hasRaised || field.reliefOutside ? fine : coarse,
       onProgress: (v) => self.postMessage({ type: 'progress', value: v * 0.9 }),
     });
     const stl = writeBinarySTL(mesh.positions, mesh.indices, `Lithophane ${settings.shape} ${settings.diameter}mm`);

@@ -33,7 +33,8 @@ export function buildPreviewGrid(field, NT = 360, NS = 180) {
 
 /**
  * Glow texture, RGBA8, width TW over theta and height TH over s.
- * mode 'glow' = simulated backlight brightness; 'thickness' = grey map of wall thickness.
+ * mode 'glow' = simulated backlight brightness; 'thickness' = grey map of wall thickness
+ * (white = Thinnest, black = Thickest; carved and raised lines past Thickest stay black).
  */
 export function buildGlowTexture(field, settings, TW, TH, mode = 'glow') {
   const data = new Uint8Array(TW * TH * 4);
@@ -45,10 +46,15 @@ export function buildGlowTexture(field, settings, TW, TH, mode = 'glow') {
     for (let x = 0; x < TW; x++) {
       field.eval(((x + 0.5) / TW) * TWO_PI, s, ev);
       const wall = ev.t + ev.raise; // raised markings add to the total wall the light passes through
-      let v;
-      if (mode === 'thickness') v = 1 - (wall - tMin) / (tMax - tMin + 0.4);
-      else v = Math.exp(-MU * (wall - tMin)) * falloff;
-      const g = Math.round(255 * Math.pow(Math.min(1, Math.max(0, v)), 1 / 2.2));
+      let g;
+      if (mode === 'thickness') {
+        // Same greys as the Photo panel's grey map: white = Thinnest, black = Thickest (or more)
+        const v = 1 - (wall - tMin) / (tMax - tMin);
+        g = Math.round(255 * Math.min(1, Math.max(0, v)));
+      } else {
+        const v = Math.exp(-MU * (wall - tMin)) * falloff;
+        g = Math.round(255 * Math.pow(Math.min(1, Math.max(0, v)), 1 / 2.2));
+      }
       const o = (y * TW + x) * 4;
       data[o] = data[o + 1] = data[o + 2] = g; data[o + 3] = 255;
     }
