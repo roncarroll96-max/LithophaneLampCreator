@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Lithophane Lamp Creator</title>
+  <meta name="description" content="Turn a photo into a printable lithophane ball lamp (STL).">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="importmap">
+    { "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/"
+    } }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Lithophane Lamp Creator</span>
+    </div>
+    <nav class="top-actions">
+      <button class="btn ghost" id="btnNew" title="Start a new project">New</button>
+      <button class="btn ghost" id="btnOpenProject" title="Open a saved .lithoproj file">Open project</button>
+      <button class="btn ghost" id="btnSaveProject" title="Save photo and settings to a file">Save project</button>
+      <button class="btn primary" id="btnChoosePhoto">Choose photo</button>
+    </nav>
+    <input type="file" id="filePhoto" accept="image/*,.heic,.heif" hidden>
+    <input type="file" id="fileProject" accept=".lithoproj,application/json" hidden>
+  </header>
+
+  <main class="workspace">
+    <section class="viewport" id="viewport" aria-label="3D preview">
+      <div class="view-toggle" role="group" aria-label="Preview style">
+        <button class="seg active" data-view="glow">Lit</button>
+        <button class="seg" data-view="plain">Plain</button>
+      </div>
+      <button class="btn ghost small view-reset" id="btnResetView">Reset view</button>
+      <div class="empty-state" id="emptyState">
+        <div class="empty-card">
+          <div class="empty-title">Drop a photo here</div>
+          <div class="empty-sub">or</div>
+          <button class="btn primary" id="btnChoosePhoto2">Choose photo</button>
+          <div class="empty-note">Your photo stays on this computer. Nothing is uploaded.</div>
+        </div>
+      </div>
+      <div class="busy" id="busy" hidden>Updating…</div>
+      <div class="drop-hint" id="dropHint" hidden>Drop to use this photo</div>
+    </section>
+
+    <aside class="panel" id="panel">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="photo" role="tab">Photo</button>
+        <button class="tab" data-tab="ball" role="tab">Ball</button>
+        <button class="tab" data-tab="markings" role="tab">Markings</button>
+        <button class="tab" data-tab="export" role="tab">Export</button>
+      </div>
+      <div class="tab-body" id="tabBody"></div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+// 3D preview (Three.js): the ball on its lighted base, shown either glowing (simulated backlight)
+// or as a plain grey model for checking shape and raised markings.
+
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/OrbitControls.js';
+import { buildPreviewGrid, buildGlowTexture, MU } from './core/previewData.js';
+
+const AMBER = new THREE.Color(1.0, 0.62, 0.25);
+
+export class Preview {
+  constructor(container) {
+    this.container = container;
+    this.mode = 'glow';
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    container.appendChild(this.renderer.domElement);
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x0d0a0f);
+    this.camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+    this.camera.up.set(0, 0, 1);
+    this.camera.position.set(0, -480, 90);
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.target.set(0, 0, 0);
+    this.controls.minDistance = 120;
+    this.controls.maxDistance = 1500;
+
+    // Lights only matter in plain mode
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x302830, 1.1));
+    const key = new THREE.DirectionalLight(0xffffff, 1.6);
+    key.position.set(-300, -400, 500);
+    this.scene.add(key);
+
+    // Ball
+    this.texture = new THREE.DataTexture(new Uint8Array(4), 1, 1, THREE.RGBAFormat);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.texture.wrapS = THREE.RepeatWrapping;
+    this.texture.magFilter = THREE.LinearFilter;
+    this.texture.minFilter = THREE.LinearMipmapLinearFilter;
+    this.texture.generateMipmaps = true;
+    this.glowMat = new THREE.MeshBasicMaterial({ map: this.texture, color: AMBER });
+    this.plainMat = new THREE.MeshStandardMaterial({ color: 0xd9d4ca, roughness: 0.65, metalness: 0 });
+    this.ballGeom = new THREE.BufferGeometry();
+    this.ball = new THREE.Mesh(this.ballGeom, this.glowMat);
+    this.scene.add(this.ball);
+
+    // Collar + base
+    this.group = new THREE.Group();
+    this.scene.add(this.group);
+    this.collarGlow = new THREE.MeshBasicMaterial({ color: AMBER.clone().multiplyScalar(0.55) });
+    this.baseMat = new THREE.MeshStandardMaterial({ color: 0x1b171d, roughness: 0.35, metalness: 0.2 });
+    this.floorMat = new THREE.MeshStandardMaterial({ color: 0x120e13, roughness: 0.9 });
+
+    this._resize = () => this.resize();
+    new ResizeObserver(this._resize).observe(container);
+    this.resize();
+    const loop = () => { this.controls.update(); this.renderer.render(this.scene, this.camera); requestAnimationFrame(loop); };
+    loop();
+  }
+
+  resize() {
+    const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  setMode(mode) {
+    this.mode = mode;
+    this.ball.material = mode === 'plain' ? this.plainMat : this.glowMat;
+    this.collar && (this.collar.material = mode === 'plain' ? this.plainMat : this.collarGlow);
+    this.scene.background.set(mode === 'plain' ? 0x1d1a20 : 0x0d0a0f);
+  }
+
+  /** Rebuilds the ball surface (needed when shape, size or raised markings change). */
+  updateGeometry(field, fine = true) {
+    const g = buildPreviewGrid(field, fine ? 360 : 180, fine ? 180 : 90);
+    this.ballGeom.dispose();
+    this.ballGeom = new THREE.BufferGeometry();
+    this.ballGeom.setAttribute('position', new THREE.BufferAttribute(g.positions, 3));
+    this.ballGeom.setAttribute('uv', new THREE.BufferAttribute(g.uvs, 2));
+    this.ballGeom.setIndex(new THREE.BufferAttribute(g.indices, 1));
+    this.ballGeom.computeVertexNormals();
+    this.ball.geometry = this.ballGeom;
+  }
+
+  /** Recomputes the glow texture. Width/height control sharpness vs speed. */
+  updateTexture(field, settings, TW, TH) {
+    const data = buildGlowTexture(field, settings, TW, TH, 'glow');
+    const old = this.texture;
+    const tex = new THREE.DataTexture(data, TW, TH, THREE.RGBAFormat);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+    tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+    tex.needsUpdate = true;
+    this.texture = tex;
+    this.glowMat.map = tex;
+    this.glowMat.needsUpdate = true;
+    old.dispose();
+  }
+
+  /** Collar, base and floor around the ball (preview only). */
+  updateStand(shape, collar, settings) {
+    this.group.clear();
+    const o = {};
+    let zEdge = Infinity;
+    for (let i = 0; i < 64; i++) {
+      const th = (i / 64) * Math.PI * 2;
+      shape.surf(th, shape.phiEdge(th), o);
+      zEdge = Math.min(zEdge, o.z);
+    }
+    const zBot = zEdge - collar.height;
+    // Collar as a tube
+    const prof = [
+      new THREE.Vector2(collar.ri, zBot), new THREE.Vector2(collar.ro, zBot),
+      new THREE.Vector2(collar.ro, zEdge + 0.5), new THREE.Vector2(collar.ri, zEdge + 0.5),
+      new THREE.Vector2(collar.ri, zBot),
+    ];
+    const collarGeom = new THREE.LatheGeometry(prof, 96);
+    collarGeom.rotateX(Math.PI / 2);
+    const tCol = Math.exp(-MU * (settings.opening.collarWall - settings.tMin));
+    this.collarGlow.color.copy(AMBER).multiplyScalar(Math.max(0.15, tCol));
+    this.collar = new THREE.Mesh(collarGeom, this.mode === 'plain' ? this.plainMat : this.collarGlow);
+    this.group.add(this.collar);
+
+    // A simple round base below the collar (stand-in until the base generator exists)
+    const baseR = collar.ro + 22, baseH = 22;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(baseR, baseR + 4, baseH, 96), this.baseMat);
+    base.rotation.x = Math.PI / 2;
+    base.position.z = zBot - baseH / 2;
+    this.group.add(base);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(collar.ri, collar.ro + 2, 96),
+      new THREE.MeshBasicMaterial({ color: AMBER, transparent: true, opacity: 0.9 }));
+    ring.position.z = zBot + 0.05;
+    this.group.add(ring);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(900, 64), this.floorMat);
+    floor.position.z = zBot - baseH;
+    this.group.add(floor);
+    // Warm pool of light on the floor
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(baseR * 3, 64), new THREE.MeshBasicMaterial({
+      color: AMBER, transparent: true, opacity: 0.08, depthWrite: false,
+    }));
+    pool.position.z = zBot - baseH + 0.2;
+    this.group.add(pool);
+
+    // Frame the ball + base: fit the taller of (height, width/aspect) into the vertical field of view
+    this._frameBox = { w: Math.max(shape.a, baseR) * 2, h: shape.c - (zBot - baseH) };
+    this.controls.target.set(0, 0, (zBot - baseH + shape.c) / 2);
+  }
+
+  frame() {
+    const t = this.controls.target, box = this._frameBox || { w: 200, h: 200 };
+    const vfov = (this.camera.fov * Math.PI) / 180;
+    const needH = Math.max(box.h, box.w / Math.max(0.3, this.camera.aspect)) * 1.25;
+    const dist = needH / 2 / Math.tan(vfov / 2) + Math.max(box.w, box.h) / 2;
+    this.camera.position.set(t.x, t.y - dist, t.z + dist * 0.12);
+    this.controls.update();
+  }
+
+  /** Snapshot of the current view as a data URL (used for project thumbnails). */
+  snapshot() { return this.renderer.domElement.toDataURL('image/jpeg', 0.8); }
+}

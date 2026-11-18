@@ -1,0 +1,30 @@
+# Lithophane Lamp Creator
+
+Turn a photo into a 3D-printable lithophane ball lamp (STL). Everything runs in your browser;
+photos never leave your computer.
+
+See [APP-SPEC.md](APP-SPEC.md) for the full specification.
+
+## Run it on this PC
+Double-click **start.bat**. It starts a tiny local web server and opens
+<http://localhost:5178> in your browser. Close the black window to stop it.
+(Needs Node.js, free from nodejs.org.)
+
+## How to use
+1. **Choose photo** (or drag one onto the preview). Automatic adjustments are applied.
+2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes.
+3. **Ball** tab: shape, size (Small 100 / Medium 150 / Large 200 mm), wall thickness, opening and collar.
+4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
+5. **Export** tab: check the bed fit, pick a detail level, **Export ball STL**.
+6. Print opening-down, with slicer supports for the curve just above the collar.
+
+Work is auto-saved in the browser. **Save project** downloads a `.lithoproj` file
+(photo + settings) you can reopen later or send to someone.
+
+## For developers
+- Plain HTML + JavaScript modules, no build step. Three.js is vendored in `vendor/three`
+  (refresh with `npm install && npm run vendor`).
+- `js/core/` has no browser dependencies (shapes, lithophane field, mesh, STL) and is shared
+  by the page, the export Web Worker and the tests.
+- `npm test` runs the geometry tests (watertight shells, sizes, thickness range, STL format).
+- To host: upload the folder (without `node_modules`) to any static host.
