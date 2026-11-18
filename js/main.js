@@ -692,6 +692,9 @@ function textTab() {
   return out;
 }
 
+/** Link to the printer setting tips page (opens in a new tab, so your work stays put). */
+const tipsLink = () => el('p', { class: 'note' }, el('a', { href: 'tips.html', target: '_blank', rel: 'noopener', class: 'tips-link' }, 'Printer setting tips: what generally works well →'));
+
 function numberInput(path, label, lo, hi) {
   const s = app.settings;
   const i = el('input', { type: 'number', min: lo, max: hi, step: 0.5, value: getPath(s, path), style: 'width:76px', 'aria-label': label });
@@ -751,6 +754,8 @@ function baseTab() {
       info ? note(info.flip
         ? 'Prints upside down (top on the bed): the STL is already turned. No supports needed.'
         : 'Prints standing up, as it sits on the table. No supports needed.') : null,
+      info ? note('The base is not a lithophane: normal slicer settings are fine. Print it in dark, opaque filament.') : null,
+      tipsLink(),
       el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: exportBaseStl },
         app.exporting ? 'Building…' : 'Export base STL'),
       progress,
@@ -823,7 +828,8 @@ function exportTab() {
         ? note('The cube STL is already turned upside down: top face on the bed. No supports needed.')
         : note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
       !hasPhotos() ? note('No photo yet: this exports a plain ball with markings.', 'warn') : null,
-      note('The base is a separate file: Base tab, Export base STL.')),
+      note('The base is a separate file: Base tab, Export base STL.'),
+      tipsLink()),
   ];
 }
 

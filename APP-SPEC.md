@@ -272,6 +272,9 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
 
+### Version 1.0.2: printer setting tips page (2026-11-18)
+A "Printer Setting Tips" page (tips.html) with slicer settings that generally work well: 100% sparse infill, 3-4 wall loops, 0.12 mm layers, seam at the back, Arachne, slower outer wall, supports (off for the cube), how each file goes on the bed, base settings (normal settings, dark opaque filament), nozzle and filament, a checklist and troubleshooting. Linked from "Print tips" in the header and from the Export and Base tabs; opens in a new tab so the app keeps your work. Checked on desktop and phone (no sideways scrolling; settings stack as cards on phones).
+
 ### Version 1.0.1: "Ball" tab renamed "Shape" (2026-11-18)
 The tab holding the shape, size, wall thickness and opening is now called **Shape** (it covers the cube too). Earlier notes below still say "Ball tab".
 

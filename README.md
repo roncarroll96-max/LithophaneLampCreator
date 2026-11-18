@@ -38,6 +38,10 @@ Double-click **start.bat**. It starts a tiny local web server and opens
 7. **Export** tab: check the bed fit, pick a detail level, **Export ball STL**.
 8. Print opening-down, with slicer supports for the curve just above the collar.
 
+**Print tips** (link in the header, also on the Export and Base tabs) opens a page of slicer
+settings that generally work well: 100% sparse infill, 3 to 4 wall loops, layer height, seam,
+supports, how each file goes on the bed, the base, and troubleshooting.
+
 Work is auto-saved in the browser. **Save project** downloads a `.lithoproj` file
 (photo + settings) you can reopen later or send to someone.
 

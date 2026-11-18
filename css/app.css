@@ -46,6 +46,9 @@ button, input, select { font: inherit; color: inherit; }
 }
 .brand-name { font-weight: 650; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand-version { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+.brand-link { color: var(--amber); font-size: 12.5px; white-space: nowrap; flex: none; text-decoration: none; border-bottom: 1px dotted var(--amber); }
+.brand-link:hover { border-bottom-style: solid; }
+.tips-link { color: var(--amber); }
 .top-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
 .btn {
@@ -246,6 +249,7 @@ input[type=number] { width: 90px; }
   .check { min-height: 40px; align-items: center; }
   .check input[type=checkbox] { width: 22px; height: 22px; flex: none; }
   .text-row .text-pick { min-height: 40px; }
+  .brand-link { padding: 10px 4px; margin: -10px -4px; } /* bigger tap area, same look */
   /* Photo list: name on its own line, buttons underneath */
   .photo-row { flex-wrap: wrap; }
   .photo-row .text-pick { flex: 1 1 100%; }

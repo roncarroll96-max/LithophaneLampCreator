@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Printer Setting Tips</title>
+  <meta name="description" content="Slicer settings that generally work well for printing lithophane lamps and their bases.">
+  <style>
+    :root {
+      --bg: #0d0a0f; --panel: #18141b; --panel-2: #211b25; --line: #2e2633;
+      --text: #f1ece6; --muted: #a39aa6; --amber: #ffad48; --amber-2: #ff8a1f;
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 var(--font); }
+    a { color: var(--amber); }
+    .top {
+      position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 12px;
+      padding: 10px 16px; background: linear-gradient(180deg, #1a141c, #120e14); border-bottom: 1px solid var(--line);
+    }
+    .mark { width: 22px; height: 22px; border-radius: 50%; flex: none;
+      background: radial-gradient(circle at 40% 35%, #ffe3b0, var(--amber) 45%, #a3520f 100%); box-shadow: 0 0 14px rgba(255,160,60,.35); }
+    .top b { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .back { margin-left: auto; white-space: nowrap; text-decoration: none; border: 1px solid var(--line);
+      background: var(--panel-2); color: var(--text); padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+    .back:hover { border-color: var(--amber); }
+    main { max-width: 860px; margin: 0 auto; padding: 8px 16px 64px; }
+    h1 { font-size: 26px; line-height: 1.2; margin: 22px 0 6px; }
+    .lede { color: var(--muted); margin: 0 0 18px; }
+    h2 { font-size: 18px; margin: 30px 0 10px; color: var(--amber); }
+    p { margin: 8px 0; }
+    .key {
+      border: 1px solid #5a4a3a; border-left: 4px solid var(--amber); background: #1d1712;
+      border-radius: 10px; padding: 12px 14px; margin: 14px 0;
+    }
+    .key strong { color: var(--amber); }
+    .rows { display: grid; gap: 8px; }
+    .row {
+      display: grid; grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.8fr) 2fr; gap: 6px 14px;
+      align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    }
+    .row .name { font-weight: 600; }
+    .row .name small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; }
+    .row .val { color: var(--amber); font-weight: 650; }
+    .row .val small { display: block; color: var(--muted); font-weight: 400; font-size: 12.5px; }
+    .row .why { color: #d9d2cc; font-size: 14px; }
+    ul.check { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
+    ul.check li { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px 8px 36px; position: relative; }
+    ul.check li::before { content: ""; position: absolute; left: 12px; top: 12px; width: 13px; height: 13px; border: 2px solid var(--amber); border-radius: 3px; }
+    .note { color: var(--muted); font-size: 13.5px; }
+    footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 36px; padding-top: 14px; }
+    @media (max-width: 640px) {
+      h1 { font-size: 22px; }
+      .row { grid-template-columns: 1fr; }
+      .row .val { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <span class="mark" aria-hidden="true"></span>
+    <b>Printer Setting Tips</b>
+    <a class="back" href="./">← Back to the app</a>
+  </header>
+  <main>
+    <h1>Printer settings that generally work well</h1>
+    <p class="lede">Starting points for printing lithophane lamps and their bases. Names match Bambu Studio and
+      OrcaSlicer; other slicers use similar names. Every printer is a little different, so treat these as a
+      first try and adjust from your test prints.</p>
+
+    <div class="key">
+      <strong>The one rule:</strong> a lithophane is a picture made of plastic thickness, so the lamp's wall must print
+      <strong>solid</strong>. Normal settings fill the middle of a wall with a sparse pattern that is mostly air; light
+      scatters off it and the picture looks blotchy and blurry. Set <strong>Sparse infill density to 100%</strong>.
+    </div>
+
+    <h2>The lamp (ball, football, Moon, cube)</h2>
+    <div class="rows">
+      <div class="row">
+        <div class="name">Sparse infill density<small>Strength tab</small></div>
+        <div class="val">100%</div>
+        <div class="why">Fills the wall solid. The most important setting on this page. (Leave <em>solid</em> infill,
+          which is only the top and bottom layers, as it is.)</div>
+      </div>
+      <div class="row">
+        <div class="name">Wall loops<small>Strength tab</small></div>
+        <div class="val">3 to 4</div>
+        <div class="why">Each loop is printed on both the outside and the inside of the shell, so 4 loops cover about
+          3.4 mm, nearly the whole wall; 100% infill fills the rest. This is what most lithophane guides use.</div>
+      </div>
+      <div class="row">
+        <div class="name">Layer height<small>Quality tab or preset</small></div>
+        <div class="val">0.12 mm<small>0.08 mm for the finest detail</small></div>
+        <div class="why">Much of a lamp is close to vertical, so up-and-down detail can't be finer than one layer.
+          Thinner layers give sharper edges and less banding, but take longer.</div>
+      </div>
+      <div class="row">
+        <div class="name">Seam position<small>Quality tab</small></div>
+        <div class="val">Back</div>
+        <div class="why">Each layer starts and ends at the seam, leaving a thin line. Turn the lamp so the picture faces
+          away from it.</div>
+      </div>
+      <div class="row">
+        <div class="name">Wall generator<small>Quality tab</small></div>
+        <div class="val">Arachne</div>
+        <div class="why">Handles walls whose thickness keeps changing, like a lithophane. The default in recent versions.</div>
+      </div>
+      <div class="row">
+        <div class="name">Outer wall speed<small>Speed tab</small></div>
+        <div class="val">About half the default</div>
+        <div class="why">A cleaner surface and more even light.</div>
+      </div>
+      <div class="row">
+        <div class="name">Supports<small>Support tab</small></div>
+        <div class="val">On: tree, build plate only<small>Off for the cube</small></div>
+        <div class="why">Balls, the football and the Moon need them for the curve just above the collar. The cube is
+          designed to print without them.</div>
+      </div>
+      <div class="row">
+        <div class="name">Ironing</div>
+        <div class="val">Off</div>
+        <div class="why">Not needed.</div>
+      </div>
+    </div>
+
+    <h2>How each file goes on the bed</h2>
+    <div class="rows">
+      <div class="row"><div class="name">Balls and the Moon</div><div class="val">Opening down</div>
+        <div class="why">As exported. Turn it so the picture faces away from the seam.</div></div>
+      <div class="row"><div class="name">Football</div><div class="val">On its side, opening down</div>
+        <div class="why">As exported. The Large football only fits a 256 mm bed placed diagonally: rotate it 45° in the
+          slicer (the app tells you when).</div></div>
+      <div class="row"><div class="name">Cube</div><div class="val">Top face on the bed</div>
+        <div class="why">Already upside down in the file. The 45° funnel underneath needs no supports.</div></div>
+      <div class="row"><div class="name">Base: LED puck or bulb</div><div class="val">Top on the bed</div>
+        <div class="why">Already upside down in the file. No supports.</div></div>
+      <div class="row"><div class="name">Base: LED strip riser</div><div class="val">Standing up</div>
+        <div class="why">As it sits on the table. No supports.</div></div>
+    </div>
+
+    <h2>The base</h2>
+    <p>The base isn't a lithophane, so normal settings are fine: <strong>0.2 mm layers, 2 to 3 wall loops, 15 to 20%
+      sparse infill</strong>. Print it in <strong>black or another dark, opaque filament</strong> so light only comes out
+      through the lamp. If the collar is too tight or too loose, change <em>Collar fit</em> on the Base tab by 0.1 to
+      0.2 mm and print again.</p>
+
+    <h2>Printer and material</h2>
+    <div class="rows">
+      <div class="row"><div class="name">Nozzle</div><div class="val">0.4 mm</div>
+        <div class="why">Works well. A 0.2 or 0.25 mm nozzle gives sharper edges but prints much slower. With 0.4 mm,
+          keep the app's Thinnest at 0.8 mm or more (two printed lines).</div></div>
+      <div class="row"><div class="name">Filament</div><div class="val">White PLA</div>
+        <div class="why">Use one spool for the whole lamp: brands and even shades of white let different amounts of
+          light through.</div></div>
+      <div class="row"><div class="name">Print time</div><div class="val">2 to 3× longer</div>
+        <div class="why">Than a normal print of the same size. That's normal for lithophanes.</div></div>
+    </div>
+
+    <h2>Checklist before you print the lamp</h2>
+    <ul class="check">
+      <li>Sparse infill density 100%</li>
+      <li>Wall loops 3 to 4</li>
+      <li>Layer height 0.12 mm (or 0.08 mm)</li>
+      <li>Seam position Back, picture turned away from it</li>
+      <li>Supports on, build plate only (off for the cube)</li>
+      <li>In the slicer preview, scroll through the layers: the wall should show only loops and solid fill, no open
+        diagonal pattern</li>
+    </ul>
+
+    <h2>If something looks wrong</h2>
+    <div class="rows">
+      <div class="row"><div class="name">Blotchy or patchy dark areas</div><div class="val">Sparse infill</div>
+        <div class="why">Sparse infill 100%, wall loops 3 to 4.</div></div>
+      <div class="row"><div class="name">Grainy or streaky light</div><div class="val">Infill lines show</div>
+        <div class="why">Try more wall loops (6 to 10) so loops fill more of the wall.</div></div>
+      <div class="row"><div class="name">Horizontal stripes</div><div class="val">Layer lines</div>
+        <div class="why">Layer height 0.12 or 0.08 mm; slow the outer wall.</div></div>
+      <div class="row"><div class="name">Blurry edges</div><div class="val">Layers, glow or contrast</div>
+        <div class="why">Thinner layers; raise the app's Thinnest to 1.0 to 1.2 mm; raise Contrast on the Photo tab.</div></div>
+      <div class="row"><div class="name">Thin vertical line through the picture</div><div class="val">The seam</div>
+        <div class="why">Seam position Back, and turn the lamp.</div></div>
+      <div class="row"><div class="name">Very bright spots or small holes</div><div class="val">Walls too thin</div>
+        <div class="why">Keep Thinnest at 0.8 mm or more with a 0.4 mm nozzle.</div></div>
+      <div class="row"><div class="name">Whole lamp looks washed out</div><div class="val">Light too bright</div>
+        <div class="why">Raise Thinnest a little, or dim the light.</div></div>
+      <div class="row"><div class="name">Light leaks out of the base</div><div class="val">Light filament</div>
+        <div class="why">Print the base in dark, opaque filament.</div></div>
+    </div>
+
+    <p class="note" style="margin-top:18px">Tip: to test settings quickly, export a Small lamp with the picture shrunk
+      to fit. It prints much faster and shows the same problems.</p>
+
+    <footer>
+      Lithophane Lamp Creator <span id="ver"></span> · These tips are also in the Printer Settings PDF (docs folder).
+      · <a href="./">Back to the app</a>
+    </footer>
+  </main>
+  <script type="module">
+    import { APP_VERSION } from './js/version.js';
+    document.getElementById('ver').textContent = `v${APP_VERSION}`;
+  </script>
+</body>
+</html>
