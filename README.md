@@ -1,7 +1,9 @@
 # Lithophane Lamp Creator
 
-Turn a photo into a 3D-printable lithophane ball lamp (STL). Everything runs in your browser;
-photos never leave your computer.
+Turn photos into 3D-printable lithophane lamps (STL): balls (basketball, soccer, football,
+baseball/softball, volleyball, plain), a Moon, or a cube with a photo on each side, plus a
+matching base for an LED puck, an LED strip or a bulb. Everything runs in your browser;
+photos never leave your computer. Works on desktop, tablet and phone.
 
 See [APP-SPEC.md](APP-SPEC.md) for the full specification.
 

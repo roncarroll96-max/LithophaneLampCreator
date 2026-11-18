@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later)_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -15,8 +15,8 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 0.6 | Several photos per ball |
 | 0.7 | Cube with a photo on each of its 5 visible faces |
 | 0.8 | Base generator and light riser |
-| 0.9 | AI photo tools (background, face brightening) |
-| 1.0 | Phone and tablet polish, final check against this spec |
+| 0.9 | ~~AI photo tools~~ skipped for now (moved to Later, 2026-11-18). Cut-out photos made with a phone or Windows Photos already work (0.4.1). |
+| 1.0 | Phone and tablet polish, final check against this spec (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -37,8 +37,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 3. **Automatic adjustments on load**, each with an on/off switch and a slider afterward:
    - Auto levels + contrast (uses the full thickness range)
    - Sharpening
-   - Background removal or dimming (an in-browser AI model separates the subject; the background can be faded, darkened or blurred)
-   - Face brightening (an in-browser face detector lifts shadows on faces)
+   - *(Background removal and face brightening with in-browser AI moved to Later on 2026-11-18. Photos already cut out elsewhere work: see "Cut-out photos" below.)*
 4. **Manual tweaks**: brightness, contrast, gamma, sharpness, background fade amount, invert check. There's a before/after view and a "reset to auto" button.
 5. **Photo coverage**: a slider from a small front window up to a full 360° wrap, with an adjustable soft edge where the photo fades into the plain ball surface.
 
@@ -119,6 +118,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 24. **Desktop, tablet and phone layouts.** On phones, choosing Fine export shows a warning that it may fail and suggests Standard, but still allows it.
 
 ### Later (not in version 1)
+- AI photo tools: background removal or dimming, and face brightening, with in-browser models (skipped for now, 2026-11-18)
 - Splitting the shell into two halves for support-free printing
 - Customer-facing features on the hosted site (ads placement, help pages, sample gallery)
 - 3MF export (smaller files than STL)
@@ -134,7 +134,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Stored:** the current project (photo + settings) in the browser's own storage on that computer, plus project files you choose to save to your PC.
 - **Defaults** you change (size, thickness, base light dimensions) are remembered in the browser.
 - **Nothing leaves the computer.** There's no database and no server.
-- **Bundled assets:** NASA moon height and color maps (public domain, downsized), AI models for background and face detection, open-license fonts. All are included with the app so it works offline.
+- **Bundled assets:** NASA moon height and color maps (public domain, downsized), open-license fonts. All are included with the app so it works offline.
 
 ## Rules and edge cases
 - **Light vs. thickness:** brighter photo pixels = thinner plastic (min thickness); darker = thicker (max thickness). Defaults are 0.8 mm min, 3.0 mm max *(assumed)*.
@@ -147,7 +147,6 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Cut-out photos** (PNG/WebP with a transparent background, e.g. from a phone's "lift subject" or Windows Photos' background removal): the transparent area shows as the chosen **Background**: **blend into the ball** (default; the plain ball or Moon carries on behind the subject, so no window edge shows), **bright** or **dark**, with an **edge softness** slider (default 2 mm). Automatic adjustments look only at the visible subject. The photo is kept as PNG so the transparency survives saving and reopening. *(0.4.1)*
 - **SVG files** have no fixed pixel size, so they are always drawn at full working resolution (2400 px on the long side), whatever size the file lists. *(0.2)*
 - **Very large or tiny photos:** large photos are scaled down to what the chosen detail level can use. Tiny photos show a "low resolution, may look blurry" warning.
-- **AI features failing** (older browser, model won't load): the photo still works without them and a banner says which feature is unavailable.
 - **Export too big for the device:** warn before starting. If the browser runs out of memory, show a clear message suggesting a lower detail level, not a silent crash.
 
 ## Screens and look
@@ -156,10 +155,10 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Photo panel** shows the adjusted photo as a grey map (what becomes thickness) with a before/after toggle.
 
 ## Environment and deployment
-- **Now:** runs locally on your Windows PC in Chrome. A `start.bat` launches a tiny local web server (Node is already installed) and opens the browser, because the AI models need to be served that way rather than opened as a plain file. It works with no internet.
+- **Now:** runs locally on your Windows PC in Chrome. A `start.bat` launches a tiny local web server (Node is already installed) and opens the browser, because the app's background work (export) needs to be served that way rather than opened as a plain file. It works with no internet.
 - **Your friend (before hosting):** gets the folder and runs the same `start.bat` (needs Node installed), or waits for the hosted version.
 - **Later:** the same files go on a free static host (GitHub Pages, Netlify or Cloudflare Pages). No server code, $0 hosting.
-- **Technology:** a plain HTML/JavaScript web app; Three.js for 3D (bundled locally); MediaPipe-style in-browser models for background and face detection (bundled locally).
+- **Technology:** a plain HTML/JavaScript web app; Three.js for 3D (bundled locally).
 
 ## Decisions
 | Topic | Decision | Decided by |
@@ -169,7 +168,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Processing | Everything in the browser, photos never uploaded | Assumed (Claude's default) |
 | Photo coverage | Adjustable from front window to full wrap | You |
 | Markings | Carved, raised or off, per design | You |
-| Auto-adjust | Levels/contrast, sharpen, background, face brightening | You |
+| Auto-adjust | Levels/contrast and sharpen. Background and face AI tools moved to Later | You (AI skipped 2026-11-18) |
 | Preview | Toggle lit glow / plain grey | You |
 | Export detail | Draft / Standard / Fine chosen at export | You |
 | Text | In version 1 (0.3) | You |
@@ -272,6 +271,47 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 1.0: phone and tablet polish, final check, done (2026-11-18)
+Phone and tablet: every tab checked at 375 × 812 (phone) and 768 × 1024 (tablet): nothing runs off the side and every button, option and checkbox is at least 36 px tall (small buttons and option bars are 40 px on phones, checkboxes 22 px). On phones the photo list shows each name on its own line with the buttons underneath. Touch screens have no hover, so in the Thickness view a tap on the ball shows the thickness there. In phone mode the Fine-detail warning appears and a Standard export completes. New projects now keep your own defaults (printer bed, size, wall thickness, opening, cube and base settings, detail), as this spec asks.
+
+**Final check against the features (version 1):**
+
+| # | Feature | Status |
+|---|---|---|
+| 1 | Load a photo (JPG, PNG, WebP, HEIC where supported, SVG), file picker or drag-and-drop | Done |
+| 2 | Zoom, pan, rotate inside the window | Done |
+| 3 | Automatic adjustments on load | Done for levels/contrast and sharpening ("Auto adjust" re-applies them; sliders change them). AI background and face tools moved to Later |
+| 4 | Manual tweaks, before/after ("Hold: original"), back to auto ("Auto adjust") | Done (no AI background fade, see 3) |
+| 5 | Coverage from a small window to a full wrap, soft edge | Done |
+| 5a | Several photos (up to 6), placed freely | Done (0.6) |
+| 6-12 | Basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon | Done (0.1-0.5) |
+| 12a | Cube with 5 face photos | Done (0.7) |
+| 13 | Markings carved / raised / off, width and darkness | Done |
+| 14, 14a | Size presets plus custom, remembered; printer bed check with "rotate 45°" | Done |
+| 15 | Text | Done (0.3) |
+| 16 | Opening and collar, adjustable; fit clearance | Done (clearance lives in the base's collar seat) |
+| 17 | Base generator: puck, strip riser, bulb socket | Done (0.8) |
+| 18 | 3D preview: lit, plain, thickness map | Done |
+| 19 | Thinnest / thickest wall | Done |
+| 20 | STL export with detail choice and size estimate; ball and base as separate files | Done |
+| 21 | Watertight shells | Done (checked by the automated tests for every shape and base) |
+| 22, 23 | Browser auto-save; project files (all photos) | Done |
+| 24 | Desktop, tablet and phone layouts; Fine warning on phones | Done (checked in phone and tablet sizes on this PC) |
+
+**"How we'll know it works":**
+
+| # | Check | Status |
+|---|---|---|
+| 1 | Real photo to print-ready STL in under 5 minutes | Done in the app; your own timing still to confirm |
+| 2 | STL opens with no repair warnings; ball and base fit first time | Shells are watertight (tests). Base fit: needs your first base print |
+| 3 | Lit on the base: clear face, dark basketball lines | Seen on your two test prints (milestone 1) |
+| 4 | Save, close, reopen and continue; project opens the same for your friend | Done (autosave and project files tested, including old single-photo projects) |
+| 5 | Moon shows recognisable maria and craters when lit | Seen in the lit preview; needs a Moon print |
+| 6 | On a phone: load, adjust, preview, export at Standard | Done in phone mode on this PC; a real phone is still to try (e.g. via GitHub Pages) |
+| 7 | Medium cube with five photos: one STL, prints upside down without supports, sits on your base, glows evenly | STL and orientation done; needs a cube print |
+
+What still needs a real print or a real phone: base fit (and your puck's real size), a cube, a football (tip shape), a Moon, and trying the app on your phone.
 
 ### Version 0.8: base generator, done (2026-11-18)
 Built: a Base tab and a separate "Export base STL". Three light types:

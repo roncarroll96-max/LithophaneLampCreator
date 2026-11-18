@@ -999,8 +999,12 @@ $('fileProject').addEventListener('change', async (e) => {
 });
 $('btnNew').addEventListener('click', () => {
   if (hasPhotos() && !confirm('Start a new project? The current photos and settings will be cleared (save a project file first if you want to keep them).')) return;
-  const bed = app.settings.bed;
-  app.settings = defaultSettings(); app.settings.bed = bed;
+  // A new project starts from your own defaults: printer bed, size, wall thickness, opening and base
+  const old = app.settings;
+  app.settings = defaultSettings();
+  for (const k of ['bed', 'sizePreset', 'diameter', 'footballLength', 'footballWidth', 'tMin', 'tMax', 'opening', 'cube', 'base', 'detail']) {
+    if (old[k] !== undefined) app.settings[k] = structuredClone(old[k]);
+  }
   app.images = {}; app.selectedPhoto = null;
   $('emptyState').classList.remove('hidden');
   changed('shape'); renderTab();

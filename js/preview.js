@@ -64,7 +64,11 @@ export class Preview {
       hoverPending = true;
       requestAnimationFrame(() => { hoverPending = false; this._hover(lastEvt); });
     });
-    el.addEventListener('pointerleave', () => this.onHover && this.onHover(null));
+    el.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch' && this.onHover) this.onHover(null); });
+    // Touch screens have no hover: a tap shows the thickness readout instead
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' && this.onHover && this.mode === 'thickness') this._hover(e);
+    });
     // Dragging something on the ball (e.g. a photo): onDragStart(hit) returns true to take the
     // drag; the view then stays still while onDragMove(hit) follows the pointer.
     this.onDragStart = null; this.onDragMove = null; this.onDragEnd = null;
