@@ -7,7 +7,7 @@ import { createField } from './core/field.js';
 import { estimateTriangles, stlBytes } from './core/mesh.js';
 import {
   defaultSettings, mergeSettings, SIZE_PRESETS, SHAPES, DETAIL_PRESETS,
-  bodyAxes, collarDims, markingWidth, MAX_PHOTOS, defaultPhotoSettings, photoSlot,
+  bodyAxes, collarDims, markingWidth, MAX_PHOTOS, defaultPhotoSettings, photoSlot, cubePhotoSlot,
 } from './core/settings.js';
 import { autosave, loadAutosave, saveProjectFile, readProjectFile, projectPhotos, download } from './storage.js';
 import { TEXT_FONTS, defaultTextItem, placementAt } from './core/textLayer.js';
@@ -113,6 +113,13 @@ function update(quick) {
 
 // ---------- Photos ----------
 const hasPhotos = () => app.settings.photos.some((p) => app.images[p.id]);
+const isCube = () => SHAPES[app.settings.shape]?.body === 'cube';
+/** Puts the photos on the cube's faces in list order: front, back, left, right, top. */
+function fitPhotosToFaces() {
+  if (!app.shape || app.shape.kind !== 'cube') return;
+  app.settings.photos.forEach((cfg, i) => Object.assign(cfg, cubePhotoSlot(i, app.settings, app.shape)));
+  changed('field'); renderTab();
+}
 const selectedCfg = () => app.settings.photos.find((p) => p.id === app.selectedPhoto) || null;
 /** The adjusted picture of every photo, by id (what the field draws). */
 function processedMap() {
@@ -145,7 +152,9 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
     let cfg = id ? s.photos.find((p) => p.id === id) : null;
     if (!cfg) {
       const topUp = app.shape ? Math.floor(app.shape.elev(1)) - 2 : 70;
-      cfg = { ...defaultPhotoSettings(), ...photoSlot(s.photos.length, topUp), id: id || newPhotoId() };
+      const slot = isCube() && app.shape && app.shape.kind === 'cube'
+        ? cubePhotoSlot(s.photos.length, s, app.shape) : photoSlot(s.photos.length, topUp);
+      cfg = { ...defaultPhotoSettings(), ...slot, id: id || newPhotoId() };
       s.photos.unshift(cfg); // a new photo goes on top
     }
     if (fresh) {
@@ -200,7 +209,8 @@ function projectBaseName() {
   const s = app.settings;
   const first = app.settings.photos.find((p) => app.images[p.id]);
   const n = ((first && app.images[first.id].name) || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
-  const size = s.shape === 'football' ? `${s.footballLength}x${s.footballWidth}mm` : `${s.diameter}mm`;
+  const size = s.shape === 'football' ? `${s.footballLength}x${s.footballWidth}mm`
+    : isCube() ? `${s.cube.size}mm` : `${s.diameter}mm`;
   return `${n}-${s.shape}-${size}`;
 }
 
@@ -431,7 +441,9 @@ function photoTab() {
     section('Photo window on the ball',
       slider(P('around'), 'Around the ball', -180, 180, 0.5, { fmt: deg }),
       slider(P('centerY'), 'Up / down', upMin, upMax, 0.5, { fmt: mm }),
-      slider(P('coverage'), 'Size (how far around)', 20, 360, 1, { fmt: deg }),
+      slider(P('coverage'), 'Size (how far around)', 10, 360, 0.5, {
+        fmt: (v) => `${Math.round(v)}° (${app.shape ? Math.round((v / 360) * app.shape.eqPerimeter) : '?'} mm wide)`,
+      }),
       aspectToggle(),
       p.aspect == null
         ? null
@@ -443,6 +455,7 @@ function photoTab() {
       segmented(P('projection'), [
         { value: 'natural', label: 'Natural', title: 'No squeezing; best for a window on the side' },
         { value: 'flat', label: 'Flat', title: 'Best for the top of the ball or a small photo' },
+        { value: 'planar', label: 'Straight-on', title: 'No distortion on a flat face (cube); a straight-on view on a ball' },
         { value: 'wrap', label: 'Wrap', title: 'Fills all the way around; best near 360°' },
       ]),
     ),
@@ -462,10 +475,20 @@ function ballTab() {
   shapeSel.addEventListener('change', () => { s.shape = shapeSel.value; changed('shape'); renderTab(); });
 
   const sizeSeg = segmented('sizePreset', [
-    ...Object.entries(SIZE_PRESETS).map(([k, v]) => ({ value: k, label: `${v.label} ${v.diameter}` })),
+    ...Object.entries(SIZE_PRESETS).map(([k, v]) => ({ value: k, label: `${v.label} ${isCube() ? v.cubeSize : v.diameter}` })),
     { value: 'custom', label: 'Custom' },
   ], 'shape', (v) => {
-    if (SIZE_PRESETS[v]) Object.assign(s, { diameter: SIZE_PRESETS[v].diameter, footballLength: SIZE_PRESETS[v].footballLength, footballWidth: SIZE_PRESETS[v].footballWidth });
+    if (SIZE_PRESETS[v]) {
+      Object.assign(s, { diameter: SIZE_PRESETS[v].diameter, footballLength: SIZE_PRESETS[v].footballLength, footballWidth: SIZE_PRESETS[v].footballWidth });
+      s.cube.size = SIZE_PRESETS[v].cubeSize;
+    }
+    changed('shape'); renderTab();
+  });
+  const cubeInput = el('input', { type: 'number', min: 60, max: 200, step: 1, value: s.cube.size, 'aria-label': 'Cube size in mm' });
+  cubeInput.addEventListener('change', () => {
+    const v = Math.min(200, Math.max(60, parseFloat(cubeInput.value) || 100));
+    cubeInput.value = v; s.cube.size = v;
+    s.sizePreset = Object.keys(SIZE_PRESETS).find((k) => SIZE_PRESETS[k].cubeSize === v) || 'custom';
     changed('shape'); renderTab();
   });
   const dia = el('input', { type: 'number', min: 60, max: 250, step: 1, value: s.diameter, 'aria-label': 'Diameter in mm' });
@@ -486,8 +509,16 @@ function ballTab() {
   });
 
   return [
-    section('Shape', shapeSel,
-      note('The football arrives in the next version.')),
+    section('Shape', shapeSel),
+    isCube() ? section('Cube',
+      slider('cube.round', 'Edge rounding', 2, 15, 0.5, { fmt: mm, group: 'shape' }),
+      slider('cube.border', 'Photo border', 2, 20, 0.5, { fmt: mm }),
+      el('button', { class: 'btn small', onclick: fitPhotosToFaces, disabled: !s.photos.length, title: 'Front, back, left, right, top, in list order' }, 'Fit photos to faces'),
+      note('Each photo fills its face, leaving the border plain. Photos go front, back, left, right, top in list order.'),
+      checkbox('evenGlow.on', 'Even glow (thinner plastic farther from the light)', 'field', () => renderTab()),
+      s.evenGlow.on ? slider('evenGlow.strength', 'Even glow strength', 0, 1, 0.01, { fmt: pct }) : null,
+      note('Prints upside down with its top face on the bed, so no supports are needed. The underside slopes down to the opening like a funnel.'),
+    ) : null,
     isMoonShape() ? section('Moon',
       segmented('moon.mode', [
         { value: 'moon', label: 'Moon only', title: 'A classic moon lamp' },
@@ -498,7 +529,9 @@ function ballTab() {
       note(app.moonPrep ? 'Moon maps: NASA Scientific Visualization Studio (CGI Moon Kit).' : 'Loading the Moon maps...'),
     ) : null,
     section('Size', sizeSeg,
-      s.shape === 'football'
+      isCube()
+        ? el('div', { class: 'row', style: 'margin-top:10px' }, el('span', { class: 'grow' }, 'Cube size (mm)'), cubeInput)
+        : s.shape === 'football'
         ? el('div', { class: 'row', style: 'margin-top:10px;gap:8px' },
           el('span', { class: 'grow' }, 'Length × width (mm)'), footballInput('footballLength', 120, 320), footballInput('footballWidth', 70, 200))
         : el('div', { class: 'row', style: 'margin-top:10px' }, el('span', { class: 'grow' }, 'Ball diameter (mm)'), dia)),
@@ -654,6 +687,7 @@ function exportTab() {
 
   const ax = bodyAxes(s);
   const estSize = [ax.a * 2, ax.b * 2, ax.c * 2];
+  if (isCube() && app.shape && app.shape.funnelBottom != null) estSize[2] = ax.c - app.shape.funnelBottom + s.opening.collarHeight;
   const estDiag = [2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2), 2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2)];
   const fit = app.lastExport ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
 
@@ -690,7 +724,9 @@ function exportTab() {
     section('Detail', ...opts,
       s.detail === 'fine' && isPhone() ? note('Fine detail may be too big for a phone and could fail. Standard is recommended here.', 'warn') : null),
     section('Export', btn, progress, stats,
-      note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
+      isCube()
+        ? note('The cube STL is already turned upside down: top face on the bed. No supports needed.')
+        : note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
       !hasPhotos() ? note('No photo yet: this exports a plain ball with markings.', 'warn') : null),
   ];
 }

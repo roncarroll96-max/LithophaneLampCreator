@@ -156,6 +156,23 @@ export function buildShellMesh({ shape, field, stepInner, stepOuter, collar, onP
   return { positions, indices, bbox, triangles: indices.length / 3, volume: vol };
 }
 
+/**
+ * Turns a finished mesh upside down for printing (the cube prints with its top face on the bed):
+ * a half turn about the X axis, (x, y, z) -> (x, -y, height - z). A rotation keeps the triangles
+ * facing outward. Updates positions and bbox in place.
+ */
+export function flipUpsideDown(mesh) {
+  const p = mesh.positions, H = mesh.bbox.max[2];
+  for (let i = 0; i < p.length; i += 3) { p[i + 1] = -p[i + 1]; p[i + 2] = H - p[i + 2]; }
+  const bbox = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
+  for (let i = 0; i < p.length; i += 3) for (let a = 0; a < 3; a++) {
+    if (p[i + a] < bbox.min[a]) bbox.min[a] = p[i + a];
+    if (p[i + a] > bbox.max[a]) bbox.max[a] = p[i + a];
+  }
+  mesh.bbox = bbox;
+  return mesh;
+}
+
 /** Checks that every edge is shared by exactly two triangles facing opposite ways. */
 export function checkWatertight(indices, vertexCount) {
   const edges = new Map();

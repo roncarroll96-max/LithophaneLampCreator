@@ -1,9 +1,9 @@
 // Default project settings, size presets and helpers shared by the UI and the export worker.
 
 export const SIZE_PRESETS = {
-  S: { label: 'Small', diameter: 100, footballLength: 160, footballWidth: 100 },
-  M: { label: 'Medium', diameter: 150, footballLength: 240, footballWidth: 150 },
-  L: { label: 'Large', diameter: 200, footballLength: 280, footballWidth: 175 },
+  S: { label: 'Small', diameter: 100, footballLength: 160, footballWidth: 100, cubeSize: 80 },
+  M: { label: 'Medium', diameter: 150, footballLength: 240, footballWidth: 150, cubeSize: 100 },
+  L: { label: 'Large', diameter: 200, footballLength: 280, footballWidth: 175, cubeSize: 130 },
 };
 
 export const SHAPES = {
@@ -14,6 +14,7 @@ export const SHAPES = {
   baseball: { label: 'Baseball / softball', body: 'sphere', markings: 'baseball', ready: true },
   volleyball: { label: 'Volleyball', body: 'sphere', markings: 'volleyball', ready: true },
   moon: { label: 'Moon', body: 'sphere', markings: 'moon', ready: true },
+  cube: { label: 'Cube (5 photos)', body: 'cube', markings: 'none', ready: true },
 };
 
 /** Export detail presets: spacing between mesh points on the photo surface (mm). */
@@ -50,6 +51,12 @@ export function defaultSettings() {
       yaw: 60, pitch: 20, roll: 0,
     },
     texts: [],                // text items (see core/textLayer.js defaultTextItem)
+    cube: {
+      size: 100,              // edge length, mm
+      round: 5,               // edge rounding, mm
+      border: 5,              // plain border around each face photo, mm
+    },
+    evenGlow: { on: true, strength: 0.5 }, // cube: thinner plastic farther from the light
     moon: {
       mode: 'moon',           // 'moon' (Moon only) | 'photo' (photo in a front window, fading into the Moon)
       craters: 0.4,           // how strongly NASA's height map deepens craters (0..1)
@@ -100,9 +107,33 @@ export function photoSlot(n, topUp) {
   return slots[Math.min(n, slots.length - 1)];
 }
 
+/**
+ * Where the n-th photo starts on the cube: front, back, left, right, top (then a smaller one on
+ * the front). Each fills its face minus the plain border, straight on (planar projection).
+ * shape: the built cube shape (for its ring length and top height).
+ */
+export function cubePhotoSlot(n, settings, shape) {
+  const size = settings.cube?.size ?? 100, border = settings.cube?.border ?? 5;
+  const faceW = Math.max(10, size - 2 * border - 2 * (settings.cube?.round ?? 5) * 0.3);
+  const coverage = +((faceW / shape.eqPerimeter) * 360).toFixed(1);
+  const faces = [
+    { around: 0, centerY: 0 }, { around: 180, centerY: 0 }, { around: -90, centerY: 0 }, { around: 90, centerY: 0 },
+    { around: 0, centerY: +shape.elev(1).toFixed(1) },
+  ];
+  const f = n < faces.length ? faces[n] : { around: 0, centerY: 0 };
+  return {
+    ...f, projection: 'planar', aspect: 1, feather: Math.min(4, border),
+    coverage: n < faces.length ? coverage : +(coverage / 2).toFixed(1),
+  };
+}
+
 /** Semi-axes of the shape body for the current settings. */
 export function bodyAxes(settings) {
   const body = SHAPES[settings.shape]?.body || 'sphere';
+  if (body === 'cube') {
+    const h = (settings.cube?.size ?? 100) / 2;
+    return { a: h, b: h, c: h, kind: 'cube', round: Math.max(1, Math.min(h * 0.4, settings.cube?.round ?? 5)) };
+  }
   if (body === 'football') {
     const a = settings.footballLength / 2, b = settings.footballWidth / 2;
     const tip = Math.max(0, Math.min(1, settings.footballTip ?? 0.6));

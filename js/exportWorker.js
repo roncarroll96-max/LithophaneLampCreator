@@ -4,7 +4,7 @@
 
 import { buildEllipsoidShape } from './core/shapes.js';
 import { createField } from './core/field.js';
-import { buildShellMesh, diagonalFootprint } from './core/mesh.js';
+import { buildShellMesh, diagonalFootprint, flipUpsideDown } from './core/mesh.js';
 import { writeBinarySTL } from './core/stl.js';
 import { bodyAxes, collarDims } from './core/settings.js';
 
@@ -18,6 +18,7 @@ self.onmessage = (e) => {
       shape, field, stepInner, stepOuter: field.hasRaised ? stepInner : stepOuter, collar,
       onProgress: (v) => self.postMessage({ type: 'progress', value: v * 0.9 }),
     });
+    if (shape.kind === 'cube') flipUpsideDown(mesh); // prints with its top face on the bed
     const stl = writeBinarySTL(mesh.positions, mesh.indices, `Lithophane ${settings.shape} ${settings.diameter}mm`);
     const size = mesh.bbox.max.map((v, i) => v - mesh.bbox.min[i]);
     const stats = {

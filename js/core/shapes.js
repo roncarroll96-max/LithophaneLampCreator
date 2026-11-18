@@ -30,7 +30,7 @@ export function wrapAngle(a) {
  * can be offset inwards without folding over itself.
  * collarOuterR is the radius where the shell meets the collar (the opening edge).
  */
-export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2 }, collarOuterR) {
+export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2, round = 5 }, collarOuterR) {
   const ia2 = 1 / (a * a), ib2 = 1 / (b * b), ic2 = 1 / (c * c);
   const tapered = kind === 'football' && Math.abs(tipN - 2) > 1e-6;
   // Tapered football: radius along a direction depends only on |dx|; tabulate it once
@@ -49,6 +49,66 @@ export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2 }, coll
     }
   }
   const aN = Math.pow(a, tipN);
+
+  // ---- Cube (half size a, edges rounded by `round`). It prints upside down, so its underside
+  // can't be flat: a 45° funnel hangs below the bottom face, down to the opening. Each horizontal
+  // slice of the funnel is a rounded square (corner radius cRho) whose half size shrinks by 1 mm
+  // per mm down. Where it starts (z = cTop) the slice matches the cube's own slice exactly, so
+  // the funnel covers the whole bottom and meets the rounded edges at the same 45° slope.
+  const isCube = kind === 'cube';
+  const cE = a - round;                                // half size of the box before rounding
+  const cC = 2 * cE + round * Math.SQRT2;               // slice half size = cC + z
+  const cTop = -(cE + round / Math.SQRT2);              // where the funnel meets the rounded edge
+  const cRho = round / Math.SQRT2;                      // corner radius of every funnel slice
+  const cK = cC - cRho;                                 // inner square half size = cK + z
+  const cBot = collarOuterR - cC;                       // funnel bottom: slice half size = collarOuterR
+  const cn = { r: 0, nx: 0, ny: 0, nz: 0 };
+  /** Distance from the centre to the cube's surface along unit direction d, and the normal there. */
+  function cubeRay(dx, dy, dz) {
+    const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
+    // Rounded box: |max(r·|d| - e, 0)| = round. Try 1, 2, then 3 active axes (largest first).
+    const v = [ax, ay, az].sort((p, q) => q - p);
+    let rb = (cE + round) / v[0];
+    if (rb * v[1] > cE) {
+      let A = v[0] * v[0] + v[1] * v[1], B = v[0] + v[1];
+      rb = (cE * B + Math.sqrt(Math.max(0, cE * cE * B * B - A * (2 * cE * cE - round * round)))) / A;
+      if (rb * v[2] > cE) {
+        A += v[2] * v[2]; B += v[2];
+        rb = (cE * B + Math.sqrt(Math.max(0, cE * cE * B * B - A * (3 * cE * cE - round * round)))) / A;
+      }
+    }
+    cn.r = rb;
+    cn.nx = Math.sign(dx) * Math.max(rb * ax - cE, 0);
+    cn.ny = Math.sign(dy) * Math.max(rb * ay - cE, 0);
+    cn.nz = Math.sign(dz) * Math.max(rb * az - cE, 0);
+    // Funnel below (only for downward directions that pass through it)
+    if (dz < 0) {
+      const hi = Math.max(ax, ay), lo = Math.min(ax, ay);
+      // flat side of the slice: r·hi = cC + r·dz, valid while the other coordinate is inside the inner square
+      let rSide = cC / (hi - dz), corner = false;
+      if (rSide * lo > cK + rSide * dz) {
+        // rounded corner of the slice: (r(ax-dz) - cK)² + (r(ay-dz) - cK)² = cRho²
+        const A1 = ax - dz, A2 = ay - dz, A = A1 * A1 + A2 * A2, B = A1 + A2;
+        rSide = (cK * B + Math.sqrt(Math.max(0, cK * cK * B * B - A * (2 * cK * cK - cRho * cRho)))) / A;
+        corner = true;
+      }
+      const rBot = cBot / dz, rIn = cTop / dz;
+      const rOut = Math.min(rSide, rBot);
+      if (rIn <= rOut && rOut > rb) {
+        cn.r = rOut;
+        if (rBot <= rSide) { cn.nx = 0; cn.ny = 0; cn.nz = -1; }
+        else if (corner) {
+          const k = cK + rOut * dz;
+          let qx = rOut * ax - k, qy = rOut * ay - k;
+          const ql = Math.hypot(qx, qy) || 1; qx /= ql; qy /= ql;
+          cn.nx = Math.sign(dx) * qx; cn.ny = Math.sign(dy) * qy; cn.nz = -(qx + qy);
+        } else {
+          cn.nx = ax >= ay ? Math.sign(dx) : 0; cn.ny = ax >= ay ? 0 : Math.sign(dy); cn.nz = -1;
+        }
+      }
+    }
+    return cn;
+  }
   const minHoriz = Math.min(a, b);
   if (collarOuterR >= minHoriz * 0.9) {
     throw new Error(`The opening (${(collarOuterR * 2).toFixed(0)} mm with collar) is too big for this ball size.`);
@@ -59,7 +119,10 @@ export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2 }, coll
     const sp = Math.sin(phi);
     const dx = sp * Math.cos(theta), dy = sp * Math.sin(theta), dz = -Math.cos(phi);
     let r, nx, ny, nz;
-    if (tapered) {
+    if (isCube) {
+      const q = cubeRay(dx, dy, dz);
+      r = q.r; nx = q.nx; ny = q.ny; nz = q.nz;
+    } else if (tapered) {
       const f = Math.min(1, Math.abs(dx)) * RT, i = Math.min(RT - 1, Math.floor(f));
       r = rTab[i] + (rTab[i + 1] - rTab[i]) * (f - i);
       const ax = Math.abs(r * dx);
@@ -182,6 +245,7 @@ export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2 }, coll
 
   return {
     kind, a, b, c, collarOuterR, tipN: tapered ? tipN : 2,
+    round: isCube ? round : 0, funnelBottom: isCube ? cBot : null,
     surf, phiEdge, phiAt, merArc, ringArc, ringArcFrom, ringPerimeter, elev,
     sEquator, merLenMax, eqPerimeter,
     eqRho: eqPerimeter / TWO_PI,

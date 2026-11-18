@@ -42,10 +42,12 @@ export function buildGlowTexture(field, settings, TW, TH, mode = 'glow') {
   const { tMin, tMax } = settings;
   for (let y = 0; y < TH; y++) {
     const s = (y + 0.5) / TH;
-    const falloff = 1.12 - 0.3 * s; // the light sits below the ball
+    const rowFalloff = 1.12 - 0.3 * s; // the light sits below the ball
     for (let x = 0; x < TW; x++) {
       field.eval(((x + 0.5) / TW) * TWO_PI, s, ev);
       const wall = ev.t + ev.raise; // raised markings add to the total wall the light passes through
+      // the cube reports how much light reaches each spot; balls use a simple top-to-bottom fade
+      const falloff = ev.light != null ? Math.min(1.6, ev.light) : rowFalloff;
       let g;
       if (mode === 'thickness') {
         // Same greys as the Photo panel's grey map: white = Thinnest, black = Thickest (or more)

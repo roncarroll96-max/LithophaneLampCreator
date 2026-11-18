@@ -238,7 +238,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Your current process and tools:** not yet described. Knowing which software and settings give you good prints today would help tune the defaults. (You)
 - **Your puck light:** its diameter and height, so the default base fits it. (You, ideally with calipers)
 - **Football shape:** the default tip shape (60%) is a guess at a real football; check it against a real ball on the first football print and adjust the default if needed. (You, after first football print)
-- **Cube underside:** the angled underside hangs a little below the walls. Check on the first cube print that it looks right sitting on your base, or whether the walls should reach further down. (You, at the cube test print)
+- **Cube underside:** the 45° funnel under the cube hangs about 20 mm below the bottom of the walls on the Medium cube (total height 125 mm with the collar). Check on the first cube print that it looks right sitting on your base. (You, at the cube test print)
 - **Even glow for balls too?** The same distance correction could help Large balls. Decide after seeing it on the cube. (You, after 0.7)
 - **File sizes:** measured (see feature 20). Still to confirm: does your slicer handle the Standard file comfortably? (You, at test print)
 
@@ -268,6 +268,13 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 0.7: cube, done (2026-11-18)
+Built: "Cube (5 photos)" shape: 80 / 100 / 130 mm presets plus custom size, adjustable edge rounding (5 mm default), same 50 mm opening and collar. Underneath, a 45° funnel runs from the rounded bottom edges down to the opening; its slices are rounded squares that match the cube where they meet, so there are no flat ceilings to print. (Only about 1 mm of each bottom corner's rounding shows past the funnel: patches of 1-2 mm.) Photos on the cube use the new "Straight-on" (planar) projection, so they sit on the flat faces without distortion; new photos go front, back, left, right, top, each filling its face minus the "Photo border" (5 mm default), and "Fit photos to faces" re-places them in list order. The top photo is upright seen from the front. Even glow (on by default, strength 50%) thins the wall where less light from the base arrives and thickens it where more does; the lit preview uses the same light model for the cube. The exported cube STL is already turned upside down (top face on the bed).
+
+Checks passed: 45 automated tests (5 new: body shape and no flat underside surfaces; watertight shell turned top-face-down; photos on a face without distortion; five face slots sized to the border; even glow direction, limits, and no light value for balls). In the browser: five photos landed on the five faces, letters upright, top photo upright seen from the front; export 100 × 100 × 125.1 mm with the flat top face on the bed, matching the bed-fit estimate.
+
+To check on a print: how the funnel looks on your base, the even glow (top vs. bottom of the walls), and the 5 mm border.
 
 ### Version 0.6.1: version number in the header, done (2026-11-18)
 The app's version shows next to its name (from js/version.js; a test keeps it equal to package.json).

@@ -9,6 +9,7 @@ import { THETA_FRONT, wrapAngle } from './shapes.js';
 import { MARKING_TYPES, rotationMatrix } from './markings.js';
 import { SHAPES, markingWidth, defaultPhotoSettings } from './settings.js';
 import { createTextLayer, sForUp } from './textLayer.js';
+import { MU } from './previewData.js';
 import { boxBlur } from './blur.js';
 
 // Softened copies of cut-out photo transparency, reused while the softness stays the same
@@ -89,7 +90,18 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
       const mmPerPx = (W * zoom * cover) / img.w;
       L.alphaMap = softAlpha(img.alpha, img.w, img.h, Math.round(Math.max(0, p.edgeSoft ?? 2) / 2 / mmPerPx));
     }
-    if (L.projection === 'flat') {
+    if (L.projection === 'planar') {
+      // Planar: straight-on coordinates on the plane at the window centre (no distortion on a
+      // flat face such as a cube side; on a ball it is a plain orthographic view)
+      const th = THETA_FRONT + L.aroundRad;
+      shape.surf(th, shape.phiAt(th, sForUp(shape, p.centerY)), ftmp);
+      const N = [ftmp.nx, ftmp.ny, ftmp.nz];
+      let U = [-N[1], N[0], 0];
+      const ul = Math.hypot(U[0], U[1]);
+      U = ul < 1e-6 ? [Math.cos(L.aroundRad), Math.sin(L.aroundRad), 0] : [U[0] / ul, U[1] / ul, 0];
+      const V = [N[1] * U[2] - N[2] * U[1], N[2] * U[0] - N[0] * U[2], N[0] * U[1] - N[1] * U[0]];
+      Object.assign(L, { N, U, V, C: [ftmp.x, ftmp.y, ftmp.z] });
+    } else if (L.projection === 'flat') {
       // Flat: unrolled around the window centre (keeps distances true from the centre;
       // works anywhere, including the top of the ball)
       const th = THETA_FRONT + L.aroundRad;
@@ -115,6 +127,26 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
   const mo = { fill: 0, bright: 0, stripes: settings.footballStripes !== false };
   const fixedFrame = !!(markFn && markFn.usesPoint);
 
+  // ---- Light from the base (cube): a point light just below the collar. lightRel is how much
+  // light reaches a spot compared with the middle of a side face; "even glow" thins the wall
+  // where less light arrives and thickens it where more does, so the cube glows evenly.
+  const isCube = SHAPES[settings.shape]?.body === 'cube';
+  const glowOn = isCube && settings.evenGlow?.on !== false;
+  const glowK = glowOn ? Math.max(0, Math.min(1, settings.evenGlow?.strength ?? 0.5)) / MU : 0;
+  let lightZ = 0, lightRef = 1;
+  if (isCube) {
+    const fb = shape.funnelBottom ?? -shape.c;
+    lightZ = fb - (settings.opening?.collarHeight ?? 5) - 5;
+    const h = shape.a, d2 = h * h + lightZ * lightZ;
+    lightRef = (h / Math.sqrt(d2)) / d2; // middle of a side face: inward normal points at the axis
+  }
+  function lightRel(S) {
+    const lx = -S.x, ly = -S.y, lz = lightZ - S.z;
+    const d2 = lx * lx + ly * ly + lz * lz, d = Math.sqrt(d2);
+    const cos = Math.max(0.05, -(S.nx * lx + S.ny * ly + S.nz * lz) / d);
+    return cos / d2 / lightRef;
+  }
+
   const tmp = {};
   const textLayer = createTextLayer(settings, shape, textMasks);
   const tx = { hits: [], clear: 0 };
@@ -133,6 +165,14 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
 
   /** Window coordinates (mm, x right, y up from the window centre) of a surface point. */
   function windowXY(L, theta, s, S, outXY) {
+    if (L.projection === 'planar') {
+      // only the side of the ball/cube facing the same way as the window
+      if (S.nx * L.N[0] + S.ny * L.N[1] + S.nz * L.N[2] < 0.3) { outXY[0] = 1e9; outXY[1] = 1e9; return; }
+      const px = S.x - L.C[0], py = S.y - L.C[1], pz = S.z - L.C[2];
+      outXY[0] = px * L.U[0] + py * L.U[1] + pz * L.U[2];
+      outXY[1] = px * L.V[0] + py * L.V[1] + pz * L.V[2];
+      return;
+    }
     if (L.projection === 'flat') {
       const c = S.dx * L.N[0] + S.dy * L.N[1] + S.dz * L.N[2];
       const tx = S.dx - c * L.N[0], ty = S.dy - c * L.N[1], tz = S.dz - c * L.N[2];
@@ -245,6 +285,13 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
       }
     }
 
+    // ---- Even glow (cube)
+    let light = null;
+    if (isCube) {
+      light = lightRel(S);
+      if (glowOn) t = Math.min(tMax + LINE_EXTRA, Math.max(tMin, t + glowK * Math.log(light)));
+    }
+
     // ---- Plain band above the opening so the ball seats cleanly on the collar
     const arcE = shape.merArc(theta, s);
     if (arcE < MOUNT_ARC + MOUNT_BLEND) {
@@ -253,7 +300,7 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
       raise *= 1 - mz;
     }
 
-    out.t = t; out.raise = raise; out.mask = mask; out.photoId = photoId;
+    out.t = t; out.raise = raise; out.mask = mask; out.photoId = photoId; out.light = light;
     out.x = S.x + S.nx * raise; out.y = S.y + S.ny * raise; out.z = S.z + S.nz * raise;
     out.ix = S.x - S.nx * t; out.iy = S.y - S.ny * t; out.iz = S.z - S.nz * t;
     out.sx = S.x; out.sy = S.y; out.sz = S.z;

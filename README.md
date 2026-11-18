@@ -26,6 +26,8 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    size (Small 100 / Medium 150 / Large 200 mm; footballs 160 × 100 / 240 × 150 / 280 × 175 mm),
    wall thickness, opening and collar. For the football: tip shape, from oval to pointed.
    For the Moon: Moon only or Photo + Moon, crater depth, and turning the Moon.
+   For the cube (5 photos): size, edge rounding, photo border, "Fit photos to faces", even glow.
+   The cube STL comes out upside down, top face on the bed, ready to print without supports.
 4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
 5. **Text** tab: add names, numbers or dates. Pick a font and style (carved, bright or raised),
    click the ball to place the text, then fine-tune size, bend and position.
