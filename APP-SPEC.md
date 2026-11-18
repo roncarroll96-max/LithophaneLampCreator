@@ -8,7 +8,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | Version | Contents |
 |---|---|
 | 0.1.0 | Milestone 1 (done, tagged) |
-| 0.2 | Print-quality tools: thickness view in the preview, option to put the photo relief on the outside, SVGs always loaded at full resolution |
+| 0.2 | Print-quality tools: thickness view in the preview, SVGs always loaded at full resolution (0.2.1 removed the short-lived "photo detail on the outside" option) |
 | 0.3 | Text |
 | 0.4 | Soccer ball, baseball/softball, volleyball, Moon |
 | 0.5 | Football |
@@ -98,7 +98,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 **Preview and export**
 
 18. **3D preview** (rotate and zoom) with a toggle between **simulated backlit glow** (roughly how it looks on the base), **plain grey model** (for checking shape and markings) and **thickness map** (white = thinnest, black = thickest, with a legend; pointing at the ball shows the wall thickness there in mm). *(Thickness map added in 0.2.)*
-19. **Lithophane thickness settings**: minimum (brightest) and maximum (darkest) wall thickness, and which side the photo detail is on: **inside** (default, smooth outside) or **outside** (detail faces the viewer and may look sharper; the outside is textured). The wall thickness is the same either way, and the band next to the collar is unchanged. *(Added in 0.2.)*
+19. **Lithophane thickness settings**: minimum (brightest) and maximum (darkest) wall thickness.
 20. **STL export** with a detail level chosen at export: **Draft / Standard / Fine**. Detail is the spacing between points on the photo side: Draft 0.5 mm, Standard 0.3 mm, Fine 0.2 mm (same for every size; the smooth outside uses 1 mm unless lines are raised). Measured sizes: Medium Standard ≈ 83 MB, Large Standard ≈ 150 MB, Medium Fine ≈ 178 MB; raised lines roughly double the file. It shows an estimated file size first. The ball and base export as separate files.
 21. **Exported shells are watertight** (no holes or flipped faces), so slicers accept them without repair.
 
@@ -198,7 +198,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Opening / collar | 50 mm opening, 5 mm collar | You |
 | Printing | White PLA, 0.4 mm nozzle, opening-down | Assumed (you accepted defaults) |
 | Thickness | 0.8 mm min, 3.0 mm max | Assumed (you accepted defaults) |
-| Relief side | Photo relief on the inside, smooth outside | Assumed (Claude's default) |
+| Relief side | Photo relief always on the inside, smooth outside. An "outside" option was tried in 0.2.0 and removed in 0.2.1: it has no good use for these lamps | You (2026-11-18) |
 | Collar wall | 2 mm (opening 50 mm inside, 54 mm outside) | Assumed (Claude's default) |
 | Plain band above collar | First 4 mm of the ball above the collar kept plain (no photo or lines), blending in over 6 mm | Assumed (Claude's default) |
 | Carved line darkness | Lines go up to 0.4 mm past the thickest setting so they show over dark photo areas | Assumed (Claude's default) |
@@ -240,7 +240,9 @@ Built: Thickness view in the preview (legend plus a readout of the wall thicknes
 
 Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps the wall thickness, leaves the collar edge unchanged and never goes past the ball size); in the browser, a 120 px SVG loaded with no low-resolution warning, the Thickness view showed 0.80 mm on white and 2.54 mm on a grey area, and an outside-relief export completed with the estimated size.
 
-To check on a print: does outside relief look sharper than inside? A Small ball with the same photo, once each way, answers it.
+### Version 0.2.1: done (2026-11-18)
+Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
+"Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
 
 ### Test print (milestone 1, done)
 Print Medium at Standard detail, opening down, with slicer supports for the curve above the collar. Report back:

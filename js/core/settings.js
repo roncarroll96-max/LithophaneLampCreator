@@ -33,7 +33,6 @@ export function defaultSettings() {
     footballWidth: 150,
     tMin: 0.8,
     tMax: 3.0,
-    reliefSide: 'inside',     // 'inside' (smooth outside) | 'outside' (photo pressed into the outer surface)
     opening: { diameter: 50, collarHeight: 5, collarWall: 2.0 },
     photo: {
       auto: true,
