@@ -164,9 +164,45 @@ function volleyball(dx, dy, dz, radius, width) {
   return lineProfile(Math.min(dEdge, dStrip) * radius, width);
 }
 
+// ---------------------------------------------------------------- Football
+// Works on the actual surface point (mm) because the body is not a sphere. The ball lies along
+// X with the laces on top (+Z). Four seams run tip to tip at 90° steps around the X axis; eight
+// cross laces sit over the top seam; optional end stripes are reported in out.bright (they glow
+// brighter, i.e. thinner plastic).
+const FB_LACES = 8;
+function football(dx, dy, dz, radius, width, out, S, shape) {
+  const x = S.x, y = S.y, z = S.z, a = shape.a, b = shape.b;
+  const rho = Math.hypot(y, z);
+  const psi = Math.atan2(z, y); // 0 = +Y, π/2 = top
+  // Nearest of the four seams (0°, 90°, 180°, 270°), as a distance along the surface
+  const q = Math.PI / 2;
+  const dPsi = Math.abs(psi - Math.round(psi / q) * q);
+  let cover = lineProfile(rho * dPsi, width);
+  // Cross laces over the top seam
+  const half = 0.36 * a, barHalf = 0.14 * b, barW = Math.max(1.2, 0.05 * b);
+  const sTop = rho * (psi - q); // mm around the ball from the top seam
+  if (Math.abs(x) <= half + barW && Math.abs(sTop) <= barHalf + barW && z > 0) {
+    const step = (2 * half) / FB_LACES;
+    const k = Math.max(0, Math.min(FB_LACES - 1, Math.floor((x + half) / step)));
+    const xk = -half + (k + 0.5) * step;
+    const dist = Math.hypot(x - xk, Math.max(0, Math.abs(sTop) - barHalf));
+    cover = Math.max(cover, lineProfile(dist, barW));
+  }
+  if (out) {
+    out.bright = 0;
+    if (out.stripes !== false) {
+      const xs = 0.58 * a, sw = 0.09 * a;
+      out.bright = lineProfile(Math.abs(Math.abs(x) - xs), sw);
+    }
+  }
+  return cover;
+}
+football.usesPoint = true; // gets the surface point; the turn sliders don't apply
+
 export const MARKING_TYPES = {
   none: null,
   moon: null,
+  football,
   basketball,
   soccer,
   baseball,

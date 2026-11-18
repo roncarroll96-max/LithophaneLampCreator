@@ -186,6 +186,9 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Cut-out photo background | Blend into the ball by default; bright and dark also offered; edge softness slider | You chose to add it (2026-11-18); default assumed (Claude's) |
 | Text size default | Letters 15 mm tall; app warns below 6 mm (script below 10 mm) since thin strokes may not print | Assumed (Claude's default) |
 | Football mounting | Lying on its side | You |
+| Football stripes | Bright end stripes (thinner plastic, glow lighter), with a switch to turn them off | You (2026-11-18) |
+| Football tips | Like a real football by default (fuller middle, tapered ends, rounded enough at the tip to print); tip sharpness slider | You (2026-11-18) |
+| Football laces | On top as it lies on the base; photo on the side facing you | You (2026-11-18) |
 | Overhang | Slicer supports; one-piece shell | You |
 | Base | App generates a base; puck (default), LED ring/strip, bulb socket | You |
 | Saving | Browser auto-save + project files | You |
@@ -232,7 +235,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Multiple photos:** is there a maximum you'd use (2? 5? 10?), and should photos be able to blend into each other where they overlap, or always have the top one win? (You, before milestone 2)
 - **Your current process and tools:** not yet described. Knowing which software and settings give you good prints today would help tune the defaults. (You)
 - **Your puck light:** its diameter and height, so the default base fits it. (You, ideally with calipers)
-- **Football shape:** a real football is more pointed than a perfect oval. Version 1 has a "tip sharpness" slider; confirm it matches your footballs. (You, after first test print)
+- **Football shape:** the default tip shape (60%) is a guess at a real football; check it against a real ball on the first football print and adjust the default if needed. (You, after first football print)
 - **Cube underside:** the angled underside hangs a little below the walls. Check on the first cube print that it looks right sitting on your base, or whether the walls should reach further down. (You, at the cube test print)
 - **Even glow for balls too?** The same distance correction could help Large balls. Decide after seeing it on the cube. (You, after 0.7)
 - **File sizes:** measured (see feature 20). Still to confirm: does your slicer handle the Standard file comfortably? (You, at test print)
@@ -263,6 +266,11 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 0.5: football, done (2026-11-18)
+Built: football body that tapers like a real ball (|x/a|^n + (y²+z²)/b² = 1, with a "Tip shape" slider from oval to pointed; the tip stays rounded, at least 10 mm radius, so the wall never folds over itself); lies on its side with the opening under its belly; four tip-to-tip seams, eight cross laces on top, and bright end stripes (switch on the Markings tab); length × width inputs on the Ball tab; the turn sliders are hidden for the football since its laces stay on top; football files are named by length × width. Also fixed: tabs no longer show a stray "null" where an optional section is left out.
+
+Checks passed: 33 automated tests (5 new: the body matches its formula with outward normals and the right size; pointier tips taper more but stay printable; laces, seams and stripes in the right places with stripes switchable; watertight shells for pointed, raised-lace and plain footballs; stripes reach the thinnest wall). In the browser: the football draws with laces on top and stripes near both ends; Large shows "rotate it 45° in your slicer (280 × 175 mm)"; an export completed at 240 × 150 mm with no errors.
 
 ### Version 0.4.1: cut-out photos, done (2026-11-18)
 Built: photos with transparent backgrounds are recognised; a "Background (cut-out photo)" section on the Photo tab chooses blend into ball / bright / dark plus edge softness; auto adjustments ignore the empty area; the grey map shows the background as it will print; the photo is stored as PNG when it has transparency.

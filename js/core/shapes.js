@@ -24,10 +24,31 @@ export function wrapAngle(a) {
 /**
  * Builds a shape object for an ellipsoid with semi-axes a (X), b (Y), c (Z).
  * A sphere is a = b = c. A football lying on its side is a = length/2, b = c = width/2.
+ * For a football, tipN < 2 makes the ends taper like a real ball: the body becomes
+ *   |x/a|^tipN + (y² + z²)/b² = 1
+ * (tipN = 2 is the plain oval). The tip stays rounded with radius b²·tipN/(2a), so the wall
+ * can be offset inwards without folding over itself.
  * collarOuterR is the radius where the shell meets the collar (the opening edge).
  */
-export function buildEllipsoidShape({ a, b, c, kind = 'sphere' }, collarOuterR) {
+export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2 }, collarOuterR) {
   const ia2 = 1 / (a * a), ib2 = 1 / (b * b), ic2 = 1 / (c * c);
+  const tapered = kind === 'football' && Math.abs(tipN - 2) > 1e-6;
+  // Tapered football: radius along a direction depends only on |dx|; tabulate it once
+  const RT = 4096;
+  let rTab = null;
+  if (tapered) {
+    rTab = new Float64Array(RT + 1);
+    for (let i = 0; i <= RT; i++) {
+      const cx = i / RT, s2 = 1 - cx * cx;
+      let lo = 0, hi = Math.max(a, b) * 1.01;
+      for (let it = 0; it < 60; it++) {
+        const r = (lo + hi) / 2;
+        if (Math.pow((r * cx) / a, tipN) + (r * r * s2) * ib2 < 1) lo = r; else hi = r;
+      }
+      rTab[i] = (lo + hi) / 2;
+    }
+  }
+  const aN = Math.pow(a, tipN);
   const minHoriz = Math.min(a, b);
   if (collarOuterR >= minHoriz * 0.9) {
     throw new Error(`The opening (${(collarOuterR * 2).toFixed(0)} mm with collar) is too big for this ball size.`);
@@ -37,9 +58,18 @@ export function buildEllipsoidShape({ a, b, c, kind = 'sphere' }, collarOuterR) 
   function surf(theta, phi, out) {
     const sp = Math.sin(phi);
     const dx = sp * Math.cos(theta), dy = sp * Math.sin(theta), dz = -Math.cos(phi);
-    const r = 1 / Math.sqrt(dx * dx * ia2 + dy * dy * ib2 + dz * dz * ic2);
+    let r, nx, ny, nz;
+    if (tapered) {
+      const f = Math.min(1, Math.abs(dx)) * RT, i = Math.min(RT - 1, Math.floor(f));
+      r = rTab[i] + (rTab[i + 1] - rTab[i]) * (f - i);
+      const ax = Math.abs(r * dx);
+      nx = (tipN * Math.pow(ax, tipN - 1) * Math.sign(dx)) / aN;
+      ny = 2 * r * dy * ib2; nz = 2 * r * dz * ib2;
+    } else {
+      r = 1 / Math.sqrt(dx * dx * ia2 + dy * dy * ib2 + dz * dz * ic2);
+      nx = r * dx * ia2; ny = r * dy * ib2; nz = r * dz * ic2;
+    }
     const x = r * dx, y = r * dy, z = r * dz;
-    let nx = x * ia2, ny = y * ib2, nz = z * ic2;
     const nl = 1 / Math.hypot(nx, ny, nz);
     out.x = x; out.y = y; out.z = z;
     out.nx = nx * nl; out.ny = ny * nl; out.nz = nz * nl;
@@ -149,7 +179,7 @@ export function buildEllipsoidShape({ a, b, c, kind = 'sphere' }, collarOuterR) 
   const eqPerimeter = ringPerimeter(sEquator);
 
   return {
-    kind, a, b, c, collarOuterR,
+    kind, a, b, c, collarOuterR, tipN: tapered ? tipN : 2,
     surf, phiEdge, phiAt, merArc, ringArc, ringPerimeter, elev,
     sEquator, merLenMax, eqPerimeter,
     eqRho: eqPerimeter / TWO_PI,

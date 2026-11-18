@@ -163,7 +163,8 @@ function scheduleAutosave() {
 function projectBaseName() {
   const s = app.settings;
   const n = (app.photoName || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
-  return `${n}-${s.shape}-${s.diameter}mm`;
+  const size = s.shape === 'football' ? `${s.footballLength}x${s.footballWidth}mm` : `${s.diameter}mm`;
+  return `${n}-${s.shape}-${size}`;
 }
 
 // ---------- Moon maps (loaded the first time the Moon shape is chosen) ----------
@@ -276,7 +277,8 @@ const num2 = (v) => (+v).toFixed(2);
 function renderTab() {
   const body = $('tabBody');
   const scroll = body.scrollTop;
-  body.replaceChildren(...({ photo: photoTab, ball: ballTab, markings: markingsTab, text: textTab, export: exportTab }[app.tab])());
+  // Sections can be left out with null; skip those (replaceChildren would show them as "null")
+  body.replaceChildren(...({ photo: photoTab, ball: ballTab, markings: markingsTab, text: textTab, export: exportTab }[app.tab])().filter(Boolean));
   body.scrollTop = scroll;
   if (app.tab === 'photo') drawThumb();
 }
@@ -372,6 +374,16 @@ function ballTab() {
     changed('shape'); renderTab();
   });
   const dia = el('input', { type: 'number', min: 60, max: 250, step: 1, value: s.diameter, 'aria-label': 'Diameter in mm' });
+  const footballInput = (key, lo, hi) => {
+    const i = el('input', { type: 'number', min: lo, max: hi, step: 1, value: s[key], style: 'width:76px', 'aria-label': key === 'footballLength' ? 'Football length in mm' : 'Football width in mm' });
+    i.addEventListener('change', () => {
+      const v = Math.min(hi, Math.max(lo, parseFloat(i.value) || s[key]));
+      i.value = v; s[key] = v;
+      s.sizePreset = Object.keys(SIZE_PRESETS).find((k) => SIZE_PRESETS[k].footballLength === s.footballLength && SIZE_PRESETS[k].footballWidth === s.footballWidth) || 'custom';
+      changed('shape'); renderTab();
+    });
+    return i;
+  };
   dia.addEventListener('change', () => {
     const v = Math.min(250, Math.max(60, parseFloat(dia.value) || 150));
     dia.value = v; s.diameter = v; s.sizePreset = Object.keys(SIZE_PRESETS).find((k) => SIZE_PRESETS[k].diameter === v) || 'custom';
@@ -391,7 +403,14 @@ function ballTab() {
       note(app.moonPrep ? 'Moon maps: NASA Scientific Visualization Studio (CGI Moon Kit).' : 'Loading the Moon maps...'),
     ) : null,
     section('Size', sizeSeg,
-      el('div', { class: 'row', style: 'margin-top:10px' }, el('span', { class: 'grow' }, 'Ball diameter (mm)'), dia)),
+      s.shape === 'football'
+        ? el('div', { class: 'row', style: 'margin-top:10px;gap:8px' },
+          el('span', { class: 'grow' }, 'Length × width (mm)'), footballInput('footballLength', 120, 320), footballInput('footballWidth', 70, 200))
+        : el('div', { class: 'row', style: 'margin-top:10px' }, el('span', { class: 'grow' }, 'Ball diameter (mm)'), dia)),
+    s.shape === 'football' ? section('Football',
+      slider('footballTip', 'Tip shape (oval → pointed)', 0, 1, 0.01, { fmt: pct, group: 'shape' }),
+      note('Lies on its side with the laces on top. Your photo goes on the side facing you.'),
+    ) : null,
     section('Wall thickness',
       slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
       slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5) }),
@@ -430,8 +449,9 @@ function markingsTab() {
       m.style === 'raised' ? slider('markings.raise', 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
       slider('markings.fade', 'Fade over the photo', 0, 1, 0.01, { fmt: pct }),
       kind === 'soccer' ? slider('markings.panelDark', 'Pentagon darkness', 0, 1, 0.01, { fmt: pct }) : null,
+      kind === 'football' ? checkbox('footballStripes', 'End stripes (glow bright, like a college ball)') : null,
     ),
-    m.style === 'off' ? null : section('Turn the markings',
+    m.style === 'off' || kind === 'football' ? null : section('Turn the markings',
       slider('markings.yaw', 'Spin', -180, 180, 1, { fmt: deg }),
       slider('markings.pitch', 'Tilt forward / back', -90, 90, 1, { fmt: deg }),
       slider('markings.roll', 'Tilt sideways', -90, 90, 1, { fmt: deg }),

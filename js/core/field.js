@@ -80,7 +80,8 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
   const carved = mk.style === 'carved';
   const raised = mk.style === 'raised';
   const panelDark = mk.panelDark ?? 0.5;
-  const mo = { fill: 0 };
+  const mo = { fill: 0, bright: 0, stripes: settings.footballStripes !== false };
+  const fixedFrame = !!(markFn && markFn.usesPoint);
 
   const tmp = {};
   const textLayer = createTextLayer(settings, shape, textMasks);
@@ -166,16 +167,18 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
     // ---- Markings (evaluated on the ball's own rotated frame)
     if (markFn && !(textLayer && tx.clear >= 1)) {
       const dx = S.dx, dy = S.dy, dz = S.dz;
-      // R^T * d (rotating the markings by R)
-      const lx = R[0] * dx + R[3] * dy + R[6] * dz;
-      const ly = R[1] * dx + R[4] * dy + R[7] * dz;
-      const lz = R[2] * dx + R[5] * dy + R[8] * dz;
-      mo.fill = 0;
-      let m = markFn(lx, ly, lz, markR, lineW, mo);
+      // R^T * d (rotating the markings by R); the football's markings are fixed to its body
+      const lx = fixedFrame ? dx : R[0] * dx + R[3] * dy + R[6] * dz;
+      const ly = fixedFrame ? dy : R[1] * dx + R[4] * dy + R[7] * dz;
+      const lz = fixedFrame ? dz : R[2] * dx + R[5] * dy + R[8] * dz;
+      mo.fill = 0; mo.bright = 0;
+      let m = markFn(lx, ly, lz, markR, lineW, mo, S, shape);
       if (textLayer) m *= 1 - tx.clear;
       const k = 1 - mk.fade * mask;
       // Darker panels (soccer pentagons), then the lines on top
       if (mo.fill > 0 && panelDark > 0) t += (tMax - t) * mo.fill * panelDark * k;
+      // Bright bands (football end stripes): thinner plastic
+      if (mo.bright > 0) t += (tMin - t) * mo.bright * (1 - (textLayer ? tx.clear : 0)) * k;
       if (m > 0) {
         if (carved) t += (tMax + LINE_EXTRA - t) * m * mk.darkness * k;
         else if (raised) raise = mk.raise * m * k;

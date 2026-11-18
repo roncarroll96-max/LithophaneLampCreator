@@ -20,8 +20,9 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    choose whether the empty area blends into the ball, glows bright or stays dark.
 2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes.
    The **Thickness** button above the preview shows the walls as a grey map; point at the ball to read the thickness in mm.
-3. **Ball** tab: shape (basketball, soccer, baseball/softball, volleyball, plain sphere or Moon),
-   size (Small 100 / Medium 150 / Large 200 mm), wall thickness, opening and collar.
+3. **Ball** tab: shape (basketball, soccer, football, baseball/softball, volleyball, plain sphere or Moon),
+   size (Small 100 / Medium 150 / Large 200 mm; footballs 160 × 100 / 240 × 150 / 280 × 175 mm),
+   wall thickness, opening and collar. For the football: tip shape, from oval to pointed.
    For the Moon: Moon only or Photo + Moon, crater depth, and turning the Moon.
 4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
 5. **Text** tab: add names, numbers or dates. Pick a font and style (carved, bright or raised),

@@ -10,7 +10,7 @@ export const SHAPES = {
   basketball: { label: 'Basketball', body: 'sphere', markings: 'basketball', ready: true },
   sphere: { label: 'Plain sphere', body: 'sphere', markings: 'none', ready: true },
   soccer: { label: 'Soccer ball', body: 'sphere', markings: 'soccer', ready: true },
-  football: { label: 'Football', body: 'football', markings: 'football', ready: false },
+  football: { label: 'Football', body: 'football', markings: 'football', ready: true },
   baseball: { label: 'Baseball / softball', body: 'sphere', markings: 'baseball', ready: true },
   volleyball: { label: 'Volleyball', body: 'sphere', markings: 'volleyball', ready: true },
   moon: { label: 'Moon', body: 'sphere', markings: 'moon', ready: true },
@@ -31,6 +31,8 @@ export function defaultSettings() {
     diameter: 150,
     footballLength: 240,
     footballWidth: 150,
+    footballTip: 0.6,         // 0 = smooth oval .. 1 = most pointed (still printable)
+    footballStripes: true,    // bright end stripes
     tMin: 0.8,
     tMax: 3.0,
     opening: { diameter: 50, collarHeight: 5, collarWall: 2.0 },
@@ -75,7 +77,8 @@ export function bodyAxes(settings) {
   const body = SHAPES[settings.shape]?.body || 'sphere';
   if (body === 'football') {
     const a = settings.footballLength / 2, b = settings.footballWidth / 2;
-    return { a, b, c: b, kind: 'football' };
+    const tip = Math.max(0, Math.min(1, settings.footballTip ?? 0.6));
+    return { a, b, c: b, kind: 'football', tipN: 2 - 0.8 * tip };
   }
   const r = settings.diameter / 2;
   return { a: r, b: r, c: r, kind: 'sphere' };
