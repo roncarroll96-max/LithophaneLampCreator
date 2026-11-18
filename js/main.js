@@ -413,7 +413,7 @@ function photoTab() {
         ? 'Drag the selected photo on the ball to move it (pick it in this list first). Where photos overlap, the one higher in the list is in front.'
         : 'Drag the photo on the ball to move it.') : null,
       isMoonShape() && s.moon.mode !== 'photo'
-        ? note('The Moon is set to "Moon only", so photos are not used. Choose "Photo + Moon" on the Ball tab to show them.', 'warn')
+        ? note('The Moon is set to "Moon only", so photos are not used. Choose "Photo + Moon" on the Shape tab to show them.', 'warn')
         : null,
     ),
   ];
@@ -579,7 +579,7 @@ function markingsTab() {
   const s = app.settings, m = s.markings;
   const kind = SHAPES[s.shape]?.markings;
   if (!kind || kind === 'none') return [section('Markings', note('The plain sphere has no markings.'))];
-  if (kind === 'moon') return [section('Markings', note('The Moon has no lines. Its craters and maria come from NASA maps (Ball tab).'))];
+  if (kind === 'moon') return [section('Markings', note('The Moon has no lines. Its craters and maria come from NASA maps (Shape tab).'))];
   const autoW = markingWidth({ ...s, markings: { ...m, width: null } });
   return [
     section('Style',
@@ -725,7 +725,7 @@ function baseTab() {
     kind === 'bulb' ? [
       segmented('base.socket', Object.entries(SOCKETS).map(([k, v]) => ({ value: k, label: v.label })), 'field', () => renderTab()),
       note(`The socket screws onto a 1/8" threaded lamp nipple through the top. The bulb must fit through the ${(col.ri * 2).toFixed(0)} mm opening.`),
-      info && info.socketFits === false ? note('This socket is wider than the opening. Use a smaller socket or a bigger opening (Ball tab).', 'warn') : null,
+      info && info.socketFits === false ? note('This socket is wider than the opening. Use a smaller socket or a bigger opening (Shape tab).', 'warn') : null,
     ] : null,
   );
   const shapeOpts = segmented('base.shape', [

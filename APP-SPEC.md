@@ -272,6 +272,9 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
 
+### Version 1.0.1: "Ball" tab renamed "Shape" (2026-11-18)
+The tab holding the shape, size, wall thickness and opening is now called **Shape** (it covers the cube too). Earlier notes below still say "Ball tab".
+
 ### Version 1.0: phone and tablet polish, final check, done (2026-11-18)
 Phone and tablet: every tab checked at 375 × 812 (phone) and 768 × 1024 (tablet): nothing runs off the side and every button, option and checkbox is at least 36 px tall (small buttons and option bars are 40 px on phones, checkboxes 22 px). On phones the photo list shows each name on its own line with the buttons underneath. Touch screens have no hover, so in the Thickness view a tap on the ball shows the thickness there. In phone mode the Fine-detail warning appears and a Standard export completes. New projects now keep your own defaults (printer bed, size, wall thickness, opening, cube and base settings, detail), as this spec asks.
 
