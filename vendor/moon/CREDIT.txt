@@ -1,0 +1,7 @@
+Moon maps from NASA's Scientific Visualization Studio, "CGI Moon Kit"
+https://svs.gsfc.nasa.gov/4720
+
+lroc_color_2k.jpg  - surface brightness (LRO Camera color mosaic), 2048x1024
+ldem_3_8bit.jpg    - height map (LRO Laser Altimeter), 1024x512
+
+Credit: NASA's Scientific Visualization Studio. NASA imagery is free to use.

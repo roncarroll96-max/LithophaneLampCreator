@@ -18,7 +18,9 @@ Double-click **start.bat**. It starts a tiny local web server and opens
 1. **Choose photo** (or drag one onto the preview). Automatic adjustments are applied.
 2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes.
    The **Thickness** button above the preview shows the walls as a grey map; point at the ball to read the thickness in mm.
-3. **Ball** tab: shape, size (Small 100 / Medium 150 / Large 200 mm), wall thickness, opening and collar.
+3. **Ball** tab: shape (basketball, soccer, baseball/softball, volleyball, plain sphere or Moon),
+   size (Small 100 / Medium 150 / Large 200 mm), wall thickness, opening and collar.
+   For the Moon: Moon only or Photo + Moon, crater depth, and turning the Moon.
 4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
 5. **Text** tab: add names, numbers or dates. Pick a font and style (carved, bright or raised),
    click the ball to place the text, then fine-tune size, bend and position.

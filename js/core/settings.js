@@ -9,11 +9,11 @@ export const SIZE_PRESETS = {
 export const SHAPES = {
   basketball: { label: 'Basketball', body: 'sphere', markings: 'basketball', ready: true },
   sphere: { label: 'Plain sphere', body: 'sphere', markings: 'none', ready: true },
-  soccer: { label: 'Soccer ball', body: 'sphere', markings: 'soccer', ready: false },
+  soccer: { label: 'Soccer ball', body: 'sphere', markings: 'soccer', ready: true },
   football: { label: 'Football', body: 'football', markings: 'football', ready: false },
-  baseball: { label: 'Baseball / softball', body: 'sphere', markings: 'baseball', ready: false },
-  volleyball: { label: 'Volleyball', body: 'sphere', markings: 'volleyball', ready: false },
-  moon: { label: 'Moon', body: 'sphere', markings: 'moon', ready: false },
+  baseball: { label: 'Baseball / softball', body: 'sphere', markings: 'baseball', ready: true },
+  volleyball: { label: 'Volleyball', body: 'sphere', markings: 'volleyball', ready: true },
+  moon: { label: 'Moon', body: 'sphere', markings: 'moon', ready: true },
 };
 
 /** Export detail presets: spacing between mesh points on the photo surface (mm). */
@@ -54,9 +54,15 @@ export function defaultSettings() {
       darkness: 1,            // carved lines: 0..1
       raise: 1.0,             // raised lines: height in mm
       fade: 0.3,              // how much lines fade inside the photo (0..1)
+      panelDark: 0.5,         // soccer: how much darker the pentagons glow (0 = same as hexagons)
       yaw: 60, pitch: 20, roll: 0,
     },
     texts: [],                // text items (see core/textLayer.js defaultTextItem)
+    moon: {
+      mode: 'moon',           // 'moon' (Moon only) | 'photo' (photo in a front window, fading into the Moon)
+      craters: 0.4,           // how strongly NASA's height map deepens craters (0..1)
+      spin: 0,                // degrees; turns the Moon (0 = the side that faces Earth at the front)
+    },
     bed: { x: 256, y: 256, z: 256 },
     detail: 'standard',
   };

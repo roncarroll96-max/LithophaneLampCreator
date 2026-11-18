@@ -12,6 +12,8 @@ import {
 import { autosave, loadAutosave, saveProjectFile, readProjectFile, download } from './storage.js';
 import { TEXT_FONTS, defaultTextItem, placementAt } from './core/textLayer.js';
 import { buildTextMasks, masksCurrent, loadAllFonts } from './text.js';
+import { loadMoon } from './moonData.js';
+import { moonMap } from './core/moon.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
 
@@ -26,6 +28,9 @@ const app = {
   collar: null,
   field: null,
   textMasks: null,   // rendered text masks by item id
+  moonPrep: null,    // prepared NASA Moon maps (loaded on first use)
+  moonMap: null,     // Moon brightness for the current crater depth
+  moonMapCraters: null,
   selectedText: null, // id of the text item being edited
   tab: 'photo',
   exporting: false,
@@ -87,7 +92,9 @@ function update(quick) {
     }
     if (!app.shape) return;
     ensureTextMasks();
-    app.field = createField(s, app.shape, app.processed, app.textMasks);
+    app.field = createField(s, app.shape, app.processed, app.textMasks, ensureMoon());
+    // A Moon-only lamp needs no photo, so don't cover it with the "choose a photo" card
+    $('emptyState').classList.toggle('hidden', !!app.base || (isMoonShape() && s.moon.mode !== 'photo'));
     const raised = app.field.hasRaised;
     if (shapeChanged || raised || !quick || app._wasRaised !== raised) preview.updateGeometry(app.field, !quick);
     app._wasRaised = raised;
@@ -154,6 +161,29 @@ function projectBaseName() {
   const s = app.settings;
   const n = (app.photoName || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
   return `${n}-${s.shape}-${s.diameter}mm`;
+}
+
+// ---------- Moon maps (loaded the first time the Moon shape is chosen) ----------
+let moonLoading = false;
+const isMoonShape = () => SHAPES[app.settings.shape]?.markings === 'moon';
+function ensureMoon() {
+  if (!isMoonShape()) return null;
+  if (!app.moonPrep) {
+    if (!moonLoading) {
+      moonLoading = true;
+      loadMoon()
+        .then((prep) => { app.moonPrep = prep; changed('field'); if (app.tab === 'ball') renderTab(); })
+        .catch((err) => { console.error(err); toast(`The Moon maps could not be loaded: ${err.message || err}`, 'err'); })
+        .finally(() => { moonLoading = false; });
+    }
+    return null;
+  }
+  const craters = app.settings.moon.craters;
+  if (!app.moonMap || app.moonMapCraters !== craters) {
+    app.moonMap = moonMap(app.moonPrep, craters);
+    app.moonMapCraters = craters;
+  }
+  return app.moonMap;
 }
 
 // ---------- Text masks (drawn from the fonts in the background, then the preview updates) ----------
@@ -270,6 +300,9 @@ function photoTab() {
         el('button', { class: 'btn small', onclick: () => $('filePhoto').click() }, app.base ? 'Change photo' : 'Choose photo'),
         holdBtn, autoBtn),
       app.base ? note('Lighter areas print thinner and glow brighter.') : null,
+      isMoonShape() && s.moon.mode !== 'photo'
+        ? note('The Moon is set to "Moon only", so the photo is not used. Choose "Photo + Moon" on the Ball tab to show it.', 'warn')
+        : null,
     ),
     section('Tone',
       slider('photo.blackPoint', 'Black point', 0, 0.6, 0.005, { fmt: num2, group: 'tone' }),
@@ -335,7 +368,16 @@ function ballTab() {
 
   return [
     section('Shape', shapeSel,
-      note('More shapes (soccer, football, baseball, volleyball, Moon) arrive in the next milestone.')),
+      note('The football arrives in the next version.')),
+    isMoonShape() ? section('Moon',
+      segmented('moon.mode', [
+        { value: 'moon', label: 'Moon only', title: 'A classic moon lamp' },
+        { value: 'photo', label: 'Photo + Moon', title: 'Your photo in a front window, fading into the Moon' },
+      ], 'field', () => renderTab()),
+      slider('moon.craters', 'Crater depth', 0, 1, 0.01, { fmt: pct }),
+      slider('moon.spin', 'Turn the Moon', -180, 180, 1, { fmt: deg }),
+      note(app.moonPrep ? 'Moon maps: NASA Scientific Visualization Studio (CGI Moon Kit).' : 'Loading the Moon maps...'),
+    ) : null,
     section('Size', sizeSeg,
       el('div', { class: 'row', style: 'margin-top:10px' }, el('span', { class: 'grow' }, 'Ball diameter (mm)'), dia)),
     section('Wall thickness',
@@ -354,6 +396,7 @@ function markingsTab() {
   const s = app.settings, m = s.markings;
   const kind = SHAPES[s.shape]?.markings;
   if (!kind || kind === 'none') return [section('Markings', note('The plain sphere has no markings.'))];
+  if (kind === 'moon') return [section('Markings', note('The Moon has no lines. Its craters and maria come from NASA maps (Ball tab).'))];
   const autoW = markingWidth({ ...s, markings: { ...m, width: null } });
   return [
     section('Style',
@@ -374,6 +417,7 @@ function markingsTab() {
       m.style === 'carved' ? slider('markings.darkness', 'Darkness', 0, 1, 0.01, { fmt: pct }) : null,
       m.style === 'raised' ? slider('markings.raise', 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
       slider('markings.fade', 'Fade over the photo', 0, 1, 0.01, { fmt: pct }),
+      kind === 'soccer' ? slider('markings.panelDark', 'Pentagon darkness', 0, 1, 0.01, { fmt: pct }) : null,
     ),
     m.style === 'off' ? null : section('Turn the markings',
       slider('markings.yaw', 'Spin', -180, 180, 1, { fmt: deg }),
@@ -561,7 +605,8 @@ function exportStl() {
     done();
   };
   const photo = app.processed ? { w: app.processed.w, h: app.processed.h, data: app.processed.data.slice() } : null;
-  worker.postMessage({ settings: structuredClone(s), photo, textMasks: app.textMasks, stepInner: step, stepOuter: OUTER_STEP }, photo ? [photo.data.buffer] : []);
+  const moon = isMoonShape() ? app.moonMap : null;
+  worker.postMessage({ settings: structuredClone(s), photo, textMasks: app.textMasks, moon, stepInner: step, stepOuter: OUTER_STEP }, photo ? [photo.data.buffer] : []);
 }
 
 // ---------- Wiring ----------

@@ -22,10 +22,11 @@ const MOUNT_BLEND = 6;      // mm to blend from the plain mount band into the de
 /**
  * photo: { w, h, data: Float32Array brightness 0..1 } or null
  * textMasks: rendered text masks by item id (see textLayer.js), or null
+ * moon: { w, h, data: Float32Array brightness 0..1 } equirectangular Moon map (see moon.js), or null
  * Returns { eval(theta, s, out) } where out receives:
  *   x,y,z (outer surface), ix,iy,iz (inner surface), t (wall mm), raise (mm), mask (0..1 photo)
  */
-export function createField(settings, shape, photo, textMasks = null) {
+export function createField(settings, shape, photo, textMasks = null, moon = null) {
   const { tMin, tMax } = settings;
   const p = settings.photo;
   const mk = settings.markings;
@@ -45,6 +46,12 @@ export function createField(settings, shape, photo, textMasks = null) {
   const surround = p.surround;
   const oval = p.windowShape === 'oval';
 
+  // Moon: its surface replaces the plain ball; in 'moon' mode the photo is not used at all
+  const isMoon = SHAPES[settings.shape]?.markings === 'moon' && !!moon;
+  const moonOnly = isMoon && settings.moon?.mode !== 'photo';
+  const moonSpin = ((settings.moon?.spin || 0) * Math.PI) / 180;
+  const usePhoto = photo && !moonOnly;
+
   // Markings
   const markFn = mk.style === 'off' ? null : MARKING_TYPES[SHAPES[settings.shape]?.markings] || null;
   const R = rotationMatrix(mk.yaw, mk.pitch, mk.roll);
@@ -52,6 +59,8 @@ export function createField(settings, shape, photo, textMasks = null) {
   const markR = shape.markRadius;
   const carved = mk.style === 'carved';
   const raised = mk.style === 'raised';
+  const panelDark = mk.panelDark ?? 0.5;
+  const mo = { fill: 0 };
 
   const tmp = {};
   const textLayer = createTextLayer(settings, shape, textMasks);
@@ -70,13 +79,30 @@ export function createField(settings, shape, photo, textMasks = null) {
     return a * (1 - wy) + b * wy;
   }
 
+  function sampleMoon(theta, dz) {
+    // Longitude 0 (the side that faces Earth) at the front, east to the right as seen from Earth
+    const lon = wrapAngle(theta - THETA_FRONT + moonSpin);
+    const lat = Math.asin(Math.max(-1, Math.min(1, dz)));
+    const fx = (0.5 + lon / (2 * Math.PI)) * moon.w - 0.5, fy = (0.5 - lat / Math.PI) * moon.h - 0.5;
+    const x0 = Math.floor(fx), y0 = Math.floor(fy), wx = fx - x0, wy = fy - y0;
+    const xa = ((x0 % moon.w) + moon.w) % moon.w, xb = (xa + 1) % moon.w;
+    const ya = Math.max(0, Math.min(moon.h - 1, y0)), yb = Math.max(0, Math.min(moon.h - 1, y0 + 1));
+    const d = moon.data;
+    const a = d[ya * moon.w + xa] * (1 - wx) + d[ya * moon.w + xb] * wx;
+    const b = d[yb * moon.w + xa] * (1 - wx) + d[yb * moon.w + xb] * wx;
+    return a * (1 - wy) + b * wy;
+  }
+
   function evalAt(theta, s, out) {
     const phi = shape.phiAt(theta, s);
     const S = shape.surf(theta, phi, tmp);
 
+    // ---- Base surface: the Moon, or the plain ball
+    const base = isMoon ? sampleMoon(theta, S.dz) : surround;
+
     // ---- Photo
-    let bright = surround, mask = 0;
-    if (photo) {
+    let bright = base, mask = 0;
+    if (usePhoto) {
       const dTheta = wrapAngle(theta - THETA_FRONT);
       const natural = shape.ringArc(theta, s);
       const xmm = natural * (1 - wrapBlend) + dTheta * shape.eqRho * wrapBlend;
@@ -97,7 +123,7 @@ export function createField(settings, shape, photo, textMasks = null) {
         const u = 0.5 + p.panX + qx / cover;
         const v = 0.5 + p.panY + qy / (cover * imgAspect);
         if (u >= 0 && u <= 1 && v >= 0 && v <= 1) {
-          bright = surround + (samplePhoto(u, v) - surround) * mask;
+          bright = base + (samplePhoto(u, v) - base) * mask;
         } else {
           mask = 0;
         }
@@ -116,10 +142,13 @@ export function createField(settings, shape, photo, textMasks = null) {
       const lx = R[0] * dx + R[3] * dy + R[6] * dz;
       const ly = R[1] * dx + R[4] * dy + R[7] * dz;
       const lz = R[2] * dx + R[5] * dy + R[8] * dz;
-      let m = markFn(lx, ly, lz, markR, lineW);
+      mo.fill = 0;
+      let m = markFn(lx, ly, lz, markR, lineW, mo);
       if (textLayer) m *= 1 - tx.clear;
+      const k = 1 - mk.fade * mask;
+      // Darker panels (soccer pentagons), then the lines on top
+      if (mo.fill > 0 && panelDark > 0) t += (tMax - t) * mo.fill * panelDark * k;
       if (m > 0) {
-        const k = 1 - mk.fade * mask;
         if (carved) t += (tMax + LINE_EXTRA - t) * m * mk.darkness * k;
         else if (raised) raise = mk.raise * m * k;
       }

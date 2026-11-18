@@ -178,6 +178,10 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Text readability | Optional bright outline around letters, off by default | You |
 | Text arc | Bend slider, straight by default | You |
 | Lines under text | Lines stop around text with a small gap | You |
+| Soccer look | Seam lines plus darker pentagons (classic black-and-white look), pentagon darkness slider down to none | You (2026-11-18) |
+| Baseball / softball | Curved seam plus V-shaped stitches on both sides | You (2026-11-18) |
+| Volleyball | Classic 18-panel: six groups of three strips, neighbours turned 90° | You (2026-11-18) |
+| Moon look | NASA surface brightness map (dark maria, bright craters, as seen from Earth) plus a crater-depth slider from NASA's height map | You (2026-11-18) |
 | Text size default | Letters 15 mm tall; app warns below 6 mm (script below 10 mm) since thin strokes may not print | Assumed (Claude's default) |
 | Football mounting | Lying on its side | You |
 | Overhang | Slicer supports; one-piece shell | You |
@@ -257,6 +261,13 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 0.4: soccer, baseball/softball, volleyball, Moon, done (2026-11-18)
+Built: soccer ball (32 panels from a true truncated icosahedron; seams plus darker pentagons with a "Pentagon darkness" slider); baseball/softball (the classic seam curve with 108 V-shaped stitches on both sides); classic 18-panel volleyball; Moon from two NASA maps (vendor/moon, about 570 KB, credited in vendor/moon/CREDIT.txt): "Moon only" or "Photo + Moon", crater depth and turn sliders, near side facing front with east to the right as seen from Earth. A Moon-only lamp needs no photo, so the "choose a photo" card is hidden for it. Lines on all shapes use the existing carved / raised / off, width, darkness, fade and turn settings, and stop around text.
+
+Checks passed: 24 automated tests (9 new: soccer pentagons, hexagons and seams; baseball seam on the curve and clear far from it; volleyball sections and strips turned the right way; watertight shells for all three with carved and raised lines; pentagon darkness; Moon map stretching, crater depth and east/west orientation; Moon-only vs Photo + Moon). In the browser: all four shapes selectable and drawn (soccer, baseball and volleyball patterns look right; the Moon shows Copernicus, Mare Imbrium, Mare Crisium and Tycho where they belong); stitches cover both sides of the baseball seam equally; a Moon export completed with no errors.
+
+To check on a print: are baseball stitches crisp at Medium size, and is the Moon's crater depth (40% default) about right?
 
 ### Version 0.3: text, done (2026-11-18)
 Built: Text tab with several text items (add, copy, hide, remove); carved, bright or raised style; four bundled fonts (Graduate, Montserrat, Pacifico, Playfair Display, all SIL Open Font License, about 80 KB in vendor/fonts); letter height with a small-size warning; bend slider; optional bright outline; click the ball to place, then around / up-down / rotate sliders; basketball lines stop 1.5 mm from text; text included in the Thickness view, export and saved projects.
