@@ -432,7 +432,8 @@ function exportStl() {
   const s = app.settings;
   const step = DETAIL_PRESETS[s.detail]?.step || 0.3;
   app.exporting = true; renderTab();
-  const worker = new Worker(new URL('./exportWorker.js', import.meta.url), { type: 'module' });
+  const workerUrl = new URL('./exportWorker.js', import.meta.url);
+  const worker = new Worker(workerUrl, { type: 'module' });
   const done = () => { app.exporting = false; worker.terminate(); renderTab(); };
   worker.onmessage = (e) => {
     const msg = e.data;
@@ -450,8 +451,15 @@ function exportStl() {
       done();
     }
   };
-  worker.onerror = (e) => {
-    toast(`Export failed${e.message ? ': ' + e.message : ''}. Try a lower detail level.`, 'err');
+  worker.onerror = async (e) => {
+    // The export code loads from the local server when the export starts. If start.bat
+    // was closed, that load fails, so check the server before blaming the detail level.
+    const serverUp = await fetch(workerUrl, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok, () => false);
+    if (!serverUp) {
+      toast('Export could not start: the app\'s local server is not running. Run start.bat again, then export.', 'err');
+    } else {
+      toast(`Export failed${e.message ? ': ' + e.message : ''}. Try a lower detail level.`, 'err');
+    }
     done();
   };
   const photo = app.processed ? { w: app.processed.w, h: app.processed.h, data: app.processed.data.slice() } : null;

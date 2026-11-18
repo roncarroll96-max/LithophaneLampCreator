@@ -1,7 +1,7 @@
 # Lithophane Lamp Creator: Specification
 _Interview date: 2026-11-18 · Status: Approved 2026-11-18_
 
-**Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, AI photo tools, text, base generator, phone polish.
+**Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, AI photo tools, text, base generator, phone polish.
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -27,7 +27,11 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 4. **Manual tweaks**: brightness, contrast, gamma, sharpness, background fade amount, invert check. There's a before/after view and a "reset to auto" button.
 5. **Photo coverage**: a slider from a small front window up to a full 360° wrap, with an adjustable soft edge where the photo fades into the plain ball surface.
 
-**Shapes** (one photo per ball)
+**Multiple photos** (milestone 2)
+
+5a. **Several photos on one ball, placed freely**: add photos one at a time; each appears in the list with a thumbnail. Select one to move it on the ball (drag in the 3D preview or use sliders), resize it, rotate it, and give it its own tone settings, window shape and soft edge. Reorder them (on top / below), hide, duplicate or remove. The first photo works exactly like version 1.
+
+**Shapes**
 
 6. **Basketball**: standard 8-panel line pattern.
 7. **Soccer ball**: classic 32-panel pattern (pentagons and hexagons).
@@ -66,7 +70,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 
 18. **3D preview** (rotate and zoom) with a toggle between **simulated backlit glow** (roughly how it looks on the base) and **plain grey model** (for checking shape and markings).
 19. **Lithophane thickness settings**: minimum (brightest) and maximum (darkest) wall thickness.
-20. **STL export** with a detail level chosen at export: **Draft / Standard / Fine**. Detail is set in millimetres and adjusts with ball size: Large uses a coarser Standard (about 0.3 mm) to keep files manageable, which you won't see at that viewing distance. It shows an estimated file size first. The ball and base export as separate files.
+20. **STL export** with a detail level chosen at export: **Draft / Standard / Fine**. Detail is the spacing between points on the photo side: Draft 0.5 mm, Standard 0.3 mm, Fine 0.2 mm (same for every size; the smooth outside uses 1 mm unless lines are raised). Measured sizes: Medium Standard ≈ 83 MB, Large Standard ≈ 150 MB, Medium Fine ≈ 178 MB; raised lines roughly double the file. It shows an estimated file size first. The ball and base export as separate files.
 21. **Exported shells are watertight** (no holes or flipped faces), so slicers accept them without repair.
 
 **Saving**
@@ -79,7 +83,6 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 24. **Desktop, tablet and phone layouts.** On phones, choosing Fine export shows a warning that it may fail and suggests Standard, but still allows it.
 
 ### Later (not in version 1)
-- Front and back photos (two windows on one ball), or several photos placed freely
 - Splitting the shell into two halves for support-free printing
 - Customer-facing features on the hosted site (ads placement, help pages, sample gallery)
 - 3MF export (smaller files than STL)
@@ -136,7 +139,9 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Saving | Browser auto-save + project files | You |
 | Shapes | Basketball, soccer, football, baseball, volleyball, plain sphere, Moon | You |
 | Moon | Moon only or photo blended, per project | You |
-| Photos per ball | One | You |
+| Photos per ball | Several, placed freely (milestone 2); was one | You (changed 2026-11-18) |
+| Overlapping photos | The photo on top wins, with its soft edge blending into the one below | Assumed (Claude's default) |
+| Settings per photo | Each photo has its own tone adjustments, size, position and window shape | Assumed (Claude's default) |
 | Devices | Desktop, tablet and phone | You |
 | Phone exports | Warn about Fine, but allow | You |
 | Look | Dark showroom style, amber accents | You |
@@ -150,13 +155,21 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Printing | White PLA, 0.4 mm nozzle, opening-down | Assumed (you accepted defaults) |
 | Thickness | 0.8 mm min, 3.0 mm max | Assumed (you accepted defaults) |
 | Relief side | Photo relief on the inside, smooth outside | Assumed (Claude's default) |
+| Collar wall | 2 mm (opening 50 mm inside, 54 mm outside) | Assumed (Claude's default) |
+| Plain band above collar | First 4 mm of the ball above the collar kept plain (no photo or lines), blending in over 6 mm | Assumed (Claude's default) |
+| Carved line darkness | Lines go up to 0.4 mm past the thickest setting so they show over dark photo areas | Assumed (Claude's default) |
+| Basketball line angle | Default turn: spin 60°, tilt 20°; adjustable | Assumed (Claude's guess, check on print) |
+| Line width | Automatic = 2% of ball size (3 mm on Medium) | Assumed (Claude's default) |
+| Detail presets | Draft 0.5 / Standard 0.3 / Fine 0.2 mm for all sizes | Assumed (Claude's default) |
+| Local address | http://localhost:5178 via start.bat | Assumed (Claude's default) |
 | Local launcher | `start.bat` + tiny local server | Assumed (Claude's default) |
 
 ## Open questions
+- **Multiple photos:** is there a maximum you'd use (2? 5? 10?), and should photos be able to blend into each other where they overlap, or always have the top one win? (You, before milestone 2)
 - **Your current process and tools:** not yet described. Knowing which software and settings give you good prints today would help tune the defaults. (You)
 - **Your puck light:** its diameter and height, so the default base fits it. (You, ideally with calipers)
 - **Football shape:** a real football is more pointed than a perfect oval. Version 1 has a "tip sharpness" slider; confirm it matches your footballs. (You, after first test print)
-- **File sizes:** Standard and Fine STL sizes will be measured during the build. If they're too big for your slicer, the detail presets get adjusted. (Claude, during build)
+- **File sizes:** measured (see feature 20). Still to confirm: does your slicer handle the Standard file comfortably? (You, at test print)
 
 ## How we'll know it works
 1. Load one of your real photos, choose basketball, and get a print-ready STL in under 5 minutes with only light slider tweaking.
@@ -165,3 +178,22 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 4. Save a project, close the browser, reopen it, and continue exactly where you left off. Send the project file to your friend and it opens the same for them.
 5. The Moon in moon-only mode shows recognisable maria and craters when lit.
 6. On a phone, you can load a photo, adjust it, preview, and export at Standard.
+
+## Build progress
+
+### Milestone 1: done (2026-11-18, git commit 278a773)
+Built and tested: photo loading with automatic adjustments and tone sliders; photo placement and window settings; basketball and plain sphere; carved, raised or no lines; Small/Medium/Large sizes; opening and collar; Lit and Plain preview; STL export with detail choice, bed-fit check and plastic estimate; browser auto-save and project files; desktop and phone layouts.
+
+Checks passed: 8 automated geometry tests; exported STLs re-read from raw coordinates came back closed with no bad triangles; export, reload/restore, project save/open and phone layout tested in the browser.
+
+Not built yet (milestone 2): multiple photos placed freely; soccer ball, football, baseball, volleyball, Moon; background removal and face brightening; text; base generator and light riser.
+
+### Test print (next step)
+Print Medium at Standard detail, opening down, with slicer supports for the curve above the collar. Report back:
+1. **Brightness:** are faces clear, too dark, or washed out?
+2. **Lines:** too dark, too faint, or right? Is the default angle OK?
+3. **Collar fit:** does it seat in your base? Too tight or too loose?
+4. **Print quality:** any trouble with supports or the overhang above the collar? Did the slicer handle the file?
+5. **Puck light:** its diameter and height (for the base generator).
+
+A photo of the lamp lit on its base helps tune the preview to match reality.
