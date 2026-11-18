@@ -37,21 +37,9 @@ export function defaultSettings() {
     tMax: 3.0,
     opening: { diameter: 50, collarHeight: 5, collarWall: 2.0 },
     photo: {
-      auto: true,
-      blackPoint: 0, whitePoint: 1,
-      brightness: 0, contrast: 1, gamma: 1, sharpen: 0.6,
-      invert: false,
-      zoom: 1, panX: 0, panY: 0, rotate: 0,
-      coverage: 140,          // degrees around the ball the photo window spans
-      aspect: null,           // window height / width; null = match the photo
-      centerY: 0,             // window centre height above the equator (mm)
-      feather: 8,             // soft edge width (mm)
-      windowShape: 'rect',    // 'rect' | 'oval'
-      projection: 'natural',  // 'natural' (no squeeze) | 'wrap' (fills 360°)
-      surround: 0.55,         // brightness of the plain ball outside the photo (0 dark .. 1 bright)
-      background: 'blend',    // cut-out photos: transparent areas 'blend' into the ball | 'bright' | 'dark'
-      edgeSoft: 2,            // cut-out photos: how gently the subject's outline fades (mm)
+      surround: 0.55,         // brightness of the plain ball outside the photos (0 dark .. 1 bright)
     },
+    photos: [],               // up to MAX_PHOTOS photo layers, top first (see defaultPhotoSettings)
     markings: {
       style: 'carved',        // 'carved' | 'raised' | 'off'
       width: null,            // mm; null = 2% of the ball size
@@ -70,6 +58,46 @@ export function defaultSettings() {
     bed: { x: 256, y: 256, z: 256 },
     detail: 'standard',
   };
+}
+
+export const MAX_PHOTOS = 6;
+
+/** Settings for one photo layer. Each photo on the ball has its own copy. */
+export function defaultPhotoSettings() {
+  return {
+    id: null,
+    hidden: false,
+    auto: true,
+    blackPoint: 0, whitePoint: 1,
+    brightness: 0, contrast: 1, gamma: 1, sharpen: 0.6,
+    invert: false,
+    zoom: 1, panX: 0, panY: 0, rotate: 0,
+    coverage: 140,          // degrees around the ball the photo window spans
+    aspect: null,           // window height / width; null = match the photo
+    around: 0,              // window centre, degrees around the ball (0 = front, + = to the right)
+    centerY: 0,             // window centre height above the equator (mm)
+    feather: 8,             // soft edge width (mm)
+    windowShape: 'rect',    // 'rect' | 'oval'
+    projection: 'natural',  // 'natural' (no squeeze) | 'wrap' (fills 360°) | 'flat' (any spot, e.g. the top)
+    background: 'blend',    // cut-out photos: transparent areas 'blend' into what's below | 'bright' | 'dark'
+    edgeSoft: 2,            // cut-out photos: how gently the subject's outline fades (mm)
+  };
+}
+
+/**
+ * Where the n-th photo starts (n = how many photos are already on the ball):
+ * front, back, left, right, top, then front-right. Later photos start smaller.
+ */
+export function photoSlot(n, topUp) {
+  const slots = [
+    { around: 0, centerY: 0, coverage: 140, projection: 'natural' },
+    { around: 180, centerY: 0, coverage: 90, projection: 'natural' },
+    { around: -90, centerY: 0, coverage: 70, projection: 'natural' },
+    { around: 90, centerY: 0, coverage: 70, projection: 'natural' },
+    { around: 0, centerY: topUp, coverage: 45, projection: 'flat' },
+    { around: 45, centerY: 10, coverage: 50, projection: 'natural' },
+  ];
+  return slots[Math.min(n, slots.length - 1)];
 }
 
 /** Semi-axes of the shape body for the current settings. */

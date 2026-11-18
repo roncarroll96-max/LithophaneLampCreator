@@ -16,6 +16,8 @@ Double-click **start.bat**. It starts a tiny local web server and opens
 
 ## How to use
 1. **Choose photo** (or drag one onto the preview). Automatic adjustments are applied.
+   Add up to 6 photos with **+ Add photo**; each goes on the next free side. Pick one in the list,
+   then drag it on the ball to move it.
    A cut-out photo (transparent background, e.g. from your phone's "lift subject") works too:
    choose whether the empty area blends into the ball, glows bright or stays dark.
 2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes.

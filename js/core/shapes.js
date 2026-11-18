@@ -159,14 +159,16 @@ export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2 }, coll
     const r1 = ringTab[(k + 1) * (T + 1) + i] * (1 - w) + ringTab[(k + 1) * (T + 1) + i + 1] * w;
     return r0 * (1 - v) + r1 * v;
   }
-  /** Signed arc length (mm) along the ring from the front meridian to theta (+ = towards +theta). */
-  function ringArc(theta, s) {
-    const d = wrapAngle(theta - THETA_FRONT);
-    let target = THETA_FRONT + d, offset = 0;
+  /** Signed arc length (mm) along the ring at height s from theta0 to theta (+ = towards +theta). */
+  function ringArcFrom(theta0, theta, s) {
+    let t0 = theta0 % TWO_PI; if (t0 < 0) t0 += TWO_PI;
+    let target = t0 + wrapAngle(theta - t0), offset = 0;
     if (target >= TWO_PI) { target -= TWO_PI; offset = ringPerimeter(s); }
     else if (target < 0) { target += TWO_PI; offset = -ringPerimeter(s); }
-    return ringCum(target, s) + offset - ringCum(THETA_FRONT, s);
+    return ringCum(target, s) + offset - ringCum(t0, s);
   }
+  /** Signed arc length (mm) along the ring from the front meridian to theta (+ = towards +theta). */
+  const ringArc = (theta, s) => ringArcFrom(THETA_FRONT, theta, s);
 
   const peFront = phiEdge(THETA_FRONT);
   const sEquator = (Math.PI / 2 - peFront) / (Math.PI - peFront);
@@ -180,7 +182,7 @@ export function buildEllipsoidShape({ a, b, c, kind = 'sphere', tipN = 2 }, coll
 
   return {
     kind, a, b, c, collarOuterR, tipN: tapered ? tipN : 2,
-    surf, phiEdge, phiAt, merArc, ringArc, ringPerimeter, elev,
+    surf, phiEdge, phiAt, merArc, ringArc, ringArcFrom, ringPerimeter, elev,
     sEquator, merLenMax, eqPerimeter,
     eqRho: eqPerimeter / TWO_PI,
     /** Radius used to convert angles on the marking sphere into mm. */

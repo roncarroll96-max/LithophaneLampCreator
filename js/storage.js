@@ -67,23 +67,38 @@ export function download(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
-/** Downloads a .lithoproj file containing the settings and the photo. */
-export async function saveProjectFile({ settings, photoBlob, photoName }, filename) {
+/**
+ * Downloads a .lithoproj file containing the settings and the photos.
+ * photos: [{ id, name, blob }] matching settings.photos by id.
+ */
+export async function saveProjectFile({ settings, photos }, filename) {
   const doc = {
-    format: FILE_TAG, version: 1, savedAt: new Date().toISOString(),
-    settings, photoName: photoName || null,
-    photo: photoBlob ? await blobToDataUrl(photoBlob) : null,
+    format: FILE_TAG, version: 2, savedAt: new Date().toISOString(),
+    settings,
+    photos: await Promise.all((photos || []).map(async (p) => ({ id: p.id, name: p.name || null, data: await blobToDataUrl(p.blob) }))),
   };
   download(new Blob([JSON.stringify(doc)], { type: 'application/json' }), filename);
+}
+
+/** Older saves held one photo as { photoBlob, photoName }; turn either form into a photo list. */
+export function projectPhotos(proj) {
+  if (Array.isArray(proj.photos)) return proj.photos.filter((p) => p && p.blob);
+  return proj.photoBlob ? [{ id: 'p1', name: proj.photoName || 'photo', blob: proj.photoBlob }] : [];
 }
 
 export async function readProjectFile(file) {
   let doc;
   try { doc = JSON.parse(await file.text()); } catch { throw new Error('That file is not a Lithophane Lamp Creator project.'); }
   if (!doc || doc.format !== FILE_TAG) throw new Error('That file is not a Lithophane Lamp Creator project.');
+  if (Array.isArray(doc.photos)) {
+    return {
+      settings: doc.settings,
+      photos: await Promise.all(doc.photos.map(async (p) => ({ id: p.id, name: p.name, blob: await dataUrlToBlob(p.data) }))),
+    };
+  }
+  // version 1: a single photo
   return {
     settings: doc.settings,
-    photoName: doc.photoName,
-    photoBlob: doc.photo ? await dataUrlToBlob(doc.photo) : null,
+    photos: doc.photo ? [{ id: 'p1', name: doc.photoName || 'photo', blob: await dataUrlToBlob(doc.photo) }] : [],
   };
 }

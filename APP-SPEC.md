@@ -207,7 +207,10 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Cube: border and corner sizes | 5 mm border, 5 mm edge rounding | Assumed (Claude's default) |
 | Moon | Moon only or photo blended, per project | You |
 | Photos per ball | Several, placed freely (milestone 2); was one | You (changed 2026-11-18) |
-| Overlapping photos | The photo on top wins, with its soft edge blending into the one below | Assumed (Claude's default) |
+| Overlapping photos | The photo on top wins, with its soft edge blending into the one below | You (2026-11-18) |
+| Photos per ball (max) | Up to 6 | You (2026-11-18) |
+| Moving a photo | Drag it on the ball in the 3D preview (dragging elsewhere turns the view), plus sliders | You (2026-11-18) |
+| New photo position | Next free side: back, then left, right, top | You (2026-11-18) |
 | Settings per photo | Each photo has its own tone adjustments, size, position and window shape | Assumed (Claude's default) |
 | Devices | Desktop, tablet and phone | You |
 | Phone exports | Warn about Fine, but allow | You |
@@ -232,7 +235,6 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Local launcher | `start.bat` + tiny local server | Assumed (Claude's default) |
 
 ## Open questions
-- **Multiple photos:** is there a maximum you'd use (2? 5? 10?), and should photos be able to blend into each other where they overlap, or always have the top one win? (You, before milestone 2)
 - **Your current process and tools:** not yet described. Knowing which software and settings give you good prints today would help tune the defaults. (You)
 - **Your puck light:** its diameter and height, so the default base fits it. (You, ideally with calipers)
 - **Football shape:** the default tip shape (60%) is a guess at a real football; check it against a real ball on the first football print and adjust the default if needed. (You, after first football print)
@@ -266,6 +268,11 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 0.6: several photos per ball, done (2026-11-18)
+Built: up to 6 photos per ball, each with its own picture, tone, cut-out background, position in window, window size and shape, soft edge and projection. New photos go on the next free side (back, left, right, top with the new "Flat" projection, then front-right) and start on top of the list. The Photo tab lists the photos with thumbnails and ↑ / ↓ (front/back order), Hide, Copy and Remove; the selected photo's settings show below, with "Around the ball" and "Up / down" placement sliders and a separate "Plain ball" section. Where photos overlap the one higher in the list is in front and its soft edge fades into the one below (a cut-out set to "Blend in" floats on whatever is behind it). Drag the selected photo on the ball to move it; pressing anywhere else (including other photos) turns the view. Projects and the browser autosave keep every photo; projects saved by earlier versions open with their single photo.
+
+Checks passed: 39 automated tests (6 new: two photos on opposite sides, overlap order, hidden and missing photos, a flat photo covering the top, starting sides and the 6-photo limit, older single-photo saves). In the browser: an autosave from 0.5 opened as one photo with its settings kept; two more photos went to the back and left with thumbnails; real mouse drags moved the selected photo without turning the view, and turned the view (without moving anything) when pressing on another photo; all three photos and their positions came back after a reload; a three-photo export completed.
 
 ### Version 0.5: football, done (2026-11-18)
 Built: football body that tapers like a real ball (|x/a|^n + (y²+z²)/b² = 1, with a "Tip shape" slider from oval to pointed; the tip stays rounded, at least 10 mm radius, so the wall never folds over itself); lies on its side with the opening under its belly; four tip-to-tip seams, eight cross laces on top, and bright end stripes (switch on the Markings tab); length × width inputs on the Ball tab; the turn sliders are hidden for the football since its laces stay on top; football files are named by length × width. Also fixed: tabs no longer show a stray "null" where an optional section is left out.

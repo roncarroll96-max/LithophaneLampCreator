@@ -7,8 +7,8 @@
 
 import { THETA_FRONT, wrapAngle } from './shapes.js';
 import { MARKING_TYPES, rotationMatrix } from './markings.js';
-import { SHAPES, markingWidth } from './settings.js';
-import { createTextLayer } from './textLayer.js';
+import { SHAPES, markingWidth, defaultPhotoSettings } from './settings.js';
+import { createTextLayer, sForUp } from './textLayer.js';
 import { boxBlur } from './blur.js';
 
 // Softened copies of cut-out photo transparency, reused while the softness stays the same
@@ -31,46 +31,78 @@ const MOUNT_ARC = 4;        // mm above the opening edge kept plain (no photo/ma
 const MOUNT_BLEND = 6;      // mm to blend from the plain mount band into the design
 
 /**
- * photo: { w, h, data: Float32Array brightness 0..1, alpha?: Float32Array 0..1 } or null
- *        (alpha = transparency of a cut-out photo; see settings.photo.background)
+ * The photos to place, as layers, top first. `photos` is either one image (older callers and
+ * tests: it uses settings.photos[0], or the older single-photo keys in settings.photo) or a map
+ * { [photo id]: image } for the entries of settings.photos.
+ * An image is { w, h, data: Float32Array brightness 0..1, alpha?: Float32Array 0..1 }.
+ */
+function resolveLayers(settings, photos) {
+  if (!photos) return [];
+  if (photos.data) {
+    const cfg = { ...defaultPhotoSettings(), ...settings.photo, ...((settings.photos && settings.photos[0]) || {}) };
+    return [{ cfg, img: photos }];
+  }
+  return (settings.photos || [])
+    .filter((c) => !c.hidden && photos[c.id])
+    .map((c) => ({ cfg: { ...defaultPhotoSettings(), ...c }, img: photos[c.id] }));
+}
+
+/**
+ * photos: see resolveLayers (one image, a map of images by photo id, or null)
  * textMasks: rendered text masks by item id (see textLayer.js), or null
  * moon: { w, h, data: Float32Array brightness 0..1 } equirectangular Moon map (see moon.js), or null
  * Returns { eval(theta, s, out) } where out receives:
- *   x,y,z (outer surface), ix,iy,iz (inner surface), t (wall mm), raise (mm), mask (0..1 photo)
+ *   x,y,z (outer surface), ix,iy,iz (inner surface), t (wall mm), raise (mm), mask (0..1 photo),
+ *   photoId (id of the top photo covering this point, or null)
  */
-export function createField(settings, shape, photo, textMasks = null, moon = null) {
+export function createField(settings, shape, photos, textMasks = null, moon = null) {
   const { tMin, tMax } = settings;
-  const p = settings.photo;
   const mk = settings.markings;
   const tMount = Math.min(Math.max(settings.opening.collarWall, tMin), tMax);
+  const surround = settings.photo?.surround ?? 0.55;
 
-  // Photo window (mm on the surface)
-  const W = (p.coverage / 360) * shape.eqPerimeter;
-  const imgAspect = photo ? photo.h / photo.w : 0.75;
-  const aspect = p.aspect && p.aspect > 0 ? p.aspect : imgAspect;
-  const H = W * aspect;
-  const feather = Math.max(0.01, p.feather);
-  const wrapBlend = p.projection === 'wrap' ? 1 : 0;
-  const cover = Math.max(1, aspect / imgAspect);
-  const zoom = Math.max(0.05, p.zoom);
-  const rot = (-p.rotate * Math.PI) / 180;
-  const cr = Math.cos(rot), sr = Math.sin(rot);
-  const surround = p.surround;
-  const oval = p.windowShape === 'oval';
-
-  // Moon: its surface replaces the plain ball; in 'moon' mode the photo is not used at all
+  // Moon: its surface replaces the plain ball; in 'moon' mode the photos are not used at all
   const isMoon = SHAPES[settings.shape]?.markings === 'moon' && !!moon;
   const moonOnly = isMoon && settings.moon?.mode !== 'photo';
   const moonSpin = ((settings.moon?.spin || 0) * Math.PI) / 180;
-  const usePhoto = photo && !moonOnly;
 
-  // Cut-out photos: what shows where the photo is transparent, and how soft its outline is
-  const bgMode = p.background || 'blend'; // 'blend' (the plain ball / Moon) | 'bright' | 'dark'
-  let alphaMap = null;
-  if (usePhoto && photo.alpha) {
-    const mmPerPx = (W * Math.max(0.05, p.zoom) * Math.max(1, aspect / imgAspect)) / photo.w;
-    alphaMap = softAlpha(photo.alpha, photo.w, photo.h, Math.round(Math.max(0, p.edgeSoft ?? 2) / 2 / mmPerPx));
-  }
+  // ---- Photo layers (top first), each with its own window on the ball
+  const ftmp = {};
+  const layers = (moonOnly ? [] : resolveLayers(settings, photos)).map(({ cfg: p, img }) => {
+    const W = (p.coverage / 360) * shape.eqPerimeter;
+    const imgAspect = img.h / img.w;
+    const aspect = p.aspect && p.aspect > 0 ? p.aspect : imgAspect;
+    const zoom = Math.max(0.05, p.zoom);
+    const cover = Math.max(1, aspect / imgAspect);
+    const rot = (-p.rotate * Math.PI) / 180;
+    const L = {
+      id: p.id || null, p, img, W, H: W * aspect, imgAspect, zoom, cover,
+      cr: Math.cos(rot), sr: Math.sin(rot),
+      feather: Math.max(0.01, p.feather),
+      oval: p.windowShape === 'oval',
+      projection: p.projection || 'natural',
+      aroundRad: ((p.around || 0) * Math.PI) / 180,
+      bgMode: p.background || 'blend', // cut-outs: 'blend' (whatever is below) | 'bright' | 'dark'
+      alphaMap: null,
+    };
+    if (img.alpha) {
+      const mmPerPx = (W * zoom * cover) / img.w;
+      L.alphaMap = softAlpha(img.alpha, img.w, img.h, Math.round(Math.max(0, p.edgeSoft ?? 2) / 2 / mmPerPx));
+    }
+    if (L.projection === 'flat') {
+      // Flat: unrolled around the window centre (keeps distances true from the centre;
+      // works anywhere, including the top of the ball)
+      const th = THETA_FRONT + L.aroundRad;
+      shape.surf(th, shape.phiAt(th, sForUp(shape, p.centerY)), ftmp);
+      const N = [ftmp.dx, ftmp.dy, ftmp.dz];
+      let U = [-N[1], N[0], 0];
+      const ul = Math.hypot(U[0], U[1]);
+      U = ul < 1e-6 ? [Math.cos(L.aroundRad), Math.sin(L.aroundRad), 0] : [U[0] / ul, U[1] / ul, 0];
+      const V = [N[1] * U[2] - N[2] * U[1], N[2] * U[0] - N[0] * U[2], N[0] * U[1] - N[1] * U[0]];
+      Object.assign(L, { N, U, V, Rc: Math.hypot(ftmp.x, ftmp.y, ftmp.z) });
+    }
+    return L;
+  });
 
   // Markings
   const markFn = mk.style === 'off' ? null : MARKING_TYPES[SHAPES[settings.shape]?.markings] || null;
@@ -87,17 +119,36 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
   const textLayer = createTextLayer(settings, shape, textMasks);
   const tx = { hits: [], clear: 0 };
 
-  function samplePhoto(u, v, d = photo.data) { // u,v in 0..1 image space
-    const fx = u * photo.w - 0.5, fy = v * photo.h - 0.5;
+  function samplePhoto(img, u, v, d = img.data) { // u,v in 0..1 image space
+    const fx = u * img.w - 0.5, fy = v * img.h - 0.5;
     const x0 = Math.floor(fx), y0 = Math.floor(fy);
     const wx = fx - x0, wy = fy - y0;
-    const W1 = photo.w - 1, H1 = photo.h - 1;
+    const W1 = img.w - 1, H1 = img.h - 1;
     const xa = x0 < 0 ? 0 : x0 > W1 ? W1 : x0, xb = x0 + 1 > W1 ? W1 : x0 + 1 < 0 ? 0 : x0 + 1;
     const ya = y0 < 0 ? 0 : y0 > H1 ? H1 : y0, yb = y0 + 1 > H1 ? H1 : y0 + 1 < 0 ? 0 : y0 + 1;
-    const a = d[ya * photo.w + xa] * (1 - wx) + d[ya * photo.w + xb] * wx;
-    const b = d[yb * photo.w + xa] * (1 - wx) + d[yb * photo.w + xb] * wx;
+    const a = d[ya * img.w + xa] * (1 - wx) + d[ya * img.w + xb] * wx;
+    const b = d[yb * img.w + xa] * (1 - wx) + d[yb * img.w + xb] * wx;
     return a * (1 - wy) + b * wy;
   }
+
+  /** Window coordinates (mm, x right, y up from the window centre) of a surface point. */
+  function windowXY(L, theta, s, S, outXY) {
+    if (L.projection === 'flat') {
+      const c = S.dx * L.N[0] + S.dy * L.N[1] + S.dz * L.N[2];
+      const tx = S.dx - c * L.N[0], ty = S.dy - c * L.N[1], tz = S.dz - c * L.N[2];
+      const sn = Math.hypot(tx, ty, tz);
+      const k = sn > 1e-12 ? (L.Rc * Math.atan2(sn, c)) / sn : L.Rc;
+      outXY[0] = (tx * L.U[0] + ty * L.U[1] + tz * L.U[2]) * k;
+      outXY[1] = (tx * L.V[0] + ty * L.V[1] + tz * L.V[2]) * k;
+      return;
+    }
+    const centre = THETA_FRONT + L.aroundRad;
+    const natural = shape.ringArcFrom(centre, theta, s);
+    const wrapX = wrapAngle(theta - centre) * shape.eqRho;
+    outXY[0] = L.projection === 'wrap' ? wrapX : natural;
+    outXY[1] = shape.elev(s) - L.p.centerY;
+  }
+  const xy = [0, 0];
 
   function sampleMoon(theta, dz) {
     // Longitude 0 (the side that faces Earth) at the front, east to the right as seen from Earth
@@ -120,43 +171,39 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
     // ---- Base surface: the Moon, or the plain ball
     const base = isMoon ? sampleMoon(theta, S.dz) : surround;
 
-    // ---- Photo
-    let bright = base, mask = 0;
-    if (usePhoto) {
-      const dTheta = wrapAngle(theta - THETA_FRONT);
-      const natural = shape.ringArc(theta, s);
-      const xmm = natural * (1 - wrapBlend) + dTheta * shape.eqRho * wrapBlend;
-      const ymm = shape.elev(s) - p.centerY;
-      const hx = W / 2, hy = H / 2;
-      if (oval) {
+    // ---- Photos, bottom layer first so the top one wins (its soft edge fades into what's below)
+    let bright = base, mask = 0, photoId = null;
+    for (let li = layers.length - 1; li >= 0; li--) {
+      const L = layers[li];
+      windowXY(L, theta, s, S, xy);
+      const xmm = xy[0], ymm = xy[1];
+      const hx = L.W / 2, hy = L.H / 2;
+      let m;
+      if (L.oval) {
         const r = Math.hypot(xmm / hx, ymm / hy);
-        const f = feather / Math.min(hx, hy);
-        mask = 1 - smooth(1 - f, 1, r);
+        m = 1 - smooth(1 - L.feather / Math.min(hx, hy), 1, r);
       } else {
-        const ex = hx - Math.abs(xmm), ey = hy - Math.abs(ymm);
-        mask = smooth(0, feather, ex) * smooth(0, feather, ey);
+        m = smooth(0, L.feather, hx - Math.abs(xmm)) * smooth(0, L.feather, hy - Math.abs(ymm));
       }
-      if (mask > 0) {
-        // window coords in units of window width, centred
-        const px = xmm / W, py = -ymm / W;
-        const qx = (px * cr - py * sr) / zoom, qy = (px * sr + py * cr) / zoom;
-        const u = 0.5 + p.panX + qx / cover;
-        const v = 0.5 + p.panY + qy / (cover * imgAspect);
-        if (u >= 0 && u <= 1 && v >= 0 && v <= 1) {
-          let val = samplePhoto(u, v);
-          let a = 1;
-          if (alphaMap) {
-            a = samplePhoto(u, v, alphaMap);
-            const bg = bgMode === 'bright' ? 1 : bgMode === 'dark' ? 0 : base;
-            val = val * a + bg * (1 - a);
-          }
-          bright = base + (val - base) * mask;
-          // Blend: lines and the plain ball carry on behind the subject, so they no longer count as photo
-          if (alphaMap && bgMode === 'blend') mask *= a;
-        } else {
-          mask = 0;
-        }
+      if (m <= 0) continue;
+      // window coords in units of window width, centred
+      const p = L.p;
+      const px = xmm / L.W, py = -ymm / L.W;
+      const qx = (px * L.cr - py * L.sr) / L.zoom, qy = (px * L.sr + py * L.cr) / L.zoom;
+      const u = 0.5 + p.panX + qx / L.cover;
+      const v = 0.5 + p.panY + qy / (L.cover * L.imgAspect);
+      if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+      let val = samplePhoto(L.img, u, v);
+      if (L.alphaMap) {
+        const a = samplePhoto(L.img, u, v, L.alphaMap);
+        const bg = L.bgMode === 'bright' ? 1 : L.bgMode === 'dark' ? 0 : bright;
+        val = val * a + bg * (1 - a);
+        // Blend: what's below carries on behind the subject, so it no longer counts as this photo
+        if (L.bgMode === 'blend') { bright += (val - bright) * m; m *= a; if (m > 0.5) photoId = L.id; mask = Math.max(mask, m); continue; }
       }
+      bright += (val - bright) * m;
+      if (m > 0.5) photoId = L.id;
+      mask = Math.max(mask, m);
     }
     let t = tMin + (1 - bright) * (tMax - tMin);
     let raise = 0;
@@ -206,7 +253,7 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
       raise *= 1 - mz;
     }
 
-    out.t = t; out.raise = raise; out.mask = mask;
+    out.t = t; out.raise = raise; out.mask = mask; out.photoId = photoId;
     out.x = S.x + S.nx * raise; out.y = S.y + S.ny * raise; out.z = S.z + S.nz * raise;
     out.ix = S.x - S.nx * t; out.iy = S.y - S.ny * t; out.iz = S.z - S.nz * t;
     out.sx = S.x; out.sy = S.y; out.sz = S.z;
@@ -214,7 +261,7 @@ export function createField(settings, shape, photo, textMasks = null, moon = nul
   }
 
   return {
-    eval: evalAt, window: { W, H }, tMount,
+    eval: evalAt, layers: layers.map((L) => ({ id: L.id, W: L.W, H: L.H })), tMount,
     hasRaised: (raised && !!markFn) || !!(textLayer && textLayer.hasRaised),
   };
 }

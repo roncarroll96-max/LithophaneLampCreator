@@ -65,6 +65,27 @@ export class Preview {
       requestAnimationFrame(() => { hoverPending = false; this._hover(lastEvt); });
     });
     el.addEventListener('pointerleave', () => this.onHover && this.onHover(null));
+    // Dragging something on the ball (e.g. a photo): onDragStart(hit) returns true to take the
+    // drag; the view then stays still while onDragMove(hit) follows the pointer.
+    this.onDragStart = null; this.onDragMove = null; this.onDragEnd = null;
+    let dragging = false;
+    el.addEventListener('pointerdown', (e) => {
+      if (!this.onDragStart || e.button !== 0) return;
+      const hit = this._hit(e);
+      if (!hit || !this.onDragStart(hit)) return;
+      dragging = true;
+      e.stopImmediatePropagation(); // keep the orbit controls from turning the view
+      try { el.setPointerCapture(e.pointerId); } catch { /* no real pointer (e.g. synthetic events) */ }
+    }, { capture: true });
+    el.addEventListener('pointermove', (e) => { if (dragging && this.onDragMove) this.onDragMove(this._hit(e)); });
+    const endDrag = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      try { el.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+      if (this.onDragEnd) this.onDragEnd();
+    };
+    el.addEventListener('pointerup', endDrag);
+    el.addEventListener('pointercancel', endDrag);
     // A click (press and release without dragging) on the ball reports where it landed
     this.onPick = null;
     let down = null;

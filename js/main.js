@@ -7,9 +7,9 @@ import { createField } from './core/field.js';
 import { estimateTriangles, stlBytes } from './core/mesh.js';
 import {
   defaultSettings, mergeSettings, SIZE_PRESETS, SHAPES, DETAIL_PRESETS,
-  bodyAxes, collarDims, markingWidth,
+  bodyAxes, collarDims, markingWidth, MAX_PHOTOS, defaultPhotoSettings, photoSlot,
 } from './core/settings.js';
-import { autosave, loadAutosave, saveProjectFile, readProjectFile, download } from './storage.js';
+import { autosave, loadAutosave, saveProjectFile, readProjectFile, projectPhotos, download } from './storage.js';
 import { TEXT_FONTS, defaultTextItem, placementAt } from './core/textLayer.js';
 import { buildTextMasks, masksCurrent, loadAllFonts } from './text.js';
 import { loadMoon } from './moonData.js';
@@ -20,10 +20,10 @@ const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than th
 // ---------- App state (one object) ----------
 const app = {
   settings: defaultSettings(),
-  photoBlob: null,
-  photoName: null,
-  base: null,        // { w, h, lum } original luminance
-  processed: null,   // { w, h, data } adjusted brightness map
+  // Loaded pictures by photo id: { blob, name, base: { w, h, lum, alpha }, processed: { w, h, data, alpha }, dirty }
+  images: {},
+  selectedPhoto: null, // id of the photo being edited
+  replaceTarget: null, // id whose picture the next chosen file replaces ("Change photo")
   shape: null,
   collar: null,
   field: null,
@@ -62,7 +62,7 @@ function setPath(obj, path, val) {
 // ---------- Update scheduling ----------
 let rafPending = false, idleTimer = null;
 function changed(group) {
-  if (group === 'tone') app.dirty.tone = true;
+  if (group === 'tone') { const im = app.images[app.selectedPhoto]; if (im) im.dirty = true; }
   if (group === 'shape') app.dirty.shape = true;
   app.dirty.field = true;
   app.lastExport = null;
@@ -75,11 +75,12 @@ function changed(group) {
 function update(quick) {
   const s = app.settings;
   try {
-    if (app.dirty.tone && app.base) {
-      app.processed = processPhoto(app.base, s.photo);
-      app.dirty.tone = false;
-      drawThumb();
+    let toned = false;
+    for (const cfg of s.photos) {
+      const im = app.images[cfg.id];
+      if (im && (im.dirty || !im.processed)) { im.processed = processPhoto(im.base, cfg); im.dirty = false; toned = true; }
     }
+    if (toned) { drawThumb(); drawRowThumbs(); }
     let shapeChanged = false;
     if (app.dirty.shape) {
       const collar = collarDims(s);
@@ -92,9 +93,9 @@ function update(quick) {
     }
     if (!app.shape) return;
     ensureTextMasks();
-    app.field = createField(s, app.shape, app.processed, app.textMasks, ensureMoon());
+    app.field = createField(s, app.shape, processedMap(), app.textMasks, ensureMoon());
     // A Moon-only lamp needs no photo, so don't cover it with the "choose a photo" card
-    $('emptyState').classList.toggle('hidden', !!app.base || (isMoonShape() && s.moon.mode !== 'photo'));
+    $('emptyState').classList.toggle('hidden', hasPhotos() || (isMoonShape() && s.moon.mode !== 'photo'));
     const raised = app.field.hasRaised;
     if (shapeChanged || raised || !quick || app._wasRaised !== raised) preview.updateGeometry(app.field, !quick);
     app._wasRaised = raised;
@@ -108,7 +109,17 @@ function update(quick) {
   }
 }
 
-// ---------- Photo loading ----------
+// ---------- Photos ----------
+const hasPhotos = () => app.settings.photos.some((p) => app.images[p.id]);
+const selectedCfg = () => app.settings.photos.find((p) => p.id === app.selectedPhoto) || null;
+/** The adjusted picture of every photo, by id (what the field draws). */
+function processedMap() {
+  const m = {};
+  for (const p of app.settings.photos) { const im = app.images[p.id]; if (im && im.processed) m[p.id] = im.processed; }
+  return m;
+}
+const newPhotoId = () => `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
 /** Re-encodes the photo at working size: JPEG, or PNG when it has transparency to keep. */
 async function normalizedBlob(image, w, h, keepAlpha) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -116,24 +127,35 @@ async function normalizedBlob(image, w, h, keepAlpha) {
   return new Promise((resolve) => (keepAlpha ? c.toBlob(resolve, 'image/png') : c.toBlob(resolve, 'image/jpeg', 0.92)));
 }
 
-async function loadPhoto(blob, name, { fresh = true } = {}) {
+/**
+ * Loads a picture. With no id it becomes a new photo on the next free side (up to MAX_PHOTOS);
+ * with an id it fills that photo (restoring a project, or "Change photo" when fresh).
+ */
+async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
+  const s = app.settings;
+  if (!id && s.photos.length >= MAX_PHOTOS) { toast(`A ball can hold up to ${MAX_PHOTOS} photos. Remove one first.`, 'err'); return; }
   $('busy').hidden = false; $('busy').textContent = 'Loading photo…';
   try {
     const image = await decodeImage(blob);
     const base = extractLuma(image);
-    app.photoBlob = fresh ? await normalizedBlob(image, base.w, base.h, !!base.alpha) : blob;
-    app.photoName = name || 'photo';
-    app.base = base;
+    const stored = fresh ? await normalizedBlob(image, base.w, base.h, !!base.alpha) : blob;
+    image.close?.();
+    let cfg = id ? s.photos.find((p) => p.id === id) : null;
+    if (!cfg) {
+      const topUp = app.shape ? Math.floor(app.shape.elev(1)) - 2 : 70;
+      cfg = { ...defaultPhotoSettings(), ...photoSlot(s.photos.length, topUp), id: id || newPhotoId() };
+      s.photos.unshift(cfg); // a new photo goes on top
+    }
     if (fresh) {
-      const p = app.settings.photo;
-      Object.assign(p, autoAdjust(base), { zoom: 1, panX: 0, panY: 0, rotate: 0, aspect: null, auto: true });
+      Object.assign(cfg, autoAdjust(base), { zoom: 1, panX: 0, panY: 0, rotate: 0, aspect: null, auto: true });
       if (Math.max(base.originalW, base.originalH) < 900) {
         toast('This photo is small (low resolution). It may look blurry on the ball.', 'err');
       }
     }
-    image.close?.();
+    app.images[cfg.id] = { blob: stored, name: name || 'photo', base, processed: null, dirty: true };
+    app.selectedPhoto = cfg.id;
     $('emptyState').classList.add('hidden');
-    changed('tone');
+    changed('field');
     if (app.tab === 'photo') renderTab();
   } catch (err) {
     toast(err.message || 'Could not open that photo.', 'err');
@@ -142,27 +164,40 @@ async function loadPhoto(blob, name, { fresh = true } = {}) {
   }
 }
 
+const bgFor = (cfg) => (cfg.background === 'bright' ? 1 : cfg.background === 'dark' ? 0 : app.settings.photo.surround);
+
 function drawThumb() {
   const c = document.getElementById('thumb');
-  if (!c) return;
-  const src = app.showOriginal ? app.base : app.processed;
-  const p = app.settings.photo;
-  const bg = p.background === 'bright' ? 1 : p.background === 'dark' ? 0 : p.surround;
-  if (src) drawGray(c, src, 640, bg);
+  const cfg = selectedCfg(), im = cfg && app.images[cfg.id];
+  if (!c || !im) return;
+  const src = app.showOriginal ? im.base : im.processed;
+  if (src) drawGray(c, src, 640, bgFor(cfg));
+}
+/** Small pictures in the photo list. */
+function drawRowThumbs() {
+  document.querySelectorAll('canvas[data-photo-thumb]').forEach((c) => {
+    const cfg = app.settings.photos.find((p) => p.id === c.dataset.photoThumb);
+    const im = cfg && app.images[cfg.id];
+    if (im && im.processed) drawGray(c, im.processed, 56, bgFor(cfg));
+  });
 }
 
 // ---------- Saving ----------
 let saveTimer;
 function scheduleAutosave() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => autosave({
-    settings: app.settings, photoBlob: app.photoBlob, photoName: app.photoName,
-  }), 1200);
+  saveTimer = setTimeout(() => autosave({ settings: app.settings, photos: photoFiles() }), 1200);
+}
+/** The pictures to save with the project, matching settings.photos by id. */
+function photoFiles() {
+  return app.settings.photos.filter((p) => app.images[p.id])
+    .map((p) => ({ id: p.id, name: app.images[p.id].name, blob: app.images[p.id].blob }));
 }
 
 function projectBaseName() {
   const s = app.settings;
-  const n = (app.photoName || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
+  const first = app.settings.photos.find((p) => app.images[p.id]);
+  const n = ((first && app.images[first.id].name) || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
   const size = s.shape === 'football' ? `${s.footballLength}x${s.footballWidth}mm` : `${s.diameter}mm`;
   return `${n}-${s.shape}-${size}`;
 }
@@ -227,11 +262,20 @@ function slider(path, label, min, max, step, { fmt = (v) => v, group = 'field', 
     setPath(s, path, v); val.textContent = fmt(v); changed(group);
   });
   val.addEventListener('dblclick', () => {
-    const d = getPath(defaultSettings(), path);
+    const d = defaultFor(path);
     if (typeof d !== 'number') return;
     setPath(s, path, d); input.value = d; val.textContent = fmt(d); changed(group);
   });
   return el('div', { class: 'ctl' + (disabled ? ' disabled' : '') }, el('label', {}, label), val, input);
+}
+
+/** Default value for a settings path, including per-photo and per-text settings. */
+function defaultFor(path) {
+  let m = path.match(/^photos\.\d+\.(.+)$/);
+  if (m) return getPath(defaultPhotoSettings(), m[1]);
+  m = path.match(/^texts\.\d+\.(.+)$/);
+  if (m) return getPath(defaultTextItem(), m[1]);
+  return getPath(defaultSettings(), path);
 }
 
 function segmented(path, options, group = 'field', after) {
@@ -258,11 +302,11 @@ function checkbox(path, label, group = 'field', after) {
 
 /** "Height matches the photo" on = aspect null (follow the photo); off = a fixed window height. */
 function aspectToggle() {
-  const p = app.settings.photo;
+  const p = selectedCfg(), im = p && app.images[p.id];
   const input = el('input', { type: 'checkbox' });
   input.checked = p.aspect == null;
   input.addEventListener('change', () => {
-    p.aspect = input.checked ? null : +(app.base ? app.base.h / app.base.w : 0.75).toFixed(2);
+    p.aspect = input.checked ? null : +(im ? im.base.h / im.base.w : 0.75).toFixed(2);
     changed('field'); renderTab();
   });
   return el('label', { class: 'check' }, input, 'Window height matches the photo');
@@ -280,80 +324,129 @@ function renderTab() {
   // Sections can be left out with null; skip those (replaceChildren would show them as "null")
   body.replaceChildren(...({ photo: photoTab, ball: ballTab, markings: markingsTab, text: textTab, export: exportTab }[app.tab])().filter(Boolean));
   body.scrollTop = scroll;
-  if (app.tab === 'photo') drawThumb();
+  if (app.tab === 'photo') { drawThumb(); drawRowThumbs(); }
 }
 
+function addPhoto() { app.replaceTarget = null; $('filePhoto').click(); }
+
 function photoTab() {
-  const s = app.settings, p = s.photo;
-  const thumb = app.base
-    ? el('canvas', { id: 'thumb', title: 'Grey map: lighter = thinner plastic = brighter when lit' })
-    : el('div', { class: 'thumb-empty' }, 'No photo yet. Choose one, or drop it on the preview.');
-  const holdBtn = el('button', { class: 'btn small', disabled: !app.base, title: 'Hold to compare with the original' }, 'Hold: original');
+  const s = app.settings, list = s.photos;
+  if (!list.some((p) => p.id === app.selectedPhoto)) app.selectedPhoto = list[0] ? list[0].id : null;
+  const idx = list.findIndex((p) => p.id === app.selectedPhoto);
+  const p = list[idx], im = p && app.images[p.id];
+  const P = (k) => `photos.${idx}.${k}`;
+
+  const move = (i, d) => { const j = i + d; if (j < 0 || j >= list.length) return; [list[i], list[j]] = [list[j], list[i]]; changed('field'); renderTab(); };
+  const rows = list.map((c, i) => el('div', { class: 'text-row photo-row' + (c.id === app.selectedPhoto ? ' active' : '') },
+    el('button', { class: 'text-pick', title: 'Edit this photo', onclick: () => { app.selectedPhoto = c.id; renderTab(); } },
+      el('canvas', { 'data-photo-thumb': c.id, class: 'row-thumb' }),
+      el('span', {}, (app.images[c.id] && app.images[c.id].name) || 'photo')),
+    el('button', { class: 'btn small', title: 'Bring forward (in front of the photo below)', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
+    el('button', { class: 'btn small', title: 'Send backward', disabled: i === list.length - 1, onclick: () => move(i, 1) }, '↓'),
+    el('button', { class: 'btn small', title: c.hidden ? 'Show on the ball' : 'Hide from the ball', onclick: () => { c.hidden = !c.hidden; changed('field'); renderTab(); } }, c.hidden ? 'Show' : 'Hide'),
+    el('button', {
+      class: 'btn small', title: 'Make a copy a little further round', disabled: list.length >= MAX_PHOTOS,
+      onclick: () => {
+        const src = app.images[c.id]; if (!src) return;
+        const copy = { ...structuredClone(c), id: newPhotoId(), around: ((c.around + 210) % 360) - 180 };
+        list.splice(i, 0, copy);
+        app.images[copy.id] = { ...src, processed: null, dirty: true };
+        app.selectedPhoto = copy.id; changed('field'); renderTab();
+      },
+    }, 'Copy'),
+    el('button', {
+      class: 'btn small', title: 'Remove this photo',
+      onclick: () => { list.splice(i, 1); delete app.images[c.id]; changed('field'); renderTab(); },
+    }, 'Remove'),
+  ));
+
+  const plainBall = section('Plain ball',
+    // Show the wall it makes, in mm, so it matches the Thickness view readout
+    slider('photo.surround', 'Plain ball brightness', 0, 1, 0.01, {
+      fmt: (v) => `${pct(v)} (${(s.tMin + (1 - v) * (s.tMax - s.tMin)).toFixed(2)} mm)`,
+    }),
+    note('The ball outside your photos.'));
+
+  const out = [
+    section('Photos on the ball',
+      list.length ? el('div', { class: 'text-list' }, rows) : note('No photo yet. Choose one, or drop it on the preview.'),
+      el('div', { class: 'row', style: 'margin-top:8px' },
+        el('button', { class: 'btn small', disabled: list.length >= MAX_PHOTOS, onclick: addPhoto }, '+ Add photo'),
+        el('span', { class: 'note', style: 'margin:0' }, `${list.length} of ${MAX_PHOTOS}`)),
+      list.length ? note(list.length > 1
+        ? 'Drag the selected photo on the ball to move it (pick it in this list first). Where photos overlap, the one higher in the list is in front.'
+        : 'Drag the photo on the ball to move it.') : null,
+      isMoonShape() && s.moon.mode !== 'photo'
+        ? note('The Moon is set to "Moon only", so photos are not used. Choose "Photo + Moon" on the Ball tab to show them.', 'warn')
+        : null,
+    ),
+  ];
+  if (!p || !im) { out.push(plainBall); return out; }
+
+  const thumb = el('canvas', { id: 'thumb', title: 'Grey map: lighter = thinner plastic = brighter when lit' });
+  const holdBtn = el('button', { class: 'btn small', title: 'Hold to compare with the original' }, 'Hold: original');
   const setOrig = (on) => { app.showOriginal = on; drawThumb(); };
   holdBtn.addEventListener('pointerdown', () => setOrig(true));
   ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => holdBtn.addEventListener(ev, () => setOrig(false)));
   const autoBtn = el('button', {
-    class: 'btn small', disabled: !app.base,
-    onclick: () => { Object.assign(p, autoAdjust(app.base)); changed('tone'); renderTab(); toast('Automatic adjustments applied.'); },
+    class: 'btn small',
+    onclick: () => { Object.assign(p, autoAdjust(im.base)); changed('tone'); renderTab(); toast('Automatic adjustments applied.'); },
   }, 'Auto adjust');
-  const centerMax = Math.round(Math.min(bodyAxes(s).c, 120) * 0.9);
+  const changeBtn = el('button', { class: 'btn small', onclick: () => { app.replaceTarget = p.id; $('filePhoto').click(); } }, 'Change photo');
+  const upMax = app.shape ? Math.floor(app.shape.elev(1)) : 80;
+  const upMin = app.shape ? Math.ceil(app.shape.elev(0.03)) : -60;
 
-  return [
-    section('Photo',
+  out.push(
+    section('Selected photo',
       el('div', { class: 'thumb-wrap' }, thumb),
-      el('div', { class: 'row', style: 'margin-top:8px' },
-        el('button', { class: 'btn small', onclick: () => $('filePhoto').click() }, app.base ? 'Change photo' : 'Choose photo'),
-        holdBtn, autoBtn),
-      app.base ? note('Lighter areas print thinner and glow brighter.') : null,
-      isMoonShape() && s.moon.mode !== 'photo'
-        ? note('The Moon is set to "Moon only", so the photo is not used. Choose "Photo + Moon" on the Ball tab to show it.', 'warn')
-        : null,
+      el('div', { class: 'row', style: 'margin-top:8px' }, changeBtn, holdBtn, autoBtn),
+      note('Lighter areas print thinner and glow brighter.'),
     ),
-    app.base && app.base.alpha ? section('Background (cut-out photo)',
+    im.base.alpha ? section('Background (cut-out photo)',
       note('This photo has a transparent background. Choose what shows there:'),
-      segmented('photo.background', [
-        { value: 'blend', label: 'Blend into ball', title: 'The subject floats on the plain ball (or the Moon)' },
+      segmented(P('background'), [
+        { value: 'blend', label: 'Blend in', title: 'The subject floats on whatever is behind it (the ball, the Moon or another photo)' },
         { value: 'bright', label: 'Bright', title: 'A glowing halo behind the subject' },
         { value: 'dark', label: 'Dark', title: 'A dark background so the subject stands out' },
       ], 'field', () => { drawThumb(); renderTab(); }),
-      slider('photo.edgeSoft', 'Edge softness', 0, 10, 0.5, { fmt: mm }),
+      slider(P('edgeSoft'), 'Edge softness', 0, 10, 0.5, { fmt: mm }),
     ) : null,
     section('Tone',
-      slider('photo.blackPoint', 'Black point', 0, 0.6, 0.005, { fmt: num2, group: 'tone' }),
-      slider('photo.whitePoint', 'White point', 0.4, 1, 0.005, { fmt: num2, group: 'tone' }),
-      slider('photo.brightness', 'Brightness', -0.4, 0.4, 0.01, { fmt: num2, group: 'tone' }),
-      slider('photo.contrast', 'Contrast', 0.5, 2, 0.01, { fmt: num2, group: 'tone' }),
-      slider('photo.gamma', 'Midtones (lift shadows →)', 0.5, 2.5, 0.01, { fmt: num2, group: 'tone' }),
-      slider('photo.sharpen', 'Sharpen', 0, 2, 0.05, { fmt: num2, group: 'tone' }),
-      checkbox('photo.invert', 'Invert (negative)', 'tone'),
+      slider(P('blackPoint'), 'Black point', 0, 0.6, 0.005, { fmt: num2, group: 'tone' }),
+      slider(P('whitePoint'), 'White point', 0.4, 1, 0.005, { fmt: num2, group: 'tone' }),
+      slider(P('brightness'), 'Brightness', -0.4, 0.4, 0.01, { fmt: num2, group: 'tone' }),
+      slider(P('contrast'), 'Contrast', 0.5, 2, 0.01, { fmt: num2, group: 'tone' }),
+      slider(P('gamma'), 'Midtones (lift shadows →)', 0.5, 2.5, 0.01, { fmt: num2, group: 'tone' }),
+      slider(P('sharpen'), 'Sharpen', 0, 2, 0.05, { fmt: num2, group: 'tone' }),
+      checkbox(P('invert'), 'Invert (negative)', 'tone'),
     ),
     section('Position in window',
-      slider('photo.zoom', 'Zoom', 0.5, 4, 0.01, { fmt: (v) => `${(+v).toFixed(2)}×` }),
-      slider('photo.panX', 'Move left / right', -0.5, 0.5, 0.005, { fmt: num2 }),
-      slider('photo.panY', 'Move up / down', -0.5, 0.5, 0.005, { fmt: num2 }),
-      slider('photo.rotate', 'Rotate', -180, 180, 0.5, { fmt: deg }),
+      slider(P('zoom'), 'Zoom', 0.5, 4, 0.01, { fmt: (v) => `${(+v).toFixed(2)}×` }),
+      slider(P('panX'), 'Move left / right', -0.5, 0.5, 0.005, { fmt: num2 }),
+      slider(P('panY'), 'Move up / down', -0.5, 0.5, 0.005, { fmt: num2 }),
+      slider(P('rotate'), 'Rotate', -180, 180, 0.5, { fmt: deg }),
     ),
     section('Photo window on the ball',
-      slider('photo.coverage', 'How far around', 40, 360, 1, { fmt: deg }),
+      slider(P('around'), 'Around the ball', -180, 180, 0.5, { fmt: deg }),
+      slider(P('centerY'), 'Up / down', upMin, upMax, 0.5, { fmt: mm }),
+      slider(P('coverage'), 'Size (how far around)', 20, 360, 1, { fmt: deg }),
       aspectToggle(),
       p.aspect == null
         ? null
-        : slider('photo.aspect', 'Window height', 0.25, 1.6, 0.01, { fmt: (v) => `${Math.round(v * 100)}% of width` }),
-      slider('photo.centerY', 'Raise / lower window', -centerMax, centerMax, 0.5, { fmt: mm }),
-      slider('photo.feather', 'Soft edge', 0, 40, 0.5, { fmt: mm }),
+        : slider(P('aspect'), 'Window height', 0.25, 1.6, 0.01, { fmt: (v) => `${Math.round(v * 100)}% of width` }),
+      slider(P('feather'), 'Soft edge', 0, 40, 0.5, { fmt: mm }),
       el('div', { class: 'ctl' }, el('label', {}, 'Window shape')),
-      segmented('photo.windowShape', [{ value: 'rect', label: 'Rectangle' }, { value: 'oval', label: 'Oval' }]),
+      segmented(P('windowShape'), [{ value: 'rect', label: 'Rectangle' }, { value: 'oval', label: 'Oval' }]),
       el('div', { class: 'ctl' }, el('label', {}, 'Projection')),
-      segmented('photo.projection', [
-        { value: 'natural', label: 'Natural', title: 'No squeezing; best for a front window' },
+      segmented(P('projection'), [
+        { value: 'natural', label: 'Natural', title: 'No squeezing; best for a window on the side' },
+        { value: 'flat', label: 'Flat', title: 'Best for the top of the ball or a small photo' },
         { value: 'wrap', label: 'Wrap', title: 'Fills all the way around; best near 360°' },
       ]),
-      // Show the wall it makes, in mm, so it matches the Thickness view readout
-      slider('photo.surround', 'Plain ball brightness', 0, 1, 0.01, {
-        fmt: (v) => `${pct(v)} (${(s.tMin + (1 - v) * (s.tMax - s.tMin)).toFixed(2)} mm)`,
-      }),
     ),
-  ];
+    plainBall,
+  );
+  return out;
 }
 
 function ballTab() {
@@ -596,7 +689,7 @@ function exportTab() {
       s.detail === 'fine' && isPhone() ? note('Fine detail may be too big for a phone and could fail. Standard is recommended here.', 'warn') : null),
     section('Export', btn, progress, stats,
       note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
-      !app.base ? note('No photo yet: this exports a plain ball with markings.', 'warn') : null),
+      !hasPhotos() ? note('No photo yet: this exports a plain ball with markings.', 'warn') : null),
   ];
 }
 
@@ -636,10 +729,17 @@ function exportStl() {
     }
     done();
   };
-  const pr = app.processed;
-  const photo = pr ? { w: pr.w, h: pr.h, data: pr.data.slice(), alpha: pr.alpha ? pr.alpha.slice() : null } : null;
+  // Copies of each visible photo's adjusted picture (the copies move to the worker)
+  const photos = {}, transfer = [];
+  for (const cfg of s.photos) {
+    const pr = !cfg.hidden && app.images[cfg.id] && app.images[cfg.id].processed;
+    if (!pr) continue;
+    const data = pr.data.slice(), alpha = pr.alpha ? pr.alpha.slice() : null;
+    photos[cfg.id] = { w: pr.w, h: pr.h, data, alpha };
+    transfer.push(data.buffer); if (alpha) transfer.push(alpha.buffer);
+  }
   const moon = isMoonShape() ? app.moonMap : null;
-  worker.postMessage({ settings: structuredClone(s), photo, textMasks: app.textMasks, moon, stepInner: step, stepOuter: OUTER_STEP }, photo ? [photo.data.buffer, ...(photo.alpha ? [photo.alpha.buffer] : [])] : []);
+  worker.postMessage({ settings: structuredClone(s), photos, textMasks: app.textMasks, moon, stepInner: step, stepOuter: OUTER_STEP }, transfer);
 }
 
 // ---------- Wiring ----------
@@ -675,6 +775,30 @@ preview.onHover = (h) => {
 };
 $('btnResetView').addEventListener('click', () => preview.frame());
 
+// Drag the selected photo on the ball (Photo tab). Pressing on it grabs it; pressing anywhere else
+// (including other photos, which may cover most of the ball) turns the view as usual.
+let grab = null;
+const wrap180 = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+preview.onDragStart = (h) => {
+  if (app.tab !== 'photo' || !app.field || !app.shape) return false;
+  const ev = {};
+  app.field.eval(h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)), ev);
+  if (!ev.photoId || ev.photoId !== app.selectedPhoto) return false;
+  const cfg = app.settings.photos.find((p) => p.id === ev.photoId);
+  if (!cfg) return false;
+  const at = placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)));
+  grab = { cfg, dA: wrap180(cfg.around - at.around), dY: cfg.centerY - at.up };
+  return true;
+};
+preview.onDragMove = (h) => {
+  if (!grab || !h) return;
+  const at = placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)));
+  grab.cfg.around = +wrap180(at.around + grab.dA).toFixed(1);
+  grab.cfg.centerY = +Math.min(app.shape.elev(1), Math.max(app.shape.elev(0.03), at.up + grab.dY)).toFixed(1);
+  changed('field');
+};
+preview.onDragEnd = () => { if (grab) { grab = null; renderTab(); } };
+
 // Click the ball on the Text tab: move the selected text there
 preview.onPick = (h) => {
   if (app.tab !== 'text' || !app.shape) return;
@@ -690,11 +814,12 @@ $('btnChoosePhoto').addEventListener('click', choosePhoto);
 $('btnChoosePhoto2').addEventListener('click', choosePhoto);
 $('filePhoto').addEventListener('change', (e) => {
   const f = e.target.files[0]; e.target.value = '';
-  if (f) loadPhoto(f, f.name);
+  const target = app.replaceTarget; app.replaceTarget = null;
+  if (f) loadPhoto(f, f.name, { id: target && app.settings.photos.some((p) => p.id === target) ? target : null });
 });
 
 $('btnSaveProject').addEventListener('click', async () => {
-  await saveProjectFile({ settings: app.settings, photoBlob: app.photoBlob, photoName: app.photoName }, `${projectBaseName()}.lithoproj`);
+  await saveProjectFile({ settings: app.settings, photos: photoFiles() }, `${projectBaseName()}.lithoproj`);
   toast('Project saved to your downloads.');
 });
 $('btnOpenProject').addEventListener('click', () => $('fileProject').click());
@@ -708,20 +833,34 @@ $('fileProject').addEventListener('change', async (e) => {
   } catch (err) { toast(err.message, 'err'); }
 });
 $('btnNew').addEventListener('click', () => {
-  if (app.base && !confirm('Start a new project? The current photo and settings will be cleared (save a project file first if you want to keep them).')) return;
+  if (hasPhotos() && !confirm('Start a new project? The current photos and settings will be cleared (save a project file first if you want to keep them).')) return;
   const bed = app.settings.bed;
   app.settings = defaultSettings(); app.settings.bed = bed;
-  app.photoBlob = null; app.photoName = null; app.base = null; app.processed = null;
+  app.images = {}; app.selectedPhoto = null;
   $('emptyState').classList.remove('hidden');
   changed('shape'); renderTab();
 });
 
+const PHOTO_KEYS = Object.keys(defaultPhotoSettings());
 async function applyProject(proj) {
-  app.settings = mergeSettings(proj.settings);
-  app.base = null; app.processed = null; app.photoBlob = null; app.photoName = null;
+  const s = mergeSettings(proj.settings);
+  const files = projectPhotos(proj);
+  // Projects from before several photos: the one photo's settings lived in settings.photo
+  if ((!Array.isArray(s.photos) || !s.photos.length) && files.length) {
+    const old = s.photo || {};
+    const cfg = { ...defaultPhotoSettings(), id: files[0].id, around: 0 };
+    for (const k of PHOTO_KEYS) if (k in old && k !== 'id') cfg[k] = old[k];
+    s.photos = [cfg];
+  }
+  s.photo = { surround: s.photo?.surround ?? 0.55 };
+  if (!Array.isArray(s.photos)) s.photos = [];
+  app.settings = s;
+  app.images = {}; app.selectedPhoto = null;
   changed('shape');
-  if (proj.photoBlob) await loadPhoto(proj.photoBlob, proj.photoName, { fresh: false });
-  else $('emptyState').classList.remove('hidden');
+  for (const f of files) if (s.photos.some((p) => p.id === f.id)) await loadPhoto(f.blob, f.name, { fresh: false, id: f.id });
+  s.photos = s.photos.filter((p) => app.images[p.id]); // drop any photo whose picture is missing
+  app.selectedPhoto = s.photos[0] ? s.photos[0].id : null;
+  if (!hasPhotos()) $('emptyState').classList.remove('hidden');
   renderTab();
 }
 
