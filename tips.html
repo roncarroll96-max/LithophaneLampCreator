@@ -76,7 +76,7 @@
       scatters off it and the picture looks blotchy and blurry. Set <strong>Sparse infill density to 100%</strong>.
     </div>
 
-    <h2>The lamp (ball, football, Moon, cube)</h2>
+    <h2>The lamp or panel (ball, football, Moon, cube, flat panel)</h2>
     <div class="rows">
       <div class="row">
         <div class="name">Sparse infill density<small>Strength tab</small></div>
@@ -114,9 +114,15 @@
       </div>
       <div class="row">
         <div class="name">Supports<small>Support tab</small></div>
-        <div class="val">On: tree, build plate only<small>Off for the cube</small></div>
-        <div class="why">Balls, the football and the Moon need them for the curve just above the collar. The cube is
-          designed to print without them.</div>
+        <div class="val">On: tree, build plate only<small>Off for the cube and flat panels</small></div>
+        <div class="why">Balls, the football and the Moon need them for the curve just above the collar. The cube and
+          flat panels are designed to print without them.</div>
+      </div>
+      <div class="row">
+        <div class="name">Brim<small>Others tab</small></div>
+        <div class="val">On for flat panels<small>about 5 mm</small></div>
+        <div class="why">A panel stands on a narrow edge; a brim stops it tipping or lifting, especially hearts and tall
+          panels.</div>
       </div>
       <div class="row">
         <div class="name">Ironing</div>
@@ -137,6 +143,11 @@
       <div class="row"><div class="name">Base: LED puck or bulb</div><div class="val">Top on the bed</div>
         <div class="why">Already upside down in the file. No supports.</div></div>
       <div class="row"><div class="name">Base: LED strip riser</div><div class="val">Standing up</div>
+        <div class="why">As it sits on the table. No supports.</div></div>
+      <div class="row"><div class="name">Flat panel</div><div class="val">Standing on its bottom edge</div>
+        <div class="why">As exported. Brim on, no supports. Turn it so the seam is on the frame's edge, not across the
+          picture.</div></div>
+      <div class="row"><div class="name">Panel light box or slot stand</div><div class="val">Standing up</div>
         <div class="why">As it sits on the table. No supports.</div></div>
     </div>
 
@@ -164,7 +175,7 @@
       <li>Wall loops 3 to 4</li>
       <li>Layer height 0.12 mm (or 0.08 mm)</li>
       <li>Seam position Back, picture turned away from it</li>
-      <li>Supports on, build plate only (off for the cube)</li>
+      <li>Supports on, build plate only (off for the cube and flat panels; brim on for panels)</li>
       <li>In the slicer preview, scroll through the layers: the wall should show only loops and solid fill, no open
         diagonal pattern</li>
     </ul>

@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.0: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.1: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -315,7 +315,12 @@ def app_guide(path):
         ['Plain band above the opening', '"Collar wall", kept between Thinnest and Thickest; 4 mm, then blends over 6 mm',
          '2.0 mm'],
         ['Collar', '"Collar wall"', '2.0 mm'],
+        ['Flat panel: frame', '"Frame thickness" above Thickest, within "Frame width" of the edge, then a 45-degree slope '
+         'down to the picture', '+2 mm (5.0 mm), 6 mm wide'],
+        ['Flat panel with the light box', 'Even glow: thinner higher up, farther from the LED strip', 'Strength 50%'],
     ], [1.75 * inch, 3.75 * inch, 1.5 * inch]))
+    s.append(P('On a flat panel the front is smooth and the picture and frame are on the back. Its edge is as thick as '
+               'the frame.', SMALL))
 
     s.append(P('Photo tab', H2))
     s.append(P('Photos on the ball', H3))
@@ -370,13 +375,23 @@ def app_guide(path):
         ['Projection', '<b>Natural</b>: no squeezing, best for a side. <b>Flat</b>: best for the top or a small photo. '
          '<b>Straight-on</b>: no distortion on a flat face (the cube uses it). <b>Wrap</b>: all the way round.'],
     ], [2.2 * inch, 4.8 * inch]))
-    s.append(P('<b>Plain ball</b> (bottom of the tab): "Plain ball brightness" sets the ball outside your photos. '
+    s.append(P('Photo on the panel (flat panel instead of the window on the ball)', H3))
+    s.append(table([
+        ['Setting', 'What it does'],
+        ['Fill the whole panel', 'On (the first photo): the photo covers the panel, cropped to its shape. Drag it on the '
+         'panel, or use Zoom and Move, to choose what shows.'],
+        ['Left / right, Up / down, Width', 'Off: the photo sits in a window of this size and place (later photos start '
+         'this way). Drag it on the panel to move it.'],
+        ['Arrange as collage', 'With 2 or more photos: lays them out in a grid inside the frame, in list order.'],
+    ], [2.2 * inch, 4.8 * inch]))
+    s.append(P('<b>Plain ball / plain panel</b> (bottom of the tab): the brightness outside your photos. '
                '100% = Thinnest, 0% = Thickest.', BODY))
 
     s.append(P('Shape tab', H2))
     s.append(table([
         ['Setting', 'What it does', 'Effect on the walls', 'Range / default'],
-        ['Shape', 'Basketball, plain sphere, soccer, football, baseball/softball, volleyball, Moon or Cube (5 photos).',
+        ['Shape', 'Basketball, plain sphere, soccer, football, baseball/softball, volleyball, Moon, Cube (5 photos) or '
+         'Flat panel.',
          'Sets the body and its lines.', 'Basketball'],
         ['Size', 'Small / Medium / Large or custom. Balls 100/150/200 mm; footballs 160 x 100 / 240 x 150 / '
          '280 x 175 mm; cube 80/100/130 mm.', 'A bigger lamp spreads the picture over more area.', 'Medium'],
@@ -392,6 +407,13 @@ def app_guide(path):
         ['Cube: edge rounding, photo border, even glow', 'Rounded edges; plain margin round each face photo ("Fit '
          'photos to faces" re-places them); evens out the glow.', 'Even glow thins the dim tops of the walls and '
          'thickens near the light.', '5 mm, 5 mm, on at 50%'],
+        ['Flat panel: shape and size', 'Rectangle (Match photo, 4x6, 5x7, 8x10 in, or custom), or square, circle or heart '
+         '(4, 6, 8 in or custom). Circles and hearts have a small flat on the bottom.', 'None (size only).',
+         'Rectangle, matching the photo'],
+        ['Flat panel: curve', 'Bends the panel side to side; its edges come toward you.', 'None (shape only).',
+         'Flat (0 to 120 degrees)'],
+        ['Flat panel: frame, feet', 'Raised frame on the back; feet on the bottom edge to stand without a base.',
+         'The frame is the thickest part.', 'Frame on, 6 mm; feet off'],
     ], [1.35 * inch, 2.3 * inch, 2.15 * inch, 1.2 * inch]))
     s.append(Spacer(1, 4))
     s.append(P('Thinnest and Thickest always stay at least 0.5 mm apart. New projects keep your sizes, thicknesses, '
@@ -424,7 +446,8 @@ def app_guide(path):
         ['Bend', 'Curves the text from a smile to an arch.', ''],
         ['Bright outline', 'A thin glowing outline round the letters, for reading over dark photo areas.',
          'Thinnest in a 0.8 mm ring.'],
-        ['Placing', 'Click (or tap) the lamp to move the text there; then Around, Up / down and Rotate.', ''],
+        ['Placing', 'Click (or tap) the lamp to move the text there; then Around, Up / down and Rotate. On a panel: '
+         'Left / right, Up / down and Rotate (no Raised style: the front stays smooth).', ''],
     ], [1.5 * inch, 3.2 * inch, 2.3 * inch]))
 
     s.append(P('Base tab', H2))
@@ -439,6 +462,10 @@ def app_guide(path):
          'extra width all round.'],
         ['Cable notch', 'Width and height of the notch at the back.'],
         ['Export base STL', 'A separate file, already turned the right way up for printing.'],
+        ['Flat panel: base', '<b>Light box</b>: the panel stands in a slot; an LED strip on a leaning floor behind it '
+         'shines up its back (set the strip width; even glow on/off). <b>Slot stand</b>: just the slot. <b>None</b>: '
+         'feet, a window or a frame.'],
+        ['Flat panel: slot fit', 'Extra room in the slot (default 0.4 mm). The app shows the slot width.'],
     ], [1.6 * inch, 5.4 * inch]))
 
     s.append(P('Export tab', H2))
@@ -447,7 +474,8 @@ def app_guide(path):
         ['Printer bed', 'Your printer\'s build size; the app checks the lamp fits, and says when it only fits diagonally.'],
         ['Detail: Draft / Standard / Fine', 'Points on the photo side 0.5 / 0.3 / 0.2 mm apart. Standard is best for '
          'most prints. Detail does not change wall thickness.'],
-        ['Export ball STL', 'The lamp. The cube comes out upside down (top face on the bed), ready to print.'],
+        ['Export ball / panel STL', 'The lamp. The cube comes out upside down (top face on the bed); a panel stands '
+         'on its bottom edge. Both are ready to print.'],
     ], [2.2 * inch, 4.8 * inch]))
 
     s.append(P('Getting a clearer picture', H2))
@@ -462,8 +490,8 @@ def app_guide(path):
         '<b>Print settings matter as much as these sliders.</b> See the companion Printer Settings guide.',
     ])
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.0 - Settings Guide'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.0 - Settings Guide'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.1 - Settings Guide'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.1 - Settings Guide'))
 
 
 # ---------------------------------------------------------------- document 2
@@ -473,7 +501,7 @@ def printer_guide(path):
                             title='Lithophane Lamp - Printer Settings')
     s = []
     s.append(P('Printer Settings for Lithophane Lamps', H1))
-    s.append(P('For Lithophane Lamp Creator 1.0: slicer settings for the lamp and the base, and what each one changes. '
+    s.append(P('For Lithophane Lamp Creator 1.1: slicer settings for the lamp and the base, and what each one changes. '
                'Names match Bambu Studio and OrcaSlicer; other slicers use similar names.', SUB))
 
     s.append(P('Why the slicer matters', H2))
@@ -503,8 +531,11 @@ def printer_guide(path):
          'lithophane. It is the default in recent versions.'],
         ['Outer wall speed<br/>(Speed tab)', '<b>Slower than default</b> (try about half)', 'A cleaner surface and '
          'more even light.'],
-        ['Supports<br/>(Support tab)', '<b>On</b>, tree, build plate only (balls, football, Moon). <b>Off</b> for the cube.',
-         'Balls need them for the curve just above the collar. The cube is designed to print without them.'],
+        ['Supports<br/>(Support tab)', '<b>On</b>, tree, build plate only (balls, football, Moon). <b>Off</b> for the '
+         'cube and flat panels.',
+         'Balls need them for the curve just above the collar. The cube and panels are designed to print without them.'],
+        ['Brim<br/>(Others tab)', '<b>On</b> for flat panels, about 5 mm', 'A panel stands on a narrow edge; a brim stops '
+         'it tipping or lifting, especially hearts and tall panels.'],
         ['Ironing', '<b>Off</b>', 'Not needed.'],
     ], [1.75 * inch, 1.65 * inch, 3.6 * inch]))
     s.append(Spacer(1, 10))
@@ -522,6 +553,9 @@ def printer_guide(path):
          'supports.'],
         ['Base: LED puck, bulb socket', 'Already upside down in the file (top on the bed). No supports.'],
         ['Base: LED strip riser', 'Standing up, as it sits on the table. No supports.'],
+        ['Flat panel', 'Standing up on its bottom edge, as exported, with the front facing the seam-free side. Brim on, '
+         'no supports.'],
+        ['Panel light box, slot stand', 'Standing up, as it sits on the table. No supports.'],
     ], [1.9 * inch, 5.1 * inch]))
 
     s.append(P('Printing the base', H2))
@@ -545,7 +579,7 @@ def printer_guide(path):
         'Wall loops 3 to 4',
         'Layer height 0.12 mm (or 0.08 mm)',
         'Seam position Back, and the picture turned away from it',
-        'Supports on, build plate only (off for the cube)',
+        'Supports on, build plate only (off for the cube and panels; a brim for panels)',
         'In the slicer preview, scroll through the layers: the wall should show only loops and solid fill, with no '
         'open, diagonal sparse pattern.',
     ])
@@ -571,8 +605,8 @@ def printer_guide(path):
     s.append(P('Tip: to test settings quickly, export a Small lamp with the picture shrunk to fit. It prints much faster '
                'and shows the same problems.', SMALL))
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.0 - Printer Settings'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.0 - Printer Settings'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.1 - Printer Settings'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.1 - Printer Settings'))
 
 
 if __name__ == '__main__':

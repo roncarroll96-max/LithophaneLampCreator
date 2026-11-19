@@ -175,6 +175,9 @@ export class Preview {
 
   /** Collar, base and floor around the ball (preview only). */
   updateStand(shape, collar, settings) {
+    // Panels can be turned round, so show both sides; lamps are only seen from outside
+    const side = shape.kind === 'panel' ? THREE.DoubleSide : THREE.FrontSide;
+    if (this.glowMat.side !== side) { this.glowMat.side = side; this.plainMat.side = side; this.glowMat.needsUpdate = true; this.plainMat.needsUpdate = true; }
     // Free the old stand's geometry and its own materials (shared ones are kept), but keep the
     // real base: it is put back below, since it only changes when the base settings change.
     const shared = new Set([this.plainMat, this.collarGlow, this.baseMat, this.floorMat]);
@@ -185,6 +188,8 @@ export class Preview {
     }
     this.group.clear();
     if (this._baseMesh) this.group.add(this._baseMesh);
+    if (shape.kind === 'panel') { this._panelStand(shape); return; }
+    this.collar = null;
     const o = {};
     let zEdge = Infinity;
     for (let i = 0; i < 64; i++) {
@@ -231,6 +236,41 @@ export class Preview {
     this._frameBox = { w: Math.max(shape.a, baseR) * 2, h: shape.c - (zBot - baseH) };
     this.controls.target.set(0, 0, (zBot - baseH + shape.c) / 2);
     if (this._baseMesh) this._placeBase();
+  }
+
+  /** A flat panel: a floor under its bottom edge (and a simple block until the real base is built). */
+  _panelStand(panel) {
+    this.collar = null;
+    const zBot = panel.bottom;
+    const w = panel.chordHalf * 2 + 8, d = Math.max(24, panel.sag + 24), h = 14;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w, d, h), this.baseMat);
+    base.position.set(0, -panel.sag / 2 + 6, zBot - h / 2 + 8);
+    this.group.add(base);
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(900, 64), this.floorMat);
+    floor.position.z = zBot;
+    this.group.add(floor);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(Math.max(120, w), 64), new THREE.MeshBasicMaterial({
+      color: AMBER, transparent: true, opacity: 0.06, depthWrite: false,
+    }));
+    pool.position.z = zBot + 0.2;
+    this.group.add(pool);
+    base.visible = false; // shown only while the real base is being built (see setBase)
+    Object.assign(this, { _zBot: zBot, _standBase: base, _ring: null, _floor: floor, _pool: pool, _lampTop: panel.c, _lampW: panel.chordHalf });
+    this._frameBox = { w: panel.chordHalf * 2, h: panel.H };
+    this.controls.target.set(0, 0, 0);
+    if (this._baseMesh) this._placeBase();
+  }
+
+  /** Removes the real base (a panel with no base). */
+  clearBase() {
+    if (!this._baseMesh) return;
+    this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose(); this._baseMesh = null;
+    if (this._floor && this._zBot != null) {
+      this._floor.position.z = this._zBot;
+      if (this._pool) this._pool.position.z = this._zBot + 0.2;
+      this._frameBox = { w: this._lampW * 2, h: this._lampTop - this._zBot };
+      this.controls.target.set(0, 0, (this._zBot + this._lampTop) / 2);
+    }
   }
 
   /**

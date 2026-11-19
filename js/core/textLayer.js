@@ -35,6 +35,8 @@ export function defaultTextItem(n = 0) {
     arc: 0,            // degrees of bend over the text's length, + = arch (centre higher)
     outline: false,    // thin bright outline around the letters
     raise: 1.0,        // height of raised text, mm
+    panelX: 0,         // flat panel: mm right of the middle
+    panelY: -25 - 15 * (n % 3), // flat panel: mm above (+) or below (-) the middle
     hidden: false,
   };
 }
@@ -133,4 +135,39 @@ export function createTextLayer(settings, shape, masks) {
   }
 
   return { items, sample, hasRaised: list.some((it) => it.style === 'raised') };
+}
+
+/**
+ * Text on a flat panel: the same masks, placed by panel coordinates (u right, v up, mm, from the
+ * middle). Returns { sample(u, v, out) } filling out.hits / out.clear like createTextLayer, or null.
+ */
+export function createPanelTextLayer(settings, masks) {
+  const list = (settings.texts || []).filter((it) => !it.hidden && it.text && it.text.trim() && masks && masks[it.id]);
+  if (!list.length) return null;
+  const items = list.map((it) => {
+    const mask = masks[it.id], rot = (it.rotate * Math.PI) / 180;
+    const reach = Math.hypot(Math.max(mask.cx, mask.w - mask.cx), Math.max(mask.cy, mask.h - mask.cy)) * mask.mmPerPx;
+    return { it, mask, x: it.panelX ?? 0, y: it.panelY ?? 0, cr: Math.cos(rot), sr: Math.sin(rot), reach };
+  });
+  function sample(u, v, out) {
+    out.hits.length = 0;
+    out.clear = 0;
+    for (const p of items) {
+      const lx0 = u - p.x, ly0 = v - p.y;
+      if (Math.abs(lx0) > p.reach || Math.abs(ly0) > p.reach) continue;
+      const lx = lx0 * p.cr + ly0 * p.sr, ly = -lx0 * p.sr + ly0 * p.cr;
+      const m = p.mask;
+      const px = m.cx + lx / m.mmPerPx, py = m.cy - ly / m.mmPerPx;
+      const clear = sampleMask(m, m.clear, px, py);
+      if (clear <= 0) continue;
+      out.hits.push({
+        item: p.it,
+        letters: sampleMask(m, m.letters, px, py),
+        halo: p.it.outline ? sampleMask(m, m.halo, px, py) : 0,
+      });
+      if (clear > out.clear) out.clear = clear;
+    }
+    return out;
+  }
+  return { items, sample, hasRaised: false };
 }

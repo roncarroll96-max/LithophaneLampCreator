@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later)_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -17,6 +17,8 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 0.8 | Base generator and light riser |
 | 0.9 | ~~AI photo tools~~ skipped for now (moved to Later, 2026-11-18). Cut-out photos made with a phone or Windows Photos already work (0.4.1). |
 | 1.0 | Phone and tablet polish, final check against this spec (done) |
+| 1.1 | Flat panel (feature 12b): square, rectangle, circle, heart; curve; frame; light-box base, slot stand and feet |
+| 1.2 | Speed: faster tone sliders and Base tab, lighter big-base and Fine exports, 3D view pauses when idle (from the 1.0.3 review) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -66,6 +68,23 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
     - **Text** (from 0.3) can be placed on cube faces.
     - **Printed in one piece, upside down**: the top face lies flat on the bed and the four walls print straight up, the best direction for lithophane detail. The underside angles in toward the collar so it prints without supports. The top photo is printed lying flat, so it shows slightly less detail than the four walls.
     - Wall thickness, detail levels, preview modes, bed check, export and saving work the same as for the balls.
+
+12b. **Flat panel** (version 1.1): a lithophane picture panel, the classic flat kind, as a new choice on the Shape tab.
+    - **Shapes**: square, rectangle, circle or heart.
+    - **Sizes**: rectangles 4×6, 5×7 and 8×10 inch; squares, circles and hearts 4, 6 and 8 inch; all with custom width and height. Sizes show both units, e.g. "5×7 in (127×178 mm)". A rectangle starts in the photo's own shape and orientation (portrait or landscape) so nothing is cropped; typing a size or picking a print size overrides it, and zoom and pan pick what shows.
+    - **Curve slider**: starts flat; sliding it bends the panel side to side, like a section of a tall cylinder (left and right edges come toward you). Works for every shape.
+    - **Raised frame** round the edge, following the shape (round for circles, heart-shaped for hearts): adjustable width, can be turned off. It makes the panel stiffer and hides the photo's edge.
+    - **Front smooth, picture relief on the back**, the same rule as the lamps (smooth outside, relief inside). The frame stands out on the back too, so the front lies flat against a window or frame.
+    - **Photos**: one photo fills the panel; up to 6 photos make a collage with soft edges, using the same multi-photo tools as the lamps. Tone, cut-out background, zoom, pan and drag work as on the lamps.
+    - **Text**: names, dates or captions, placed by clicking on the panel.
+    - **No markings** (the Markings tab says markings are for the ball shapes).
+    - **Prints standing upright** on its bottom edge, the best direction for lithophane detail. Circles and hearts get a small flat on the bottom so they stand on the bed and sit in a base; the print tips suggest a brim for tall thin panels. The bed check uses the upright size.
+    - **Optional feet** printed onto the bottom edge (off by default), so the panel stands by itself in a window or in front of a light. A curved panel can stand on its own without feet.
+    - **Bases** (Base tab, separate files, like the lamp bases):
+      - **Light box**: a rectangular base as wide as the panel, with a slot shaped to the panel's bottom edge (curved panels get a curved slot; circles and hearts sit in a short cradle). An LED strip inside shines up behind the panel. Designed for a common 10 mm USB LED strip, with adjustable strip width, slot fit and a cable notch. Prints without supports.
+      - **Slot stand**: a small stand with a slot and no light, for a window or with a lamp behind.
+    - **Even glow** (from the cube): with the light box, the bottom of the panel is nearest the light, so the app can make the plastic thinner higher up to even it out. On by default when the light box is chosen; strength slider.
+    - Wall thickness, detail levels, preview modes, Thickness view, export, saving and project files work the same as for the lamps. The print tips page and both PDF guides get a panel section.
 
 13. **Markings per design**: each marking set (lines, panels, laces, seams) can be **carved in** (thicker plastic, glows dark, smooth outside), **raised** (sticks out from the surface), or **off**. Line width and darkness are adjustable.
 14. **Size presets** plus a custom size field. The football scales with the preset:
@@ -236,6 +255,24 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Detail presets | Draft 0.5 / Standard 0.3 / Fine 0.2 mm for all sizes | Assumed (Claude's default) |
 | Local address | http://localhost:5178 via start.bat | Assumed (Claude's default) |
 | Local launcher | `start.bat` + tiny local server | Assumed (Claude's default) |
+| Flat panel shapes | Square, rectangle, circle, heart | You (2026-11-19) |
+| Panel sizes | Photo print sizes: 4×6, 5×7, 8×10 in; squares/circles/hearts 4, 6, 8 in; custom | You (2026-11-19) |
+| Rectangle shape | Starts matching the photo, can be overridden | You (2026-11-19) |
+| Panel curve | Slider from flat to curved, bending side to side | You (2026-11-19) |
+| Panel frame | Raised, adjustable width, can be turned off | You (2026-11-19) |
+| Panel display | Light-box base with LED strip, optional feet, simple slot stand | You (2026-11-19) |
+| Light-box base | One plain rectangular base for every panel shape, slot follows the panel's bottom | You (2026-11-19) |
+| Panel photos and text | Up to 6 photos (collage) and text | You (2026-11-19) |
+| Main use | Gifts and night lights, so the light box and frame matter most | You accepted Claude's suggestion (2026-11-19) |
+| LED strip | Designed for a common 10 mm USB strip; width adjustable | You accepted Claude's suggestion (2026-11-19) |
+| Units | Inch print sizes shown with mm next to them | You accepted Claude's suggestion (2026-11-19) |
+| Version order | Flat panel is 1.1; speed work becomes 1.2 | You (2026-11-19) |
+| Panel relief side | Front smooth, relief and frame on the back | Assumed (Claude's default, same rule as the lamps) |
+| Panel print direction | Upright on its bottom edge; circles and hearts get a small flat; brim suggested | Assumed (Claude's default) |
+| Panel feet | Optional, off by default | Assumed (Claude's default) |
+| Panel even glow | On by default with the light box | Assumed (Claude's default) |
+| Collage start | First photo fills the panel; later photos start as smaller windows to drag; an "Arrange as collage" button lays them out in a grid | Assumed (Claude's default) |
+| Panel frame default | 6 mm wide, 2 mm thicker than the thickest wall | Assumed (Claude's default, check on print) |
 
 ## Open questions
 - **Your current process and tools:** not yet described. Knowing which software and settings give you good prints today would help tune the defaults. (You)
@@ -243,6 +280,8 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Football shape:** the default tip shape (60%) is a guess at a real football; check it against a real ball on the first football print and adjust the default if needed. (You, after first football print)
 - **Cube underside:** the 45° funnel under the cube hangs about 20 mm below the bottom of the walls on the Medium cube (total height 125 mm with the collar). Check on the first cube print that it looks right sitting on your base. (You, at the cube test print)
 - **Even glow for balls too?** The same distance correction could help Large balls. Decide after seeing it on the cube. (You, after 0.7)
+- **Light-box light:** how even the glow is from a strip in the base, and whether the default even-glow strength is right. (You, at the first panel print)
+- **Heart and circle on the bed:** whether the small flat on the bottom is enough for them to print upright without tipping, or whether they need a brim or a wider flat. (You, at the first heart/circle print)
 - **File sizes:** measured (see feature 20). Still to confirm: does your slicer handle the Standard file comfortably? (You, at test print)
 
 ## How we'll know it works
@@ -253,6 +292,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 5. The Moon in moon-only mode shows recognisable maria and craters when lit.
 6. On a phone, you can load a photo, adjust it, preview, and export at Standard.
 7. A Medium cube with five different photos exports in one STL, prints upside down with no supports, sits on your current base, and glows evenly from bottom to top.
+8. A 5×7 in flat panel from one of your photos prints standing up with no supports, drops into its light-box base, and glows with a clear, even picture. The same works for a curved panel and a 6 in heart.
 
 ## Build progress
 
@@ -272,6 +312,18 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
 
+### Version 1.1: flat panel, done (2026-11-19)
+Built (feature 12b): **Flat panel** on the Shape tab.
+- **Shapes and sizes**: rectangle (Match photo, 4×6, 5×7, 8×10 in, custom; portrait or landscape follows the photo), square, circle and heart (4, 6, 8 in, custom). Sizes are shown in inches and mm. Circles have a flat 40% of their width on the bottom, hearts 16% (an 8 in heart has a 33 mm flat), so they stand up and sit in a slot.
+- **Curve** from flat to 120°, bending side to side. **Raised frame** on the back (6 mm wide, 2 mm thicker than Thickest by default, with a 45° slope into the picture; can be turned off). **Feet** (off by default): two small blocks on the bottom edge.
+- **Photos**: the first fills the panel (cropped to its shape; drag on the panel to slide it inside), later ones start as smaller windows to drag; **Arrange as collage** lays them out in the grid that best fits their shape. **Text** placed by clicking the panel; raised text isn't offered (the front stays smooth).
+- **Bases** (Base tab): **Light box**, a block as wide as the panel with a slot that follows its bottom edge (curved for curved panels) and an open trough behind it whose floor leans 30° toward the panel for the LED strip (strip width adjustable, cable notch at the back); **Slot stand**; or **None**. Both bases print standing up with no supports. **Even glow** (on by default with the light box) thins the plastic higher up, away from the strip.
+- **Export**: the panel stands on its bottom edge in the STL. Bed check uses the upright size. Tips page and both PDF guides have panel sections (supports off, brim on, how it goes on the bed).
+- Shared code: the photo blending now lives in one place for lamps and panels (no change to lamp output; all lamp tests still pass).
+
+Checks passed: 67 automated tests (6 new: rectangle sizes follow the photo; all four outlines are the right size and their rings never cross; the front stays flat while bright photo areas print thin, dark ones thick and the frame thickest; even glow thins the top only with the light box; panel meshes are closed, stand at z = 0 and are the right size, flat and curved, with feet; light box and slot stand are closed solids with a slot exactly the panel edge plus the fit, and "None" gives no base). In the browser: a wide photo made a landscape panel; a curved 6 in heart and its light box exported (152.7 × 18.2 × 116.8 mm panel, 174 × 42 × 24 mm base); text, collage, switching back to a ball (collar and base return) and the phone layout (no sideways scrolling on any tab) all worked.
+Still to check on a real print: how even the light box glow looks, the slot fit, and whether hearts and circles stand on the bed with a brim.
+
 ### Version 1.0.3: fixes from an independent code review (2026-11-19)
 An independent review of the whole app found that the geometry was solid. It also found a number of bugs and gaps around it, all now fixed:
 - **Base in the preview:** no longer disappears after New, opening a project or clicking the selected size. The stand no longer leaks graphics memory as sliders move.
@@ -283,7 +335,7 @@ An independent review of the whole app found that the geometry was solid. It als
 - **Messages:** "Run start.bat" only appears on the local copy; online it says to check the internet. Browsers too old to export, or without 3D graphics (WebGL), get a clear message instead of dead buttons. A damaged autosave or a failed project save gives a message.
 - **Safety:** project files can only carry pictures stored inside them; links to websites are ignored, so a file can't make the app contact the internet. Damaged photo or text entries are skipped. The local server (start.bat) refuses paths outside the app folder and requests that don't come from this PC by name.
 - **Phones:** the Open project button no longer filters by file type, so iPhones and iPads can pick .lithoproj files.
-Still to do (planned for 1.1): faster tone sliders and Base tab changes, faster and lighter big-base and Fine exports, and pausing the 3D view when nothing moves. There's also a tiny crease where the cube's flat rim beside the collar meets the funnel (about 1 mm, unchanged by this release); check it on the first cube print.
+Still to do (now planned for 1.2): faster tone sliders and Base tab changes, faster and lighter big-base and Fine exports, and pausing the 3D view when nothing moves. There's also a tiny crease where the cube's flat rim beside the collar meets the funnel (about 1 mm, unchanged by this release); check it on the first cube print.
 
 ### Version 1.0.2: printer setting tips page (2026-11-18)
 A "Printer Setting Tips" page (tips.html) with slicer settings that generally work well: 100% sparse infill, 3-4 wall loops, 0.12 mm layers, seam at the back, Arachne, slower outer wall, supports (off for the cube), how each file goes on the bed, base settings (normal settings, dark opaque filament), nozzle and filament, a checklist and troubleshooting. Linked from "Print tips" in the header and from the Export and Base tabs; opens in a new tab so the app keeps your work. Checked on desktop and phone (no sideways scrolling; settings stack as cards on phones).
@@ -306,6 +358,7 @@ Phone and tablet: every tab checked at 375 × 812 (phone) and 768 × 1024 (table
 | 5a | Several photos (up to 6), placed freely | Done (0.6) |
 | 6-12 | Basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon | Done (0.1-0.5) |
 | 12a | Cube with 5 face photos | Done (0.7) |
+| 12b | Flat panel | Done (1.1) |
 | 13 | Markings carved / raised / off, width and darkness | Done |
 | 14, 14a | Size presets plus custom, remembered; printer bed check with "rotate 45°" | Done |
 | 15 | Text | Done (0.3) |

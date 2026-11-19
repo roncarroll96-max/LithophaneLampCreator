@@ -27,7 +27,7 @@ const smooth = (e0, e1, x) => {
   return t * t * (3 - 2 * t);
 };
 
-const LINE_EXTRA = 0.4;     // carved lines go this much past tMax so they stay visible over dark areas
+export const LINE_EXTRA = 0.4; // carved lines go this much past tMax so they stay visible over dark areas
 const MOUNT_ARC = 4;        // mm above the opening edge kept plain (no photo/markings)
 const MOUNT_BLEND = 6;      // mm to blend from the plain mount band into the design
 
@@ -46,6 +46,90 @@ function resolveLayers(settings, photos) {
   return (settings.photos || [])
     .filter((c) => !c.hidden && photos[c.id])
     .map((c) => ({ cfg: { ...defaultPhotoSettings(), ...c }, img: photos[c.id] }));
+}
+
+/**
+ * One photo as a layer: its window is W mm wide and H = W * aspect tall (or fixedH tall). The
+ * photo fills the window, cropped (with zoom and pan) when their shapes differ.
+ */
+export function preparePhotoLayer(p, img, W, fixedH = null) {
+  const imgAspect = img.h / img.w;
+  const aspect = fixedH != null ? fixedH / W : p.aspect && p.aspect > 0 ? p.aspect : imgAspect;
+  const zoom = Math.max(0.05, p.zoom);
+  const cover = Math.max(1, aspect / imgAspect);
+  const rot = (-p.rotate * Math.PI) / 180;
+  const L = {
+    id: p.id || null, p, img, W, H: W * aspect, imgAspect, zoom, cover,
+    cr: Math.cos(rot), sr: Math.sin(rot),
+    feather: Math.max(0.01, p.feather),
+    oval: p.windowShape === 'oval',
+    projection: p.projection || 'natural',
+    aroundRad: ((p.around || 0) * Math.PI) / 180,
+    bgMode: p.background || 'blend', // cut-outs: 'blend' (whatever is below) | 'bright' | 'dark'
+    alphaMap: null,
+  };
+  if (img.alpha) {
+    const mmPerPx = (W * zoom * cover) / img.w;
+    L.alphaMap = softAlpha(img.alpha, img.w, img.h, Math.round(Math.max(0, p.edgeSoft ?? 2) / 2 / mmPerPx));
+  }
+  return L;
+}
+
+function samplePhoto(img, u, v, d = img.data) { // u,v in 0..1 image space
+  const fx = u * img.w - 0.5, fy = v * img.h - 0.5;
+  const x0 = Math.floor(fx), y0 = Math.floor(fy);
+  const wx = fx - x0, wy = fy - y0;
+  const W1 = img.w - 1, H1 = img.h - 1;
+  const xa = x0 < 0 ? 0 : x0 > W1 ? W1 : x0, xb = x0 + 1 > W1 ? W1 : x0 + 1 < 0 ? 0 : x0 + 1;
+  const ya = y0 < 0 ? 0 : y0 > H1 ? H1 : y0, yb = y0 + 1 > H1 ? H1 : y0 + 1 < 0 ? 0 : y0 + 1;
+  const a = d[ya * img.w + xa] * (1 - wx) + d[ya * img.w + xb] * wx;
+  const b = d[yb * img.w + xa] * (1 - wx) + d[yb * img.w + xb] * wx;
+  return a * (1 - wy) + b * wy;
+}
+
+/**
+ * Blends the photo layers (top first) over a plain brightness `base`. xyOf(L, xy) writes the
+ * point's position in layer L's window (mm, x right, y up from the window centre; 1e9 = outside).
+ * Writes { bright, mask, photoId } into res: the brightness, how much photo covers the point,
+ * and the id of the top photo there.
+ */
+const XY = [0, 0];
+export function blendLayers(layers, base, xyOf, res) {
+  let bright = base, mask = 0, photoId = null;
+  for (let li = layers.length - 1; li >= 0; li--) {
+    const L = layers[li];
+    xyOf(L, XY);
+    const xmm = XY[0], ymm = XY[1];
+    const hx = L.W / 2, hy = L.H / 2;
+    let m;
+    if (L.oval) {
+      const r = Math.hypot(xmm / hx, ymm / hy);
+      m = 1 - smooth(1 - L.feather / Math.min(hx, hy), 1, r);
+    } else {
+      m = smooth(0, L.feather, hx - Math.abs(xmm)) * smooth(0, L.feather, hy - Math.abs(ymm));
+    }
+    if (m <= 0) continue;
+    // window coords in units of window width, centred
+    const p = L.p;
+    const px = xmm / L.W, py = -ymm / L.W;
+    const qx = (px * L.cr - py * L.sr) / L.zoom, qy = (px * L.sr + py * L.cr) / L.zoom;
+    const u = 0.5 + p.panX + qx / L.cover;
+    const v = 0.5 + p.panY + qy / (L.cover * L.imgAspect);
+    if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+    let val = samplePhoto(L.img, u, v);
+    if (L.alphaMap) {
+      const a = samplePhoto(L.img, u, v, L.alphaMap);
+      const bg = L.bgMode === 'bright' ? 1 : L.bgMode === 'dark' ? 0 : bright;
+      val = val * a + bg * (1 - a);
+      // Blend: what's below carries on behind the subject, so it no longer counts as this photo
+      if (L.bgMode === 'blend') { bright += (val - bright) * m; m *= a; if (m > 0.5) photoId = L.id; mask = Math.max(mask, m); continue; }
+    }
+    bright += (val - bright) * m;
+    if (m > 0.5) photoId = L.id;
+    mask = Math.max(mask, m);
+  }
+  res.bright = bright; res.mask = mask; res.photoId = photoId;
+  return res;
 }
 
 /**
@@ -70,26 +154,7 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
   // ---- Photo layers (top first), each with its own window on the ball
   const ftmp = {};
   const layers = (moonOnly ? [] : resolveLayers(settings, photos)).map(({ cfg: p, img }) => {
-    const W = (p.coverage / 360) * shape.eqPerimeter;
-    const imgAspect = img.h / img.w;
-    const aspect = p.aspect && p.aspect > 0 ? p.aspect : imgAspect;
-    const zoom = Math.max(0.05, p.zoom);
-    const cover = Math.max(1, aspect / imgAspect);
-    const rot = (-p.rotate * Math.PI) / 180;
-    const L = {
-      id: p.id || null, p, img, W, H: W * aspect, imgAspect, zoom, cover,
-      cr: Math.cos(rot), sr: Math.sin(rot),
-      feather: Math.max(0.01, p.feather),
-      oval: p.windowShape === 'oval',
-      projection: p.projection || 'natural',
-      aroundRad: ((p.around || 0) * Math.PI) / 180,
-      bgMode: p.background || 'blend', // cut-outs: 'blend' (whatever is below) | 'bright' | 'dark'
-      alphaMap: null,
-    };
-    if (img.alpha) {
-      const mmPerPx = (W * zoom * cover) / img.w;
-      L.alphaMap = softAlpha(img.alpha, img.w, img.h, Math.round(Math.max(0, p.edgeSoft ?? 2) / 2 / mmPerPx));
-    }
+    const L = preparePhotoLayer(p, img, (p.coverage / 360) * shape.eqPerimeter);
     if (L.projection === 'planar') {
       // Planar: straight-on coordinates on the plane at the window centre (no distortion on a
       // flat face such as a cube side; on a ball it is a plain orthographic view)
@@ -151,18 +216,6 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
   const textLayer = createTextLayer(settings, shape, textMasks);
   const tx = { hits: [], clear: 0 };
 
-  function samplePhoto(img, u, v, d = img.data) { // u,v in 0..1 image space
-    const fx = u * img.w - 0.5, fy = v * img.h - 0.5;
-    const x0 = Math.floor(fx), y0 = Math.floor(fy);
-    const wx = fx - x0, wy = fy - y0;
-    const W1 = img.w - 1, H1 = img.h - 1;
-    const xa = x0 < 0 ? 0 : x0 > W1 ? W1 : x0, xb = x0 + 1 > W1 ? W1 : x0 + 1 < 0 ? 0 : x0 + 1;
-    const ya = y0 < 0 ? 0 : y0 > H1 ? H1 : y0, yb = y0 + 1 > H1 ? H1 : y0 + 1 < 0 ? 0 : y0 + 1;
-    const a = d[ya * img.w + xa] * (1 - wx) + d[ya * img.w + xb] * wx;
-    const b = d[yb * img.w + xa] * (1 - wx) + d[yb * img.w + xb] * wx;
-    return a * (1 - wy) + b * wy;
-  }
-
   /** Window coordinates (mm, x right, y up from the window centre) of a surface point. */
   function windowXY(L, theta, s, S, outXY) {
     if (L.projection === 'planar') {
@@ -188,7 +241,10 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
     outXY[0] = L.projection === 'wrap' ? wrapX : natural;
     outXY[1] = shape.elev(s) - L.p.centerY;
   }
-  const xy = [0, 0];
+  // The point being evaluated, for the window lookup in blendLayers
+  let curTheta = 0, curS = 0, curSurf = null;
+  const xyOf = (L, out) => windowXY(L, curTheta, curS, curSurf, out);
+  const pr = {};
 
   function sampleMoon(theta, dz) {
     // Longitude 0 (the side that faces Earth) at the front, east to the right as seen from Earth
@@ -212,39 +268,9 @@ export function createField(settings, shape, photos, textMasks = null, moon = nu
     const base = isMoon ? sampleMoon(theta, S.dz) : surround;
 
     // ---- Photos, bottom layer first so the top one wins (its soft edge fades into what's below)
-    let bright = base, mask = 0, photoId = null;
-    for (let li = layers.length - 1; li >= 0; li--) {
-      const L = layers[li];
-      windowXY(L, theta, s, S, xy);
-      const xmm = xy[0], ymm = xy[1];
-      const hx = L.W / 2, hy = L.H / 2;
-      let m;
-      if (L.oval) {
-        const r = Math.hypot(xmm / hx, ymm / hy);
-        m = 1 - smooth(1 - L.feather / Math.min(hx, hy), 1, r);
-      } else {
-        m = smooth(0, L.feather, hx - Math.abs(xmm)) * smooth(0, L.feather, hy - Math.abs(ymm));
-      }
-      if (m <= 0) continue;
-      // window coords in units of window width, centred
-      const p = L.p;
-      const px = xmm / L.W, py = -ymm / L.W;
-      const qx = (px * L.cr - py * L.sr) / L.zoom, qy = (px * L.sr + py * L.cr) / L.zoom;
-      const u = 0.5 + p.panX + qx / L.cover;
-      const v = 0.5 + p.panY + qy / (L.cover * L.imgAspect);
-      if (u < 0 || u > 1 || v < 0 || v > 1) continue;
-      let val = samplePhoto(L.img, u, v);
-      if (L.alphaMap) {
-        const a = samplePhoto(L.img, u, v, L.alphaMap);
-        const bg = L.bgMode === 'bright' ? 1 : L.bgMode === 'dark' ? 0 : bright;
-        val = val * a + bg * (1 - a);
-        // Blend: what's below carries on behind the subject, so it no longer counts as this photo
-        if (L.bgMode === 'blend') { bright += (val - bright) * m; m *= a; if (m > 0.5) photoId = L.id; mask = Math.max(mask, m); continue; }
-      }
-      bright += (val - bright) * m;
-      if (m > 0.5) photoId = L.id;
-      mask = Math.max(mask, m);
-    }
+    curTheta = theta; curS = s; curSurf = S;
+    blendLayers(layers, base, xyOf, pr);
+    const mask = pr.mask, photoId = pr.photoId, bright = pr.bright;
     let t = tMin + (1 - bright) * (tMax - tMin);
     let raise = 0;
 

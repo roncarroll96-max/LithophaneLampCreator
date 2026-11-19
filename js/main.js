@@ -16,7 +16,9 @@ import { buildTextMasks, masksCurrent, loadAllFonts } from './text.js';
 import { loadMoon } from './moonData.js';
 import { moonMap } from './core/moon.js';
 import { APP_VERSION } from './version.js';
-import { buildBase, SOCKETS } from './core/base.js';
+import { buildBase, SOCKETS, PANEL_BASE_KINDS } from './core/base.js';
+import { buildPanel, resolvePanelSize, sizeLabel, RECT_SIZES, SIDE_SIZES, PANEL_OUTLINES, IN, panelEdgeThickness } from './core/panel.js';
+import { createPanelField } from './core/panelField.js';
 import { meshSdf } from './core/sdf.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
@@ -109,6 +111,24 @@ function update(quick) {
     }
     if (toned) { drawThumb(); drawRowThumbs(); }
     let shapeChanged = false;
+    if (isPanel()) {
+      // A rectangle starts in its photo's shape: keep its size in step with the photo
+      const dims = resolvePanelSize(s.panel, panelPhotoAspect());
+      if (dims.width !== s.panel.width || dims.height !== s.panel.height) {
+        Object.assign(s.panel, dims); app.dirty.shape = true;
+      }
+    }
+    if (app.dirty.shape && isPanel()) {
+      const panel = buildPanel(s);
+      const reframe = !app.shape || app.shape.kind !== 'panel';
+      const sizeChanged = !reframe && (app.shape.W !== panel.W || app.shape.H !== panel.H);
+      app.shape = panel; app.collar = null;
+      preview.updateStand(panel, null, s);
+      if (reframe) preview.frame();
+      // The Shape tab shows the size: redraw it when the size (not just the curve) changed
+      if (sizeChanged && app.tab === 'ball') setTimeout(renderTab);
+      app.dirty.shape = false; shapeChanged = true;
+    }
     if (app.dirty.shape) {
       const maxOpen = maxOpening(s);
       if (s.opening.diameter > maxOpen && maxOpen >= 20) {
@@ -118,7 +138,7 @@ function update(quick) {
       }
       const collar = collarDims(s);
       const shape = buildEllipsoidShape(bodyAxes(s), collar.ro);
-      const firstShape = !app.shape;
+      const firstShape = !app.shape || app.shape.kind === 'panel';
       app.shape = shape; app.collar = collar;
       preview.updateStand(shape, collar, s);
       if (firstShape) preview.frame();
@@ -126,7 +146,9 @@ function update(quick) {
     }
     if (!app.shape) return;
     ensureTextMasks();
-    app.field = createField(s, app.shape, processedMap(), app.textMasks, ensureMoon());
+    app.field = isPanel()
+      ? createPanelField(s, app.shape, processedMap(), app.textMasks)
+      : createField(s, app.shape, processedMap(), app.textMasks, ensureMoon());
     // A Moon-only lamp needs no photo, so don't cover it with the "choose a photo" card
     $('emptyState').classList.toggle('hidden', hasPhotos() || (isMoonShape() && s.moon.mode !== 'photo'));
     const raised = app.field.hasRaised;
@@ -145,6 +167,55 @@ function update(quick) {
 // ---------- Photos ----------
 const hasPhotos = () => app.settings.photos.some((p) => app.images[p.id]);
 const isCube = () => SHAPES[app.settings.shape]?.body === 'cube';
+const isPanel = () => SHAPES[app.settings.shape]?.body === 'panel';
+/** "ball" or "panel", for labels. */
+const where = () => (isPanel() ? 'panel' : 'ball');
+/** Height / width of the photo a rectangle panel takes its shape from (the first one added). */
+function panelPhotoAspect() {
+  const list = app.settings.photos;
+  for (let i = list.length - 1; i >= 0; i--) {
+    const im = app.images[list[i].id];
+    if (im && im.base) return im.base.h / im.base.w;
+  }
+  return null;
+}
+/** Where the n-th photo starts on a panel: the first fills it, later ones are smaller windows. */
+function panelPhotoSlot(n) {
+  if (n === 0 || !app.shape || app.shape.kind !== 'panel') return { panelW: null, panelX: 0, panelY: 0 };
+  const { W, H } = app.shape;
+  const spots = [[-0.22, 0.22], [0.22, 0.22], [-0.22, -0.22], [0.22, -0.22], [0, 0]];
+  const [fx, fy] = spots[(n - 1) % spots.length];
+  return { panelW: +(W * 0.42).toFixed(1), panelX: +(fx * W).toFixed(1), panelY: +(fy * H).toFixed(1), aspect: null, feather: 4 };
+}
+/** Lays the panel's photos out in a grid inside the frame, in list order. */
+function arrangeCollage() {
+  const s = app.settings, list = s.photos.filter((c) => app.images[c.id]);
+  if (!app.shape || app.shape.kind !== 'panel' || !list.length) return;
+  const { W, H } = app.shape;
+  const inset = s.panel.frame ? s.panel.frameWidth + 2 : 3, gap = 3;
+  // Pick the grid whose cells best match the photos' shape (and leave few empty cells)
+  const n = list.length;
+  const photoAspect = list.reduce((a, c) => a + Math.log(app.images[c.id].base.h / app.images[c.id].base.w), 0) / n;
+  const cellOf = (cols) => {
+    const rows = Math.ceil(n / cols);
+    const cw = (W - 2 * inset - gap * (cols - 1)) / cols, ch = (H - 2 * inset - gap * (rows - 1)) / rows;
+    return { cols, rows, cw, ch, score: Math.abs(Math.log(ch / cw) - photoAspect) + 0.25 * (rows * cols - n) };
+  };
+  let best = cellOf(1);
+  for (let k = 2; k <= n; k++) { const c = cellOf(k); if (c.score < best.score) best = c; }
+  const { cols, rows, cw, ch } = best;
+  list.forEach((c, i) => {
+    const r = Math.floor(i / cols), k = i % cols;
+    const inRow = r === rows - 1 ? n - r * cols : cols; // centre a short last row
+    const x0 = -W / 2 + inset + (W - 2 * inset - (inRow * cw + (inRow - 1) * gap)) / 2;
+    Object.assign(c, {
+      panelW: +cw.toFixed(1), aspect: +(ch / cw).toFixed(3), feather: 2, windowShape: 'rect',
+      panelX: +(x0 + k * (cw + gap) + cw / 2).toFixed(1),
+      panelY: +(H / 2 - inset - r * (ch + gap) - ch / 2).toFixed(1),
+    });
+  });
+  changed('field'); renderTab();
+}
 /** Puts the photos on the cube's faces in list order: front, back, left, right, top. */
 function fitPhotosToFaces() {
   if (!app.shape || app.shape.kind !== 'cube') return;
@@ -184,8 +255,9 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
     if (gen !== app.projectGen || s !== app.settings) return; // a new project was started meanwhile
     let cfg = id ? s.photos.find((p) => p.id === id) : null;
     if (!cfg) {
-      const topUp = app.shape ? Math.floor(app.shape.elev(1)) - 2 : 70;
-      const slot = isCube() && app.shape && app.shape.kind === 'cube'
+      const topUp = app.shape?.elev ? Math.floor(app.shape.elev(1)) - 2 : 70;
+      const slot = isPanel() ? panelPhotoSlot(s.photos.length)
+        : isCube() && app.shape && app.shape.kind === 'cube'
         ? cubePhotoSlot(s.photos.length, s, app.shape) : photoSlot(s.photos.length, topUp);
       cfg = { ...defaultPhotoSettings(), ...slot, id: id || newPhotoId() };
       s.photos.unshift(cfg); // a new photo goes on top
@@ -245,6 +317,9 @@ function projectBaseName() {
   const s = app.settings;
   const first = app.settings.photos.find((p) => app.images[p.id]);
   const n = ((first && app.images[first.id].name) || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
+  if (isPanel() && app.shape && app.shape.kind === 'panel') {
+    return `${n}-panel-${app.shape.outline}-${Math.round(app.shape.W)}x${Math.round(app.shape.H)}mm`;
+  }
   const size = s.shape === 'football' ? `${s.footballLength}x${s.footballWidth}mm`
     : isCube() ? `${s.cube.size}mm` : `${s.diameter}mm`;
   return `${n}-${s.shape}-${size}`;
@@ -254,11 +329,17 @@ function projectBaseName() {
 function refreshBasePreview() {
   const s = app.settings;
   if (!app.shape) return;
-  const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening, s.tMax]);
+  const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening, s.tMax,
+    isPanel() ? s.panel : null]);
   if (key === app.baseKey) return;
   app.baseKey = key;
   try {
     const base = buildBase(s, app.shape);
+    if (!base) { // a panel with no base
+      app.baseInfo = null; app.lastBaseExport = null; preview.clearBase();
+      if (app.tab === 'base') renderTab();
+      return;
+    }
     app.baseInfo = base.info;
     const mesh = meshSdf(base.sdf, base.bounds, 1.2);
     preview.setBase(mesh.positions, mesh.indices, base.info);
@@ -413,12 +494,14 @@ function photoTab() {
       el('span', {}, (app.images[c.id] && app.images[c.id].name) || 'photo')),
     el('button', { class: 'btn small', title: 'Bring forward (in front of the photo below)', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
     el('button', { class: 'btn small', title: 'Send backward', disabled: i === list.length - 1, onclick: () => move(i, 1) }, '↓'),
-    el('button', { class: 'btn small', title: c.hidden ? 'Show on the ball' : 'Hide from the ball', onclick: () => { c.hidden = !c.hidden; changed('field'); renderTab(); } }, c.hidden ? 'Show' : 'Hide'),
+    el('button', { class: 'btn small', title: c.hidden ? `Show on the ${where()}` : `Hide from the ${where()}`, onclick: () => { c.hidden = !c.hidden; changed('field'); renderTab(); } }, c.hidden ? 'Show' : 'Hide'),
     el('button', {
       class: 'btn small', title: 'Make a copy a little further round', disabled: list.length >= MAX_PHOTOS,
       onclick: () => {
         const src = app.images[c.id]; if (!src) return;
-        const copy = { ...structuredClone(c), id: newPhotoId(), around: ((c.around + 210) % 360) - 180 };
+        const copy = isPanel()
+          ? { ...structuredClone(c), id: newPhotoId(), ...(c.panelW > 0 ? { panelX: c.panelX + 15, panelY: c.panelY - 15 } : panelPhotoSlot(1)) }
+          : { ...structuredClone(c), id: newPhotoId(), around: ((c.around + 210) % 360) - 180 };
         list.splice(i, 0, copy);
         app.images[copy.id] = { ...src, processed: null, dirty: true };
         app.selectedPhoto = copy.id; changed('field'); renderTab();
@@ -441,22 +524,25 @@ function photoTab() {
     }, 'Remove'),
   ));
 
-  const plainBall = section('Plain ball',
+  const plainBall = section(`Plain ${where()}`,
     // Show the wall it makes, in mm, so it matches the Thickness view readout
-    slider('photo.surround', 'Plain ball brightness', 0, 1, 0.01, {
+    slider('photo.surround', `Plain ${where()} brightness`, 0, 1, 0.01, {
       fmt: (v) => `${pct(v)} (${(s.tMin + (1 - v) * (s.tMax - s.tMin)).toFixed(2)} mm)`,
     }),
-    note('The ball outside your photos.'));
+    note(`The ${where()} outside your photos.`));
 
   const out = [
-    section('Photos on the ball',
+    section(`Photos on the ${where()}`,
       list.length ? el('div', { class: 'text-list' }, rows) : note('No photo yet. Choose one, or drop it on the preview.'),
       el('div', { class: 'row', style: 'margin-top:8px' },
         el('button', { class: 'btn small', disabled: list.length >= MAX_PHOTOS, onclick: addPhoto }, '+ Add photo'),
         el('span', { class: 'note', style: 'margin:0' }, `${list.length} of ${MAX_PHOTOS}`)),
       list.length ? note(list.length > 1
-        ? 'Drag the selected photo on the ball to move it (pick it in this list first). Where photos overlap, the one higher in the list is in front.'
-        : 'Drag the photo on the ball to move it.') : null,
+        ? `Drag the selected photo on the ${where()} to move it (pick it in this list first). Where photos overlap, the one higher in the list is in front.`
+        : `Drag the photo on the ${where()} to move it.`) : null,
+      isPanel() && list.length > 1
+        ? el('button', { class: 'btn small', onclick: arrangeCollage, title: 'Lay the photos out in a grid inside the frame, in list order' }, 'Arrange as collage')
+        : null,
       isMoonShape() && s.moon.mode !== 'photo'
         ? note('The Moon is set to "Moon only", so photos are not used. Choose "Photo + Moon" on the Shape tab to show them.', 'warn')
         : null,
@@ -474,8 +560,8 @@ function photoTab() {
     onclick: () => { Object.assign(p, autoAdjust(im.base)); changed('tone'); renderTab(); toast('Automatic adjustments applied.'); },
   }, 'Auto adjust');
   const changeBtn = el('button', { class: 'btn small', onclick: () => { app.replaceTarget = p.id; $('filePhoto').click(); } }, 'Change photo');
-  const upMax = app.shape ? Math.floor(app.shape.elev(1)) : 80;
-  const upMin = app.shape ? Math.ceil(app.shape.elev(0.03)) : -60;
+  const upMax = app.shape?.elev ? Math.floor(app.shape.elev(1)) : 80;
+  const upMin = app.shape?.elev ? Math.ceil(app.shape.elev(0.03)) : -60;
 
   out.push(
     section('Selected photo',
@@ -507,7 +593,7 @@ function photoTab() {
       slider(P('panY'), 'Move up / down', -0.5, 0.5, 0.005, { fmt: num2 }),
       slider(P('rotate'), 'Rotate', -180, 180, 0.5, { fmt: deg }),
     ),
-    section('Photo window on the ball',
+    isPanel() ? panelWindowSection(p, P) : section('Photo window on the ball',
       slider(P('around'), 'Around the ball', -180, 180, 0.5, { fmt: deg }),
       slider(P('centerY'), 'Up / down', upMin, upMax, 0.5, { fmt: mm }),
       slider(P('coverage'), 'Size (how far around)', 10, 360, 0.5, {
@@ -531,6 +617,81 @@ function photoTab() {
     plainBall,
   );
   return out;
+}
+
+/** Photo tab, flat panel: where the selected photo sits on the panel. */
+function panelWindowSection(p, P) {
+  const W = app.shape && app.shape.kind === 'panel' ? app.shape.W : 150;
+  const H = app.shape && app.shape.kind === 'panel' ? app.shape.H : 150;
+  const fill = !(p.panelW > 0);
+  const fillBox = el('input', { type: 'checkbox' });
+  fillBox.checked = fill;
+  fillBox.addEventListener('change', () => {
+    if (fillBox.checked) Object.assign(p, { panelW: null, panelX: 0, panelY: 0 });
+    else Object.assign(p, { panelW: +(W * 0.6).toFixed(1), panelX: 0, panelY: 0, aspect: null });
+    changed('field'); renderTab();
+  });
+  return section('Photo on the panel',
+    el('label', { class: 'check' }, fillBox, 'Fill the whole panel'),
+    fill ? note('Use Zoom and Move in "Position in window" (or drag it on the panel) to choose what shows.') : [
+      slider(P('panelX'), 'Left / right', Math.round(-W / 2), Math.round(W / 2), 0.5, { fmt: mm }),
+      slider(P('panelY'), 'Up / down', Math.round(-H / 2), Math.round(H / 2), 0.5, { fmt: mm }),
+      slider(P('panelW'), 'Width', 10, Math.round(W), 0.5, { fmt: mm }),
+      aspectToggle(),
+      p.aspect == null ? null : slider(P('aspect'), 'Window height', 0.25, 2, 0.01, { fmt: (v) => `${Math.round(v * 100)}% of width` }),
+      slider(P('feather'), 'Soft edge', 0, 40, 0.5, { fmt: mm }),
+      el('div', { class: 'ctl' }, el('label', {}, 'Window shape')),
+      segmented(P('windowShape'), [{ value: 'rect', label: 'Rectangle' }, { value: 'oval', label: 'Oval' }]),
+    ],
+  );
+}
+
+/** Shape tab, flat panel: outline, size, curve, frame and feet. */
+function panelSections() {
+  const s = app.settings, pn = s.panel;
+  const shapeSeg = segmented('panel.outline', Object.entries(PANEL_OUTLINES).map(([k, label]) => ({ value: k, label })), 'shape', (v) => {
+    pn.size = v === 'rect' ? 'photo' : '6';
+    renderTab();
+  });
+  const rect = pn.outline === 'rect';
+  const sizeOpts = rect
+    ? [{ value: 'photo', label: 'Match photo', title: 'The photo\'s own shape: nothing is cropped' },
+      ...Object.keys(RECT_SIZES).map((k) => ({ value: k, label: k.replace('x', '×'), title: `${k.replace('x', '×')} inch photo print size` })),
+      { value: 'custom', label: 'Custom' }]
+    : [...Object.keys(SIDE_SIZES).map((k) => ({ value: k, label: `${k} in` })), { value: 'custom', label: 'Custom' }];
+  const sizeSeg = segmented('panel.size', sizeOpts, 'shape', () => renderTab());
+  const num = (path, label, lo, hi) => {
+    const i = el('input', { type: 'number', min: lo, max: hi, step: 1, value: Math.round(getPath(s, path)), style: 'width:76px', 'aria-label': label });
+    i.addEventListener('change', () => {
+      const v = Math.min(hi, Math.max(lo, parseFloat(i.value) || getPath(s, path)));
+      i.value = v; setPath(s, path, v); changed('shape'); renderTab();
+    });
+    return el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, label), i);
+  };
+  const W = app.shape && app.shape.kind === 'panel' ? app.shape.W : pn.width;
+  const H = app.shape && app.shape.kind === 'panel' ? app.shape.H : pn.height;
+  return [
+    section('Panel shape', shapeSeg,
+      pn.outline === 'circle' || pn.outline === 'heart'
+        ? note('It has a small flat on the bottom so it stands up and sits in a base.') : null),
+    section('Size', sizeSeg,
+      rect && pn.size === 'photo' ? num('panel.longSide', 'Longest side (mm)', 50, 300) : null,
+      rect && pn.size === 'custom' ? [num('panel.width', 'Width (mm)', 30, 300), num('panel.height', 'Height (mm)', 30, 300)] : null,
+      !rect && pn.size === 'custom' ? num('panel.side', 'Size across (mm)', 40, 300) : null,
+      note(`Size: ${sizeLabel(W, H)}.` + (rect && pn.size !== 'custom' && pn.size !== 'photo' ? ' Portrait or landscape follows the photo.' : ''))),
+    section('Curve',
+      slider('panel.curve', 'Curve (side to side)', 0, 120, 1, { fmt: (v) => (+v < 0.5 ? 'Flat' : `${Math.round(v)}°`), group: 'shape' }),
+      note('A curved panel stands on its own and spreads the light more evenly. Its left and right edges come toward you.')),
+    section('Frame and feet',
+      checkbox('panel.frame', 'Raised frame round the edge (on the back)', 'shape', () => renderTab()),
+      pn.frame ? [
+        slider('panel.frameWidth', 'Frame width', 2, 20, 0.5, { fmt: mm }),
+        slider('panel.frameExtra', 'Frame thickness (above Thickest)', 0.5, 4, 0.1, { fmt: (v) => `+${(+v).toFixed(1)} mm (${(s.tMax + +v).toFixed(1)} mm)` }),
+      ] : null,
+      checkbox('panel.feet', 'Feet on the bottom edge (to stand without a base)', 'field', () => renderTab()),
+      pn.feet && s.base.panelKind !== 'none' ? note('Turn the feet off if the panel goes into a base (Base tab): they won\'t fit the slot.', 'warn') : null,
+      note('The front stays smooth; the picture and the frame are on the back. It prints standing up on its bottom edge.')),
+  ];
 }
 
 function ballTab() {
@@ -577,6 +738,12 @@ function ballTab() {
     changed('shape'); renderTab();
   });
 
+  const wall = section('Wall thickness',
+    slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
+    // The cube's edge rounding can't be tighter than the thickest wall, so tMax reshapes it
+    slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() ? 'shape' : 'field' }),
+    note('Typical white PLA: 0.8 mm to 3.0 mm.'));
+  if (isPanel()) return [section('Shape', shapeSel), ...panelSections(), wall];
   return [
     section('Shape', shapeSel),
     isCube() ? section('Cube',
@@ -611,11 +778,7 @@ function ballTab() {
       slider('footballTip', 'Tip shape (oval → pointed)', 0, 1, 0.01, { fmt: pct, group: 'shape' }),
       note('Lies on its side with the laces on top. Your photo goes on the side facing you.'),
     ) : null,
-    section('Wall thickness',
-      slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
-      // The cube's edge rounding can't be tighter than the thickest wall, so tMax reshapes it
-      slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() ? 'shape' : 'field' }),
-      note('Typical white PLA: 0.8 mm to 3.0 mm.')),
+    wall,
     section('Opening and collar',
       slider('opening.diameter', 'Opening diameter', 20, Math.max(20, Math.min(90, maxOpening(s))), 0.5, { fmt: mm, group: 'shape' }),
       slider('opening.collarHeight', 'Collar height', 2, 15, 0.5, { fmt: mm, group: 'shape' }),
@@ -627,7 +790,11 @@ function ballTab() {
 function markingsTab() {
   const s = app.settings, m = s.markings;
   const kind = SHAPES[s.shape]?.markings;
-  if (!kind || kind === 'none') return [section('Markings', note('The plain sphere has no markings.'))];
+  if (!kind || kind === 'none') {
+    const what = isPanel() ? 'Markings are for the ball shapes; a flat panel has none. Add words on the Text tab.'
+      : isCube() ? 'The cube has no markings.' : 'The plain sphere has no markings.';
+    return [section('Markings', note(what))];
+  }
   if (kind === 'moon') return [section('Markings', note('The Moon has no lines. Its craters and maria come from NASA maps (Shape tab).'))];
   const autoW = markingWidth({ ...s, markings: { ...m, width: null } });
   return [
@@ -700,7 +867,7 @@ function textTab() {
   ));
 
   const out = [
-    section('Text on the ball',
+    section(`Text on the ${where()}`,
       items.length ? el('div', { class: 'text-list' }, list) : note('No text yet. Add a name, number or date.'),
       el('button', { class: 'btn small', style: 'margin-top:8px', onclick: add }, '+ Add text')),
   ];
@@ -712,8 +879,8 @@ function textTab() {
   input.addEventListener('input', () => { it.text = input.value; changed('field'); });
   input.addEventListener('change', () => renderTab());
 
-  const upMax = app.shape ? Math.floor(app.shape.elev(0.97)) : 60;
-  const upMin = app.shape ? Math.ceil(app.shape.elev(0.03)) : -60;
+  const upMax = app.shape?.elev ? Math.floor(app.shape.elev(0.97)) : 60;
+  const upMin = app.shape?.elev ? Math.ceil(app.shape.elev(0.03)) : -60;
   out.push(
     section('Edit text',
       input,
@@ -723,15 +890,22 @@ function textTab() {
       segmented(`${p}.style`, [
         { value: 'carved', label: 'Carved (dark)', title: 'Thicker plastic: glows dark, outside stays smooth' },
         { value: 'bright', label: 'Bright', title: 'Thinner plastic: glows lighter than around it' },
-        { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
-      ], 'field', () => renderTab()),
-      it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
+        // A panel's front stays smooth, so raised text isn't offered there (it prints as carved)
+        isPanel() ? null : { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
+      ].filter(Boolean), 'field', () => renderTab()),
+      isPanel() && it.style === 'raised' ? note('A panel\'s front stays smooth, so raised text prints as carved.', 'warn') : null,
+      !isPanel() && it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
       slider(`${p}.size`, 'Letter height', 4, 60, 0.5, { fmt: mm }),
       it.size < font.minSize ? note(`Letters under ${font.minSize} mm may not print cleanly in this font.`, 'warn') : null,
       slider(`${p}.arc`, 'Bend (smile to arch)', -180, 180, 1, { fmt: deg }),
       checkbox(`${p}.outline`, 'Bright outline around letters (helps over dark photo areas)'),
     ),
-    section('Place on the ball',
+    isPanel() ? section('Place on the panel',
+      note('Click the panel in the preview to move this text there, then fine-tune:'),
+      slider(`${p}.panelX`, 'Left / right', Math.round(-(app.shape?.W ?? 150) / 2), Math.round((app.shape?.W ?? 150) / 2), 0.5, { fmt: mm }),
+      slider(`${p}.panelY`, 'Up / down', Math.round(-(app.shape?.H ?? 150) / 2), Math.round((app.shape?.H ?? 150) / 2), 0.5, { fmt: mm }),
+      slider(`${p}.rotate`, 'Rotate', -180, 180, 1, { fmt: deg }),
+    ) : section('Place on the ball',
       note('Click the ball in the preview to move this text there, then fine-tune:'),
       slider(`${p}.around`, 'Around the ball', -180, 180, 0.5, { fmt: deg }),
       slider(`${p}.up`, 'Up / down', upMin, upMax, 0.5, { fmt: mm }),
@@ -754,7 +928,53 @@ function numberInput(path, label, lo, hi) {
   return el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, label), i);
 }
 
+/** Base tab, flat panel: light box, slot stand or none. */
+function panelBaseTab() {
+  const s = app.settings, b = s.base, info = app.baseInfo;
+  const kind = b.panelKind || 'lightbox';
+  const progress = el('div', { class: 'progress', hidden: !app.exporting }, el('div', { id: 'exportBar' }));
+  const st = app.lastBaseExport;
+  const slotT = panelEdgeThickness(s);
+  return [
+    section('Base for the panel',
+      segmented('base.panelKind', Object.entries(PANEL_BASE_KINDS).map(([k, label]) => ({
+        value: k, label,
+        title: { lightbox: 'A base with an LED strip inside that lights the panel from behind', stand: 'A small stand with a slot, no light', none: 'Just the panel (feet, a window or a frame)' }[k],
+      })), 'field', () => renderTab()),
+      kind === 'lightbox' ? [
+        slider('base.stripW', 'LED strip width', 5, 20, 0.5, { fmt: mm }),
+        note('Stick the LED strip on the leaning floor of the trough behind the slot; it shines up the back of the panel. A 10 mm USB strip works well. Its cable leaves through the notch at the back.'),
+        checkbox('evenGlow.on', 'Even glow (thinner plastic farther from the light)', 'field', () => renderTab()),
+        s.evenGlow.on ? slider('evenGlow.strength', 'Even glow strength', 0, 1, 0.01, { fmt: pct }) : null,
+      ] : null,
+      kind === 'none' ? note('No base: stand the panel on its feet (Shape tab), hang it in a window or put it in a frame.') : null,
+      kind !== 'none' && s.panel.feet ? note('Turn the panel\'s feet off (Shape tab): they won\'t fit the slot.', 'warn') : null,
+    ),
+    kind === 'none' ? null : section('Fit and size',
+      slider('base.clearance', 'Slot fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm }),
+      note(`The slot is ${(slotT + b.clearance).toFixed(1)} mm wide for a ${slotT.toFixed(1)} mm panel edge. Too tight? Add room. Too loose? Take some away.`),
+      slider('base.extra', 'Extra width', 0, 40, 1, { fmt: mm }),
+      kind === 'lightbox' ? slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }) : null,
+    ),
+    kind === 'none' ? null : section('Export base',
+      info ? note(`Base: ${info.width.toFixed(0)} × ${info.depth.toFixed(0)} mm, ${info.height.toFixed(0)} mm tall. The panel sits ${info.slotDepth} mm deep in the slot.`) : null,
+      info ? (() => { const f = fitCheck([info.width, info.depth, info.height]); return el('div', { class: 'fit ' + f.cls }, f.text); })() : null,
+      info ? note('Prints standing up, as it sits on the table. No supports needed. Print it in dark, opaque filament.') : null,
+      tipsLink(),
+      el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: exportBaseStl },
+        app.exporting ? 'Building…' : 'Export base STL'),
+      progress,
+      st ? el('div', { class: 'stats' },
+        'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
+        'Size', el('b', {}, `${st.size.map((v) => v.toFixed(1)).join(' × ')} mm`),
+        'Plastic', el('b', {}, `≈ ${Math.round(st.volumeCm3 * 1.24)} g PLA (${st.volumeCm3.toFixed(0)} cm³)`),
+      ) : null,
+    ),
+  ];
+}
+
 function baseTab() {
+  if (isPanel()) return panelBaseTab();
   const s = app.settings, b = s.base, info = app.baseInfo;
   const col = collarDims(s);
   const kind = b.light;
@@ -837,9 +1057,18 @@ function exportTab() {
   };
 
   const ax = bodyAxes(s);
-  const estSize = [ax.a * 2, ax.b * 2, ax.c * 2];
+  let estSize = [ax.a * 2, ax.b * 2, ax.c * 2];
   if (isCube() && app.shape && app.shape.funnelBottom != null) estSize[2] = ax.c - app.shape.funnelBottom + s.opening.collarHeight;
-  const estDiag = [2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2), 2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2)];
+  let estDiag = [2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2), 2 * Math.sqrt((ax.a ** 2 + ax.b ** 2) / 2)];
+  const panel = isPanel() && app.shape && app.shape.kind === 'panel' ? app.shape : null;
+  if (panel) { // standing up: width × depth on the bed, height up
+    const T = panelEdgeThickness(s);
+    const depth = panel.sag + T + (s.panel.feet ? 2 * Math.max(15, Math.min(35, panel.H * 0.12)) : 0);
+    // a curved panel's back sticks out a little past the front at the ends
+    const width = panel.flat ? panel.W : 2 * (panel.R + T) * Math.sin(panel.W / 2 / panel.R);
+    estSize = [width, depth, panel.H];
+    estDiag = [(estSize[0] + depth) * Math.SQRT1_2, (estSize[0] + depth) * Math.SQRT1_2];
+  }
   const fit = app.lastExport ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
 
   const raised = app.field ? app.field.hasRaised : s.markings.style === 'raised' && SHAPES[s.shape]?.markings !== 'none';
@@ -859,7 +1088,7 @@ function exportTab() {
 
   const progress = el('div', { class: 'progress', hidden: !app.exporting }, el('div', { id: 'exportBar' }));
   const btn = el('button', { class: 'btn primary block', id: 'btnExport', disabled: app.exporting || !app.shape, onclick: exportStl },
-    app.exporting ? 'Building STL…' : 'Export ball STL');
+    app.exporting ? 'Building STL…' : `Export ${where()} STL`);
 
   const st = app.lastExport;
   const stats = st ? el('div', { class: 'stats' },
@@ -875,11 +1104,13 @@ function exportTab() {
     section('Detail', ...opts,
       s.detail === 'fine' && isPhone() ? note('Fine detail may be too big for a phone and could fail. Standard is recommended here.', 'warn') : null),
     section('Export', btn, progress, stats,
-      isCube()
+      panel
+        ? note('Prints standing up on its bottom edge, as exported. No supports needed; a brim helps tall or thin panels stay put.')
+        : isCube()
         ? note('The cube STL is already turned upside down: top face on the bed. No supports needed.')
         : note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
-      !hasPhotos() ? note('No photo yet: this exports a plain ball with markings.', 'warn') : null,
-      note('The base is a separate file: Base tab, Export base STL.'),
+      !hasPhotos() ? note(panel ? 'No photo yet: this exports a plain panel.' : 'No photo yet: this exports a plain ball with markings.', 'warn') : null,
+      panel && s.base.panelKind === 'none' ? null : note('The base is a separate file: Base tab, Export base STL.'),
       tipsLink()),
   ];
 }
@@ -930,7 +1161,7 @@ function exportBaseStl() {
       const bar = document.getElementById('exportBar');
       if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
     } else if (msg.type === 'done') {
-      const fileName = `${projectBaseName()}-base-${s.base.light}.stl`;
+      const fileName = `${projectBaseName()}-base-${isPanel() ? s.base.panelKind : s.base.light}.stl`;
       download(new Blob([msg.stl], { type: 'model/stl' }), fileName);
       app.lastBaseExport = { ...msg.stats, fileName };
       toast(`Saved ${fileName}`);
@@ -1038,12 +1269,35 @@ preview.onDragStart = (h) => {
   if (!ev.photoId || ev.photoId !== app.selectedPhoto) return false;
   const cfg = app.settings.photos.find((p) => p.id === ev.photoId);
   if (!cfg) return false;
+  if (app.shape.kind === 'panel') {
+    // A window moves on the panel; a photo filling the panel slides inside it instead
+    const im = app.images[cfg.id];
+    const imgAspect = im ? im.base.h / im.base.w : 1;
+    const cover = Math.max(1, (app.shape.H / app.shape.W) / imgAspect);
+    grab = { cfg, panel: true, u0: ev.u, v0: ev.v, x0: cfg.panelX, y0: cfg.panelY, px0: cfg.panX, py0: cfg.panY, k: app.shape.W * Math.max(0.05, cfg.zoom) * cover, imgAspect };
+    return true;
+  }
   const at = placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)));
   grab = { cfg, dA: wrap180(cfg.around - at.around), dY: cfg.centerY - at.up };
   return true;
 };
 preview.onDragMove = (h) => {
   if (!grab || !h) return;
+  if (grab.panel) {
+    const ev = {};
+    app.field.eval(h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)), ev);
+    const du = ev.u - grab.u0, dv = ev.v - grab.v0, c = grab.cfg;
+    if (c.panelW > 0) {
+      const W = app.shape.W / 2, H = app.shape.H / 2;
+      c.panelX = +Math.max(-W, Math.min(W, grab.x0 + du)).toFixed(1);
+      c.panelY = +Math.max(-H, Math.min(H, grab.y0 + dv)).toFixed(1);
+    } else {
+      c.panX = +Math.max(-0.5, Math.min(0.5, grab.px0 - du / grab.k)).toFixed(3);
+      c.panY = +Math.max(-0.5, Math.min(0.5, grab.py0 + dv / (grab.k * grab.imgAspect))).toFixed(3);
+    }
+    changed('field');
+    return;
+  }
   const at = placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)));
   grab.cfg.around = +wrap180(at.around + grab.dA).toFixed(1);
   grab.cfg.centerY = +Math.min(app.shape.elev(1), Math.max(app.shape.elev(0.03), at.up + grab.dY)).toFixed(1);
@@ -1056,7 +1310,11 @@ preview.onPick = (h) => {
   if (app.tab !== 'text' || !app.shape) return;
   const it = (app.settings.texts || []).find((t) => t.id === app.selectedText);
   if (!it) return;
-  Object.assign(it, placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v))));
+  if (app.shape.kind === 'panel') {
+    const ev = {};
+    app.field.eval(h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)), ev);
+    Object.assign(it, { panelX: +ev.u.toFixed(1), panelY: +ev.v.toFixed(1) });
+  } else Object.assign(it, placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v))));
   changed('field'); renderTab();
 };
 loadAllFonts();
@@ -1103,7 +1361,7 @@ $('btnNew').addEventListener('click', () => {
   // A new project starts from your own defaults: printer bed, size, wall thickness, opening and base
   const old = app.settings;
   app.settings = defaultSettings();
-  for (const k of ['bed', 'sizePreset', 'diameter', 'footballLength', 'footballWidth', 'tMin', 'tMax', 'opening', 'cube', 'base', 'detail']) {
+  for (const k of ['bed', 'sizePreset', 'diameter', 'footballLength', 'footballWidth', 'tMin', 'tMax', 'opening', 'cube', 'panel', 'base', 'detail']) {
     if (old[k] !== undefined) app.settings[k] = structuredClone(old[k]);
   }
   app.images = {}; app.selectedPhoto = null; app.selectedText = null; app.textMasks = null;

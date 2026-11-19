@@ -1,5 +1,7 @@
 // Default project settings, size presets and helpers shared by the UI and the export worker.
 
+import { defaultPanelSettings } from './panel.js';
+
 export const SIZE_PRESETS = {
   S: { label: 'Small', diameter: 100, footballLength: 160, footballWidth: 100, cubeSize: 80 },
   M: { label: 'Medium', diameter: 150, footballLength: 240, footballWidth: 150, cubeSize: 100 },
@@ -15,6 +17,7 @@ export const SHAPES = {
   volleyball: { label: 'Volleyball', body: 'sphere', markings: 'volleyball', ready: true },
   moon: { label: 'Moon', body: 'sphere', markings: 'moon', ready: true },
   cube: { label: 'Cube (5 photos)', body: 'cube', markings: 'none', ready: true },
+  panel: { label: 'Flat panel', body: 'panel', markings: 'none', ready: true },
 };
 
 /** Export detail presets: spacing between mesh points on the photo surface (mm). */
@@ -56,11 +59,13 @@ export function defaultSettings() {
       round: 5,               // edge rounding, mm
       border: 5,              // plain border around each face photo, mm
     },
-    evenGlow: { on: true, strength: 0.5 }, // cube: thinner plastic farther from the light
+    evenGlow: { on: true, strength: 0.5 }, // cube and panel light box: thinner plastic farther from the light
+    panel: defaultPanelSettings(), // flat panel (see core/panel.js)
     base: {
       light: 'puck', puckD: 70, puckH: 20, socket: 'E12', riserD: 30, riserH: 0,
       clearance: 0.4, shape: 'auto', extra: 0, cableW: 10, cableH: 8,
-    },                        // the lamp base (see core/base.js)
+      panelKind: 'lightbox', stripW: 10, // flat panel: 'lightbox' | 'stand' | 'none'; LED strip width (mm)
+    },                        // the lamp or panel base (see core/base.js)
     moon: {
       mode: 'moon',           // 'moon' (Moon only) | 'photo' (photo in a front window, fading into the Moon)
       craters: 0.4,           // how strongly NASA's height map deepens craters (0..1)
@@ -92,6 +97,8 @@ export function defaultPhotoSettings() {
     projection: 'natural',  // 'natural' (no squeeze) | 'wrap' (fills 360°) | 'flat' (any spot, e.g. the top)
     background: 'blend',    // cut-out photos: transparent areas 'blend' into what's below | 'bright' | 'dark'
     edgeSoft: 2,            // cut-out photos: how gently the subject's outline fades (mm)
+    panelX: 0, panelY: 0,   // flat panel: window centre, mm right of / above the middle
+    panelW: null,           // flat panel: window width (mm); null = the photo fills the panel
   };
 }
 

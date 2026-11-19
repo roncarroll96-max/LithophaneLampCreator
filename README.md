@@ -30,13 +30,17 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    For the Moon: Moon only or Photo + Moon, crater depth, and turning the Moon.
    For the cube (5 photos): size, edge rounding, photo border, "Fit photos to faces", even glow.
    The cube STL comes out upside down, top face on the bed, ready to print without supports.
+   For a **flat panel**: rectangle (match the photo, 4×6, 5×7, 8×10 in or custom), square, circle or heart;
+   a curve slider; a raised frame; optional feet. Several photos can make a collage ("Arrange as collage").
+   On the Base tab, choose a light box (with an LED strip), a slot stand or none. The panel STL stands
+   on its bottom edge, ready to print without supports (use a brim).
 4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
 5. **Text** tab: add names, numbers or dates. Pick a font and style (carved, bright or raised),
    click the ball to place the text, then fine-tune size, bend and position.
 6. **Base** tab: choose the light (LED puck, LED strip on a riser, or bulb socket), enter its size,
    adjust the collar fit, check that it fits your bed, and **Export base STL** (a separate file,
    already turned for printing).
-7. **Export** tab: check the bed fit, pick a detail level, **Export ball STL**.
+7. **Export** tab: check the bed fit, pick a detail level, **Export ball STL** (or **Export panel STL**).
 8. Print opening-down, with slicer supports for the curve just above the collar.
 
 **Print tips** (link in the header, also on the Export and Base tabs) opens a page of slicer

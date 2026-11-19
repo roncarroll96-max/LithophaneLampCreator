@@ -8,6 +8,7 @@
 
 import { cylinder, box, roundedSquare, cone, union, subtract } from './sdf.js';
 import { collarDims, SHAPES } from './settings.js';
+import { panelEdgeThickness } from './panel.js';
 
 export const NIPPLE_HOLE_R = 5.4; // 1/8" IPS threaded lamp nipple (about 10.3 mm) plus clearance
 export const SOCKETS = {
@@ -43,6 +44,7 @@ function lampWidth(settings) {
  * Returns { sdf, bounds, info } where info has the sizes and whether it prints upside down.
  */
 export function buildBase(settings, shape) {
+  if (shape && shape.kind === 'panel') return buildPanelBase(settings, shape);
   const b = { ...defaultBaseSettings(), ...(settings.base || {}) };
   const col = collarDims(settings);
   const rs = col.ro + b.clearance / 2;            // seat hole radius
@@ -119,6 +121,91 @@ export function buildBase(settings, shape) {
     info: {
       light: b.light, square, width: 2 * R, height: H, totalHeight: top,
       seatR: rs, seatFloor: H - seatD, flip, ...extraInfo,
+    },
+  };
+}
+
+// ---------------------------------------------------------------- flat panel bases
+// Both stand as they sit on the table (no supports) and hold the panel in a slot shaped like its
+// bottom edge: straight for a flat panel, curved for a curved one. Coordinates match the panel's
+// (x right, y away from the viewer, front of the panel at y = 0 in the middle).
+//   Light box: a block as wide as the panel. Behind the slot, an open trough holds an LED strip on
+//   a floor that leans 30° toward the panel, so the strip shines up the panel's back.
+//   Slot stand: a shorter, deeper block with just the slot.
+const TILT = Math.tan((30 * Math.PI) / 180);
+const COS_TILT = Math.cos((30 * Math.PI) / 180);
+
+export const PANEL_BASE_KINDS = {
+  lightbox: 'Light box', stand: 'Slot stand', none: 'None',
+};
+
+/**
+ * The panel's base, or null for 'none'. info: { light, width, depth, height, totalHeight,
+ * seatFloor (height of the slot floor, where the panel's bottom edge sits), flip: false, slotDepth }.
+ */
+export function buildPanelBase(settings, panel) {
+  const b = { ...defaultBaseSettings(), ...(settings.base || {}) };
+  const kind = b.panelKind || 'lightbox';
+  if (kind === 'none') return null;
+  const clr = b.clearance;
+  const Tp = panelEdgeThickness(settings);
+  const box = kind === 'lightbox';
+
+  // Arc length along the front and depth behind it (exact for a flat panel; for a curved one,
+  // measured round the bend's axis)
+  const R = panel.R, flat = !Number.isFinite(R);
+  const arcDep = flat
+    ? (x, y, o) => { o[0] = x; o[1] = y; }
+    : (x, y, o) => { o[0] = R * Math.atan2(x, y + R); o[1] = Math.hypot(x, y + R) - R; };
+  const toXY = (arc, dep) => (flat ? [arc, dep] : [(R + dep) * Math.sin(arc / R), (R + dep) * Math.cos(arc / R) - R]);
+
+  const H = box ? 24 : 16;
+  const slotDepth = box ? 10 : 8;
+  const zSlot = H - slotDepth;
+  const s0 = -clr / 2, s1 = Tp + clr / 2;              // the slot, in depth
+  const stripW = Math.max(4, b.stripW ?? 10);
+  const d0 = s1 + 2.5, d1 = d0 + stripW + 3;           // the trough (light box)
+  const dFront = s0 - (box ? 4 : 14);
+  const dBack = box ? d1 + 3 : s1 + 14;
+  const halfW = box ? panel.W / 2 + 4 + b.extra / 2 : Math.min(panel.W / 2, Math.max(30, panel.W / 4)) + b.extra / 2;
+  // The slot only needs to be as long as the panel is wide at the top of the slot
+  const panelHalf = panel.outline === 'rect' || panel.outline === 'square' ? panel.W / 2 : panel.widthAt(panel.bottom + slotDepth) / 2;
+  const slotHalf = Math.min(halfW - 1.5, panelHalf + 0.5);
+  const troughHalf = Math.min(halfW - 3, panel.W / 2 - 3);
+  const zT0 = zSlot - 3;                               // trough floor at its front edge
+  // Level for the first 2 mm (a sharp wedge there is too thin to mesh cleanly), then leaning
+  const zFloor = (dep) => zT0 + Math.max(0, dep - d0 - 2) * TILT;
+
+  // Block: the rectangle round the band of the base, along the panel's bottom edge
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i <= 40; i++) for (const dep of [dFront, dBack]) {
+    const [x, y] = toXY(-halfW + (2 * halfW * i) / 40, dep);
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+  }
+
+  const q = [0, 0];
+  const cableW = Math.max(4, b.cableW);
+  const sdf = (x, y, z) => {
+    let d = Math.max(x0 - x, x - x1, y0 - y, y - y1, -z, z - H); // the block
+    arcDep(x, y, q);
+    const arc = q[0], dep = q[1], aa = Math.abs(arc);
+    // the slot
+    d = Math.max(d, -Math.max(aa - slotHalf, s0 - dep, dep - s1, zSlot - z));
+    if (box) {
+      // the trough with its leaning floor
+      d = Math.max(d, -Math.max(aa - troughHalf, d0 - dep, dep - d1, (zFloor(dep) - z) * COS_TILT));
+      // cable notch out through the back at the right-hand end, open at the top
+      d = Math.max(d, -Math.max(troughHalf - cableW - arc, arc - troughHalf, d1 - 0.5 - dep, zFloor(d1) - 0.5 - z));
+    }
+    return d;
+  };
+
+  return {
+    sdf,
+    bounds: { min: [x0, y0, 0], max: [x1, y1, H] },
+    info: {
+      light: kind, panel: true, width: x1 - x0, depth: y1 - y0, height: H, totalHeight: H,
+      seatFloor: zSlot, slotDepth, flip: false, stripW,
     },
   };
 }

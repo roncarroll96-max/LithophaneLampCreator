@@ -31,7 +31,7 @@ export function estimateTriangles(shape, stepInner, stepOuter) {
 export const stlBytes = (tris) => 84 + tris * 50;
 
 /** Joins ring A to ring B with triangles. Both rings start at theta=0 and run the same way. */
-function stitch(A, B, out) {
+export function stitch(A, B, out) {
   const na = A.length, nb = B.length;
   let i = 0, j = 0;
   while (i < na || j < nb) {

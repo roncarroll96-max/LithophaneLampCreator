@@ -1,0 +1,116 @@
+// The flat panel's thickness field: for any point (theta, s) on the panel (see panel.js), how
+// thick the plastic is. Shares the lamps' photo blending and text masks, adds the raised frame
+// and the light box's even glow. The preview and the STL export both use it.
+//
+// Brighter photo pixel -> thinner plastic -> more light gets through. The front stays smooth;
+// the relief and the frame are on the back.
+
+import { preparePhotoLayer, blendLayers, LINE_EXTRA } from './field.js';
+import { createPanelTextLayer } from './textLayer.js';
+import { defaultPhotoSettings } from './settings.js';
+import { defaultPanelSettings, panelEdgeThickness } from './panel.js';
+import { MU } from './previewData.js';
+
+const STRIP_TILT = (30 * Math.PI) / 180; // the light box's LED strip leans 30° toward the panel
+
+/** Where the light box's LED strip sits, relative to the panel: { v, depth } in mm. */
+export function lightBoxStrip(settings, panel) {
+  const T = panelEdgeThickness(settings) + (settings.base?.clearance ?? 0.4);
+  const stripW = settings.base?.stripW ?? 10;
+  return { v: panel.bottom - 2, depth: T + 2.5 + (stripW + 3) / 2 };
+}
+
+/**
+ * photos: { [photo id]: { w, h, data, alpha? } } (the adjusted pictures), textMasks as for the lamps.
+ * Returns { eval(theta, s, out), layers, hasRaised: false, tMount } where out receives
+ * x,y,z (front), ix,iy,iz (back), sx,sy,sz, t (mm), raise (0), mask, photoId, light, u, v.
+ */
+export function createPanelField(settings, panel, photos, textMasks = null) {
+  const { tMin, tMax } = settings;
+  const pp = { ...defaultPanelSettings(), ...(settings.panel || {}) };
+  const surround = settings.photo?.surround ?? 0.55;
+
+  // ---- Photos: a window on the panel; "fill" (no width set) covers the whole panel
+  const layers = (settings.photos || [])
+    .filter((c) => !c.hidden && photos && photos[c.id])
+    .map((c) => {
+      const p = { ...defaultPhotoSettings(), ...c };
+      const fill = !(p.panelW > 0);
+      const L = fill ? preparePhotoLayer(p, photos[c.id], panel.W, panel.H) : preparePhotoLayer(p, photos[c.id], p.panelW);
+      L.cx = fill ? 0 : p.panelX || 0;
+      L.cy = fill ? 0 : p.panelY || 0;
+      return L;
+    });
+  let curU = 0, curV = 0;
+  const xyOf = (L, out) => { out[0] = curU - L.cx; out[1] = curV - L.cy; };
+  const pr = {};
+
+  const textLayer = createPanelTextLayer(settings, textMasks);
+  const tx = { hits: [], clear: 0 };
+
+  // ---- Frame: tF thick within frameWidth of the edge, then a 45° slope down to the picture
+  const frameOn = !!pp.frame;
+  const fw = Math.max(0, pp.frameWidth), tF = tMax + Math.max(0, pp.frameExtra);
+
+  // ---- Even glow (light box): an LED strip along the bottom, behind the panel, leaning toward it
+  const lightBox = (settings.base?.panelKind ?? 'lightbox') === 'lightbox';
+  const glowOn = lightBox && settings.evenGlow?.on !== false;
+  const glowK = glowOn ? Math.max(0, Math.min(1, settings.evenGlow?.strength ?? 0.5)) / MU : 0;
+  const strip = lightBox ? lightBoxStrip(settings, panel) : null;
+  const ex = -Math.sin(STRIP_TILT), ey = Math.cos(STRIP_TILT); // (depth, up) the strip faces
+  function irradiance(v) {
+    // A long strip: light falls off with distance; LEDs shine most straight ahead; the panel's
+    // back catches light best when it arrives head-on
+    const dd = -strip.depth, dv = v - strip.v; // from the strip to the panel (depth, up)
+    const d = Math.hypot(dd, dv) || 1;
+    const emit = Math.max(0.02, (ex * dd + ey * dv) / d);
+    const catchLight = Math.max(0.02, -dd / d);
+    return (emit * catchLight) / d;
+  }
+  const lightRef = lightBox ? irradiance(0) : 1;
+
+  const P = {}, S = {};
+  function evalAt(theta, s, out) {
+    panel.pointAt(theta, s, P);
+    const u = P.u, v = P.v;
+    panel.surfAt(u, v, S);
+
+    curU = u; curV = v;
+    blendLayers(layers, surround, xyOf, pr);
+    let t = tMin + (1 - pr.bright) * (tMax - tMin);
+
+    // Text: optional bright outline first, then the letters (raised text is carved on a panel,
+    // since the front stays smooth)
+    if (textLayer) {
+      textLayer.sample(u, v, tx);
+      for (const h of tx.hits) {
+        const ring = Math.max(0, h.halo - h.letters);
+        if (ring > 0) t += (tMin - t) * ring;
+        if (h.letters <= 0) continue;
+        if (h.item.style === 'bright') t += (tMin - t) * h.letters;
+        else t += (tMax + LINE_EXTRA - t) * h.letters;
+      }
+    }
+
+    // Even glow
+    let light = 1;
+    if (lightBox) {
+      light = irradiance(v) / lightRef;
+      if (glowOn) t = Math.min(tMax + LINE_EXTRA, Math.max(tMin, t + glowK * Math.log(light)));
+    }
+
+    // Frame
+    if (frameOn) {
+      const tf = tF - Math.max(0, panel.distEdge(u, v) - fw);
+      if (tf > t) t = tf;
+    }
+
+    out.t = t; out.raise = 0; out.mask = pr.mask; out.photoId = pr.photoId; out.light = light;
+    out.u = u; out.v = v;
+    out.x = out.sx = S.x; out.y = out.sy = S.y; out.z = out.sz = S.z;
+    out.ix = S.x - S.nx * t; out.iy = S.y - S.ny * t; out.iz = S.z - S.nz * t;
+    return out;
+  }
+
+  return { eval: evalAt, layers: layers.map((L) => ({ id: L.id, W: L.W, H: L.H })), hasRaised: false, tMount: tF };
+}
