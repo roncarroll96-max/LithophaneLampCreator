@@ -7,7 +7,7 @@
 // The panel stands on its bottom edge for printing (z = 0), centred on x = 0.
 
 import { TWO_PI } from './shapes.js';
-import { planRings, stitch } from './mesh.js';
+import { planRings, stitch, TriList, stitchCapacity } from './mesh.js';
 
 /** Signed volume of a triangle list (positive when the triangles face outward). */
 function signedVolume(p, idx, from = 0) {
@@ -30,7 +30,7 @@ export function buildPanelMesh({ panel, field, stepInner, stepOuter, feet = [], 
   const planI = planRings(panel, stepInner);
   const sum = (a) => a.reduce((x, y) => x + y, 0);
   const totalVerts = sum(planO.counts) + sum(planI.counts) + 2 + 8 * feet.length;
-  const pos = new Float64Array(totalVerts * 3);
+  const pos = new Float32Array(totalVerts * 3);
   let vCount = 0;
   const addV = (x, y, z) => { const o = vCount * 3; pos[o] = x; pos[o + 1] = y; pos[o + 2] = z; return vCount++; };
 
@@ -55,22 +55,21 @@ export function buildPanelMesh({ panel, field, stepInner, stepOuter, feet = [], 
   const front = ringsOf(planO, false);
   const back = ringsOf(planI, true);
 
-  const tris = [];
   const seq = [Uint32Array.of(front.pole)];
   for (let k = front.rings.length - 1; k >= 0; k--) seq.push(front.rings[k]);
   for (let k = 0; k < back.rings.length; k++) seq.push(back.rings[k]);
   seq.push(Uint32Array.of(back.pole));
+  const tris = new TriList(stitchCapacity(seq) + 12 * feet.length);
   for (let r = 0; r + 1 < seq.length; r++) stitch(seq[r], seq[r + 1], tris);
   if (onProgress) onProgress(0.9);
 
-  let indices = Uint32Array.from(tris);
-  if (signedVolume(pos, indices) < 0) {
-    for (let t = 0; t < indices.length; t += 3) { const x = indices[t + 1]; indices[t + 1] = indices[t + 2]; indices[t + 2] = x; }
+  const body = tris.done();
+  if (signedVolume(pos, body) < 0) {
+    for (let t = 0; t < body.length; t += 3) { const x = body[t + 1]; body[t + 1] = body[t + 2]; body[t + 2] = x; }
   }
 
   // ---- Feet: separate closed blocks overlapping the bottom edge (slicers merge them)
   const S = {};
-  const footTris = [];
   for (const f of feet) {
     panel.surfAt(f.u, panel.bottom, S);
     const tx = -S.ny, ty = S.nx; // along the panel, to the right (front normal turned 90°)
@@ -84,18 +83,14 @@ export function buildPanelMesh({ panel, field, stepInner, stepOuter, feet = [], 
     }
     // Box faces as quads of corner numbers (bit 0 = right, bit 1 = back, bit 2 = top)
     const quads = [[0, 2, 3, 1], [4, 5, 7, 6], [0, 1, 5, 4], [2, 6, 7, 3], [0, 4, 6, 2], [1, 3, 7, 5]];
-    const start = footTris.length;
-    for (const [a, b, c, d] of quads) footTris.push(v0 + a, v0 + b, v0 + c, v0 + a, v0 + c, v0 + d);
-    const part = Uint32Array.from(footTris.slice(start));
+    const start = tris.length;
+    for (const [a, b, c, d] of quads) { tris.push(v0 + a, v0 + b, v0 + c); tris.push(v0 + a, v0 + c, v0 + d); }
+    const part = tris.a.subarray(start, tris.length);
     if (signedVolume(pos, part) < 0) {
-      for (let t = start; t < footTris.length; t += 3) { const x = footTris[t + 1]; footTris[t + 1] = footTris[t + 2]; footTris[t + 2] = x; }
+      for (let t = 0; t < part.length; t += 3) { const x = part[t + 1]; part[t + 1] = part[t + 2]; part[t + 2] = x; }
     }
   }
-  if (footTris.length) {
-    const all = new Uint32Array(indices.length + footTris.length);
-    all.set(indices); all.set(footTris, indices.length);
-    indices = all;
-  }
+  const indices = tris.done();
 
   // ---- Stand it on the bed: bottom edge at z = 0, centred left to right
   let x0 = Infinity, x1 = -Infinity, zMin = Infinity;
@@ -103,12 +98,8 @@ export function buildPanelMesh({ panel, field, stepInner, stepOuter, feet = [], 
     x0 = Math.min(x0, pos[v * 3]); x1 = Math.max(x1, pos[v * 3]); zMin = Math.min(zMin, pos[v * 3 + 2]);
   }
   const cx = (x0 + x1) / 2;
-  const positions = new Float32Array(vCount * 3);
-  for (let v = 0; v < vCount; v++) {
-    positions[v * 3] = pos[v * 3] - cx;
-    positions[v * 3 + 1] = pos[v * 3 + 1];
-    positions[v * 3 + 2] = pos[v * 3 + 2] - zMin;
-  }
+  const positions = pos.subarray(0, vCount * 3); // moved in place (no second copy)
+  for (let v = 0; v < vCount; v++) { positions[v * 3] -= cx; positions[v * 3 + 2] -= zMin; }
   const bbox = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
   for (let v = 0; v < vCount; v++) for (let a = 0; a < 3; a++) {
     const x = positions[v * 3 + a];

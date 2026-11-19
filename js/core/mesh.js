@@ -30,6 +30,24 @@ export function estimateTriangles(shape, stepInner, stepOuter) {
 
 export const stlBytes = (tris) => 84 + tris * 50;
 
+/**
+ * Triangle corner list in one typed array of fixed size (a plain array of tens of millions of
+ * numbers needs several times the memory). stitch() pushes into it like an array.
+ */
+export class TriList {
+  constructor(maxTriangles) { this.a = new Uint32Array(maxTriangles * 3); this.length = 0; }
+  push(a, b, c) { const o = this.length; this.a[o] = a; this.a[o + 1] = b; this.a[o + 2] = c; this.length = o + 3; }
+  /** The filled part. */
+  done() { return this.a.subarray(0, this.length); }
+}
+
+/** Most triangles stitching a sequence of rings can make (each join makes at most na + nb). */
+export function stitchCapacity(seq) {
+  let n = 0;
+  for (let r = 0; r + 1 < seq.length; r++) n += seq[r].length + seq[r + 1].length;
+  return n;
+}
+
 /** Joins ring A to ring B with triangles. Both rings start at theta=0 and run the same way. */
 export function stitch(A, B, out) {
   const na = A.length, nb = B.length;
@@ -55,7 +73,7 @@ export function buildShellMesh({ shape, field, stepInner, stepOuter, collar, onP
   const sum = (a) => a.reduce((x, y) => x + y, 0);
   const nO0 = planO.counts[0], nI0 = planI.counts[0];
   const totalVerts = sum(planO.counts) + 1 + sum(planI.counts) + 1 + nO0 + 2 * nI0;
-  const pos = new Float64Array(totalVerts * 3);
+  const pos = new Float32Array(totalVerts * 3);
   let vCount = 0;
   const addV = (x, y, z) => { const o = vCount * 3; pos[o] = x; pos[o + 1] = y; pos[o + 2] = z; return vCount++; };
 
@@ -116,23 +134,19 @@ export function buildShellMesh({ shape, field, stepInner, stepOuter, collar, onP
   }
 
   // ---- Stitch the loop of rings
-  const tris = [];
   const seq = [Uint32Array.of(poleOut)];
   for (let k = outer.length - 1; k >= 0; k--) seq.push(outer[k]);
   seq.push(collarOB, collarIB, collarIT);
   for (let k = 0; k < inner.length; k++) seq.push(inner[k]);
   seq.push(Uint32Array.of(poleIn));
+  const tris = new TriList(stitchCapacity(seq));
   for (let r = 0; r + 1 < seq.length; r++) stitch(seq[r], seq[r + 1], tris);
   if (onProgress) onProgress(0.9);
 
-  // ---- Move onto the bed, compute volume (sign tells us which way the faces point)
-  const positions = new Float32Array(vCount * 3);
-  for (let v = 0; v < vCount; v++) {
-    positions[v * 3] = pos[v * 3];
-    positions[v * 3 + 1] = pos[v * 3 + 1];
-    positions[v * 3 + 2] = pos[v * 3 + 2] - zBot;
-  }
-  const indices = Uint32Array.from(tris);
+  // ---- Move onto the bed (in place), compute volume (sign tells us which way the faces point)
+  const positions = pos.subarray(0, vCount * 3);
+  for (let v = 0; v < vCount; v++) positions[v * 3 + 2] -= zBot;
+  const indices = tris.done();
   let vol = 0;
   for (let t = 0; t < indices.length; t += 3) {
     const a = indices[t] * 3, b = indices[t + 1] * 3, c = indices[t + 2] * 3;

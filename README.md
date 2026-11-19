@@ -40,7 +40,8 @@ Double-click **start.bat**. It starts a tiny local web server and opens
 6. **Base** tab: choose the light (LED puck, LED strip on a riser, or bulb socket), enter its size,
    adjust the collar fit, check that it fits your bed, and **Export base STL** (a separate file,
    already turned for printing).
-7. **Export** tab: check the bed fit, pick a detail level, **Export ball STL** (or **Export panel STL**).
+7. **Export** tab: check the bed fit, pick a detail level (each shows its file size; very big files get a warning),
+   **Export ball STL** (or **Export panel STL**).
 8. Print opening-down, with slicer supports for the curve just above the collar.
 
 **Print tips** (link in the header, also on the Export and Base tabs) opens a page of slicer

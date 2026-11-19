@@ -11,7 +11,7 @@ export class Preview {
   constructor(container) {
     this.container = container;
     this.mode = 'glow';
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(this.renderer.domElement);
@@ -106,11 +106,23 @@ export class Preview {
     this._resize = () => this.resize();
     new ResizeObserver(this._resize).observe(container);
     this.resize();
-    const loop = () => { this.controls.update(); this.renderer.render(this.scene, this.camera); requestAnimationFrame(loop); };
+    // Draw only when something changed (a setting, the view turning or still gliding to a stop),
+    // not 60 times a second: saves battery and keeps laptops and phones cool.
+    this._dirty = true;
+    this.controls.addEventListener('change', () => { this._dirty = true; });
+    const loop = () => {
+      const moving = this.controls.update();
+      if (moving || this._dirty) { this._dirty = false; this.renderer.render(this.scene, this.camera); }
+      requestAnimationFrame(loop);
+    };
     loop();
   }
 
+  /** Asks for the next frame to be drawn (call after changing anything in the scene). */
+  invalidate() { this._dirty = true; }
+
   resize() {
+    this._dirty = true;
     const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
@@ -118,6 +130,7 @@ export class Preview {
   }
 
   setMode(mode) {
+    this._dirty = true;
     const wasThickness = this.mode === 'thickness';
     this.mode = mode;
     this.ball.material = mode === 'plain' ? this.plainMat : this.glowMat;
@@ -144,6 +157,7 @@ export class Preview {
 
   /** Rebuilds the ball surface (needed when shape, size or raised markings change). */
   updateGeometry(field, fine = true) {
+    this._dirty = true;
     const g = buildPreviewGrid(field, fine ? 360 : 180, fine ? 180 : 90);
     this.ballGeom.dispose();
     this.ballGeom = new THREE.BufferGeometry();
@@ -156,6 +170,7 @@ export class Preview {
 
   /** Recomputes the glow texture. Width/height control sharpness vs speed. */
   updateTexture(field, settings, TW, TH) {
+    this._dirty = true;
     this._last = { field, settings };
     const data = buildGlowTexture(field, settings, TW, TH, this.mode === 'thickness' ? 'thickness' : 'glow');
     const old = this.texture;
@@ -175,6 +190,7 @@ export class Preview {
 
   /** Collar, base and floor around the ball (preview only). */
   updateStand(shape, collar, settings) {
+    this._dirty = true;
     // Panels can be turned round, so show both sides; lamps are only seen from outside
     const side = shape.kind === 'panel' ? THREE.DoubleSide : THREE.FrontSide;
     if (this.glowMat.side !== side) { this.glowMat.side = side; this.plainMat.side = side; this.glowMat.needsUpdate = true; this.plainMat.needsUpdate = true; }
@@ -263,6 +279,7 @@ export class Preview {
 
   /** Removes the real base (a panel with no base). */
   clearBase() {
+    this._dirty = true;
     if (!this._baseMesh) return;
     this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose(); this._baseMesh = null;
     if (this._floor && this._zBot != null) {
@@ -278,6 +295,7 @@ export class Preview {
    * seat floor where the collar's bottom is. info: { seatFloor, width }.
    */
   setBase(positions, indices, info) {
+    this._dirty = true;
     if (this._baseMesh) { this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose(); }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -290,6 +308,7 @@ export class Preview {
   }
 
   _placeBase() {
+    this._dirty = true;
     if (this._zBot == null) return;
     const bottom = this._zBot - this._baseInfo.seatFloor;
     this._baseMesh.position.z = bottom;
@@ -302,6 +321,7 @@ export class Preview {
   }
 
   frame() {
+    this._dirty = true;
     const t = this.controls.target, box = this._frameBox || { w: 200, h: 200 };
     const vfov = (this.camera.fov * Math.PI) / 180;
     const needH = Math.max(box.h, box.w / Math.max(0.3, this.camera.aspect)) * 1.25;
@@ -309,7 +329,4 @@ export class Preview {
     this.camera.position.set(t.x, t.y - dist, t.z + dist * 0.12);
     this.controls.update();
   }
-
-  /** Snapshot of the current view as a data URL (used for project thumbnails). */
-  snapshot() { return this.renderer.domElement.toDataURL('image/jpeg', 0.8); }
 }

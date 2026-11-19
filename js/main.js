@@ -1,7 +1,7 @@
 // Lithophane Lamp Creator: app wiring (state, panels, preview updates, export, saving).
 
 import { Preview } from './preview.js';
-import { decodeImage, extractLuma, autoAdjust, processPhoto, drawGray } from './image.js';
+import { decodeImage, extractLuma, shrinkBase, autoAdjust, processPhoto, drawGray } from './image.js';
 import { buildEllipsoidShape } from './core/shapes.js';
 import { createField } from './core/field.js';
 import { estimateTriangles, stlBytes } from './core/mesh.js';
@@ -19,7 +19,7 @@ import { APP_VERSION } from './version.js';
 import { buildBase, SOCKETS, PANEL_BASE_KINDS } from './core/base.js';
 import { buildPanel, resolvePanelSize, sizeLabel, RECT_SIZES, SIDE_SIZES, PANEL_OUTLINES, IN, panelEdgeThickness } from './core/panel.js';
 import { createPanelField } from './core/panelField.js';
-import { meshSdf } from './core/sdf.js';
+import { meshSdf, gridStep } from './core/sdf.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
 
@@ -52,7 +52,6 @@ const app = {
 };
 
 const $ = (id) => document.getElementById(id);
-const isPhone = () => matchMedia('(max-width: 820px)').matches && matchMedia('(pointer: coarse)').matches;
 let preview;
 try {
   preview = new Preview($('viewport'));
@@ -89,8 +88,16 @@ function setPath(obj, path, val) {
 }
 
 // ---------- Update scheduling ----------
-let rafPending = false, idleTimer = null;
+let rafPending = false, idleTimer = null, baseTimer = null;
 function changed(group) {
+  // A base setting doesn't change a ball or cube, only the base under it: rebuild just that.
+  // (On a panel the light box's strip and slot also steer even glow, so the panel updates too.)
+  if (group === 'base' && !isPanel()) {
+    clearTimeout(baseTimer);
+    baseTimer = setTimeout(refreshBasePreview, 280);
+    scheduleAutosave();
+    return;
+  }
   if (group === 'tone') { const im = app.images[app.selectedPhoto]; if (im) im.dirty = true; }
   if (group === 'shape') app.dirty.shape = true;
   app.dirty.field = true;
@@ -107,7 +114,15 @@ function update(quick) {
     let toned = false;
     for (const cfg of s.photos) {
       const im = app.images[cfg.id];
-      if (im && (im.dirty || !im.processed)) { im.processed = processPhoto(im.base, cfg); im.dirty = false; toned = true; }
+      if (!im) continue;
+      // While a slider moves, adjust a small copy of the photo (fast); the full-size picture
+      // follows when the slider stops (and always before an export)
+      if (quick && im.dirty && im.processed) {
+        im.small ||= shrinkBase(im.base);
+        im.processed = processPhoto(im.small, cfg); im.dirty = false; im.needFull = true; toned = true;
+      } else if (!im.processed || im.dirty || (!quick && im.needFull)) {
+        im.processed = processPhoto(im.base, cfg); im.dirty = false; im.needFull = false; toned = true;
+      }
     }
     if (toned) { drawThumb(); drawRowThumbs(); }
     let shapeChanged = false;
@@ -151,8 +166,13 @@ function update(quick) {
       : createField(s, app.shape, processedMap(), app.textMasks, ensureMoon());
     // A Moon-only lamp needs no photo, so don't cover it with the "choose a photo" card
     $('emptyState').classList.toggle('hidden', hasPhotos() || (isMoonShape() && s.moon.mode !== 'photo'));
+    // The 3D surface only changes with the shape or raised parts (tone, photos and carved text
+    // change just the glow picture on it); a quick coarse surface gets its sharp one when idle
     const raised = app.field.hasRaised;
-    if (shapeChanged || raised || !quick || app._wasRaised !== raised) preview.updateGeometry(app.field, !quick);
+    if (shapeChanged || raised || app._wasRaised !== raised || (!quick && !app._geomFine)) {
+      preview.updateGeometry(app.field, !quick);
+      app._geomFine = !quick;
+    }
     app._wasRaised = raised;
     updateThicknessLegend();
     if (quick) preview.updateTexture(app.field, s, 560, 280); // fast while dragging; sharp pass follows
@@ -341,7 +361,7 @@ function refreshBasePreview() {
       return;
     }
     app.baseInfo = base.info;
-    const mesh = meshSdf(base.sdf, base.bounds, 1.2);
+    const mesh = meshSdf(base.sdf, base.bounds, gridStep(base.bounds, 1.2, 3e6));
     preview.setBase(mesh.positions, mesh.indices, base.info);
     app.lastBaseExport = null;
     if (app.tab === 'base') renderTab();
@@ -402,7 +422,10 @@ function el(tag, attrs = {}, ...kids) {
 const section = (title, ...kids) => el('div', { class: 'section' }, el('h3', {}, title), ...kids);
 const note = (text, cls = '') => el('p', { class: 'note ' + cls }, text);
 
-function slider(path, label, min, max, step, { fmt = (v) => v, group = 'field', disabled = false, map } = {}) {
+/** Which part of the app a setting changes: base settings only rebuild the base. */
+const groupFor = (path) => (path.startsWith('base.') ? 'base' : 'field');
+
+function slider(path, label, min, max, step, { fmt = (v) => v, group = groupFor(path), disabled = false, map } = {}) {
   const s = app.settings;
   const cur = getPath(s, path);
   const val = el('span', { class: 'val', title: 'Double-click to reset' }, fmt(cur));
@@ -429,7 +452,7 @@ function defaultFor(path) {
   return getPath(defaultSettings(), path);
 }
 
-function segmented(path, options, group = 'field', after) {
+function segmented(path, options, group = groupFor(path), after) {
   const s = app.settings;
   const bar = el('div', { class: 'segbar', role: 'group' });
   for (const o of options) {
@@ -444,7 +467,7 @@ function segmented(path, options, group = 'field', after) {
   return bar;
 }
 
-function checkbox(path, label, group = 'field', after) {
+function checkbox(path, label, group = groupFor(path), after) {
   const input = el('input', { type: 'checkbox' });
   input.checked = !!getPath(app.settings, path);
   input.addEventListener('change', () => { setPath(app.settings, path, input.checked); changed(group); after && after(input.checked); });
@@ -815,7 +838,8 @@ function markingsTab() {
       m.width ? el('button', { class: 'btn small', onclick: () => { m.width = null; changed('field'); renderTab(); } }, 'Use automatic width') : null,
       m.style === 'carved' ? slider('markings.darkness', 'Darkness', 0, 1, 0.01, { fmt: pct }) : null,
       m.style === 'raised' ? slider('markings.raise', 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
-      slider('markings.fade', 'Fade over the photo', 0, 1, 0.01, { fmt: pct }),
+      slider('markings.fade', 'Hide lines under photos', 0, 1, 0.01, { fmt: pct }),
+      note('At 100% the lines stop at your photos (they fade back in at a photo\'s soft edge). Lower it to let them show through.'),
       kind === 'soccer' ? slider('markings.panelDark', 'Pentagon darkness', 0, 1, 0.01, { fmt: pct }) : null,
       kind === 'football' ? checkbox('footballStripes', 'End stripes (glow bright, like a college ball)') : null,
     ),
@@ -923,7 +947,7 @@ function numberInput(path, label, lo, hi) {
   const i = el('input', { type: 'number', min: lo, max: hi, step: 0.5, value: getPath(s, path), style: 'width:76px', 'aria-label': label });
   i.addEventListener('change', () => {
     const v = Math.min(hi, Math.max(lo, parseFloat(i.value) || getPath(s, path)));
-    i.value = v; setPath(s, path, v); changed('field'); renderTab();
+    i.value = v; setPath(s, path, v); changed(groupFor(path)); renderTab();
   });
   return el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, label), i);
 }
@@ -940,7 +964,7 @@ function panelBaseTab() {
       segmented('base.panelKind', Object.entries(PANEL_BASE_KINDS).map(([k, label]) => ({
         value: k, label,
         title: { lightbox: 'A base with an LED strip inside that lights the panel from behind', stand: 'A small stand with a slot, no light', none: 'Just the panel (feet, a window or a frame)' }[k],
-      })), 'field', () => renderTab()),
+      })), undefined, () => renderTab()),
       kind === 'lightbox' ? [
         slider('base.stripW', 'LED strip width', 5, 20, 0.5, { fmt: mm }),
         note('Stick the LED strip on the leaning floor of the trough behind the slot; it shines up the back of the panel. A 10 mm USB strip works well. Its cable leaves through the notch at the back.'),
@@ -983,7 +1007,7 @@ function baseTab() {
       { value: 'puck', label: 'LED puck', title: 'The puck sits inside the base and shines up through the opening' },
       { value: 'strip', label: 'LED strip on a riser', title: 'A hollow post rises into the lamp; wrap an LED strip around it' },
       { value: 'bulb', label: 'Bulb socket', title: 'Holds an E12 or E26 lamp socket on a threaded nipple' },
-    ], 'field', () => renderTab()),
+    ], undefined, () => renderTab()),
     kind === 'puck' ? [
       numberInput('base.puckD', 'Puck diameter (mm)', 30, 160),
       numberInput('base.puckH', 'Puck height (mm)', 5, 60),
@@ -995,7 +1019,7 @@ function baseTab() {
       note('Wrap the LED strip around the riser. Its wire goes in through the hole near the top and down to the notch.'),
     ] : null,
     kind === 'bulb' ? [
-      segmented('base.socket', Object.entries(SOCKETS).map(([k, v]) => ({ value: k, label: v.label })), 'field', () => renderTab()),
+      segmented('base.socket', Object.entries(SOCKETS).map(([k, v]) => ({ value: k, label: v.label })), undefined, () => renderTab()),
       note(`The socket screws onto a 1/8" threaded lamp nipple through the top. The bulb must fit through the ${(col.ri * 2).toFixed(0)} mm opening.`),
       info && info.socketFits === false ? note('This socket is wider than the opening. Use a smaller socket or a bigger opening (Shape tab).', 'warn') : null,
     ] : null,
@@ -1004,7 +1028,7 @@ function baseTab() {
     { value: 'auto', label: 'Match the lamp', title: 'Round under balls, square under the cube' },
     { value: 'round', label: 'Round' },
     { value: 'square', label: 'Square' },
-  ], 'field', () => renderTab());
+  ], undefined, () => renderTab());
   const progress = el('div', { class: 'progress', hidden: !app.exporting }, el('div', { id: 'exportBar' }));
   const st = app.lastBaseExport;
   return [
@@ -1037,6 +1061,18 @@ function baseTab() {
       ) : null,
     ),
   ];
+}
+
+/**
+ * A warning when the chosen detail makes a very big file. Phones and tablets (touch screens)
+ * have far less memory than a computer, so they are warned sooner.
+ */
+function bigFileNote(bytes) {
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const mb = Math.round(bytes / 1e6);
+  if (touch && bytes > 150e6) return note(`This file will be about ${mb} MB: that may be too big for a phone or tablet, and the export could fail. Try Standard or Draft.`, 'warn');
+  if (bytes > 400e6) return note(`This file will be about ${mb} MB: slow to build and slow to open in a slicer. Standard is usually enough.`, 'warn');
+  return null;
 }
 
 function fitCheck(size, diag) {
@@ -1072,12 +1108,9 @@ function exportTab() {
   const fit = app.lastExport ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
 
   const raised = app.field ? app.field.hasRaised : s.markings.style === 'raised' && SHAPES[s.shape]?.markings !== 'none';
+  const estBytes = (d) => stlBytes(estimateTriangles(app.shape, d.step, raised ? d.step : OUTER_STEP));
   const opts = Object.entries(DETAIL_PRESETS).map(([k, d]) => {
-    let sizeText = '';
-    if (app.shape) {
-      const tris = estimateTriangles(app.shape, d.step, raised ? d.step : OUTER_STEP);
-      sizeText = `≈ ${(stlBytes(tris) / 1e6).toFixed(0)} MB`;
-    }
+    const sizeText = app.shape ? `≈ ${(estBytes(d) / 1e6).toFixed(0)} MB` : '';
     const radio = el('input', { type: 'radio', name: 'detail', value: k });
     radio.checked = s.detail === k;
     radio.addEventListener('change', () => { s.detail = k; scheduleAutosave(); renderTab(); });
@@ -1101,8 +1134,7 @@ function exportTab() {
   return [
     section('Printer bed (mm)', el('div', { class: 'row' }, bedInput('x'), bedInput('y'), bedInput('z')),
       el('div', { class: 'fit ' + fit.cls }, fit.text)),
-    section('Detail', ...opts,
-      s.detail === 'fine' && isPhone() ? note('Fine detail may be too big for a phone and could fail. Standard is recommended here.', 'warn') : null),
+    section('Detail', ...opts, bigFileNote(app.shape && DETAIL_PRESETS[s.detail] ? estBytes(DETAIL_PRESETS[s.detail]) : 0)),
     section('Export', btn, progress, stats,
       panel
         ? note('Prints standing up on its bottom edge, as exported. No supports needed; a brim helps tall or thin panels stay put.')
@@ -1162,7 +1194,7 @@ function exportBaseStl() {
       if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
     } else if (msg.type === 'done') {
       const fileName = `${projectBaseName()}-base-${isPanel() ? s.base.panelKind : s.base.light}.stl`;
-      download(new Blob([msg.stl], { type: 'model/stl' }), fileName);
+      download(new Blob(msg.stl, { type: 'model/stl' }), fileName);
       app.lastBaseExport = { ...msg.stats, fileName };
       toast(`Saved ${fileName}`);
       done();
@@ -1199,7 +1231,7 @@ function exportStl() {
       if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
     } else if (msg.type === 'done') {
       const fileName = `${projectBaseName()}-${s.detail}.stl`;
-      download(new Blob([msg.stl], { type: 'model/stl' }), fileName);
+      download(new Blob(msg.stl, { type: 'model/stl' }), fileName);
       app.lastExport = { ...msg.stats, fileName };
       toast(`Saved ${fileName}`);
       done();
@@ -1212,9 +1244,13 @@ function exportStl() {
     toast(await workerErrorText(workerUrl, e, 'Export failed', true), 'err');
     done();
   };
-  // Copies of each visible photo's adjusted picture (the copies move to the worker)
+  // Copies of each visible photo's adjusted picture (the copies move to the worker), always at full size
   const photos = {}, transfer = [];
   for (const cfg of s.photos) {
+    const im = app.images[cfg.id];
+    if (im && (!im.processed || im.dirty || im.needFull)) {
+      im.processed = processPhoto(im.base, cfg); im.dirty = false; im.needFull = false;
+    }
     const pr = !cfg.hidden && app.images[cfg.id] && app.images[cfg.id].processed;
     if (!pr) continue;
     const data = pr.data.slice(), alpha = pr.alpha ? pr.alpha.slice() : null;

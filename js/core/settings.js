@@ -29,7 +29,7 @@ export const DETAIL_PRESETS = {
 
 export function defaultSettings() {
   return {
-    version: 1,
+    version: 2,               // 2 (app 1.2): markings hidden under photos by default
     shape: 'basketball',
     sizePreset: 'M',
     diameter: 150,
@@ -49,7 +49,7 @@ export function defaultSettings() {
       width: null,            // mm; null = 2% of the ball size
       darkness: 1,            // carved lines: 0..1
       raise: 1.0,             // raised lines: height in mm
-      fade: 0.3,              // how much lines fade inside the photo (0..1)
+      fade: 1,                // how much lines fade inside the photo (0..1; 1 = hidden under photos)
       panelDark: 0.5,         // soccer: how much darker the pentagons glow (0 = same as hexagons)
       yaw: 60, pitch: 20, roll: 0,
     },
@@ -197,5 +197,9 @@ export function mergeSettings(saved) {
     if (d[k] && typeof d[k] === 'object' && !Array.isArray(d[k])) Object.assign(d[k], saved[k]);
     else d[k] = saved[k];
   }
+  // Before version 2 the lines showed through photos (fade 30%). Projects still at that old
+  // default now hide them, as asked (2026-11-19); a fade someone chose themselves is kept.
+  if (!(saved.version >= 2) && d.markings.fade === 0.3) d.markings.fade = 1;
+  d.version = 2;
   return d;
 }

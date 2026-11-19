@@ -97,6 +97,27 @@ export function extractLuma(image) {
   return { w, h, lum, alpha, originalW: iw, originalH: ih };
 }
 
+/**
+ * A small copy of a photo's brightness (and transparency), about `maxSide` pixels on its long
+ * side, made by averaging blocks of pixels. Tone sliders work on it while they move, which is
+ * many times faster than the full picture.
+ */
+export function shrinkBase(base, maxSide = 720) {
+  const { w, h, lum, alpha } = base;
+  const f = Math.ceil(Math.max(w, h) / maxSide);
+  if (f <= 1) return base;
+  const W = Math.ceil(w / f), H = Math.ceil(h / f);
+  const out = new Float32Array(W * H), outA = alpha ? new Float32Array(W * H) : null;
+  for (let Y = 0; Y < H; Y++) for (let X = 0; X < W; X++) {
+    let s = 0, sa = 0, n = 0;
+    for (let y = Y * f; y < Math.min(h, Y * f + f); y++) for (let x = X * f; x < Math.min(w, X * f + f); x++) {
+      s += lum[y * w + x]; if (alpha) sa += alpha[y * w + x]; n++;
+    }
+    out[Y * W + X] = s / n; if (outA) outA[Y * W + X] = sa / n;
+  }
+  return { w: W, h: H, lum: out, alpha: outA };
+}
+
 function OffscreenCanvasOr(w, h) {
   if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
   const c = document.createElement('canvas'); c.width = w; c.height = h; return c;

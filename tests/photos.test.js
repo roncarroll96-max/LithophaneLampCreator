@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildEllipsoidShape, THETA_FRONT } from '../js/core/shapes.js';
 import { createField } from '../js/core/field.js';
-import { defaultSettings, defaultPhotoSettings, photoSlot, bodyAxes, collarDims, MAX_PHOTOS } from '../js/core/settings.js';
+import { defaultSettings, defaultPhotoSettings, photoSlot, bodyAxes, collarDims, MAX_PHOTOS, mergeSettings } from '../js/core/settings.js';
 import { sForUp } from '../js/core/textLayer.js';
 import { projectPhotos } from '../js/storage.js';
 
@@ -79,4 +79,30 @@ test('older saved projects with one photo turn into a photo list', () => {
   assert.deepEqual(projectPhotos({ photoBlob: blob, photoName: 'a.jpg' }), [{ id: 'p1', name: 'a.jpg', blob }]);
   assert.deepEqual(projectPhotos({ photos: [{ id: 'x', name: 'b', blob }] }), [{ id: 'x', name: 'b', blob }]);
   assert.deepEqual(projectPhotos({}), []);
+});
+
+test('ball markings stay out of the photos (unless the fade is lowered)', () => {
+  const thicknesses = (s) => {
+    const shape = buildEllipsoidShape(bodyAxes(s), collarDims(s).ro);
+    const f = createField(s, shape, { p0: flat(0.5) });
+    const out = new Set();
+    // a grid well inside the photo window (away from its soft edge)
+    for (let a = -30; a <= 30; a += 1) for (let up = -30; up <= 30; up += 1) out.add(at(f, shape, a, up).t.toFixed(4));
+    return out;
+  };
+  const s = defaultSettings();
+  s.shape = 'basketball';
+  s.photos = [{ ...defaultPhotoSettings(), id: 'p0', around: 0, coverage: 120, feather: 4 }];
+  assert.equal(s.markings.fade, 1);
+  assert.deepEqual([...thicknesses(s)], [thick(s, 0.5).toFixed(4)], 'only the photo inside its window');
+  s.markings.fade = 0.3;
+  assert.ok(thicknesses(s).size > 1, 'at 30% the lines show through');
+});
+
+test('projects saved before 1.2 at the old 30% line fade now hide the lines; a chosen fade is kept', () => {
+  assert.equal(mergeSettings({ version: 1, markings: { fade: 0.3 } }).markings.fade, 1);
+  assert.equal(mergeSettings({ version: 1, markings: { fade: 0.6 } }).markings.fade, 0.6);
+  assert.equal(mergeSettings({ version: 2, markings: { fade: 0.3 } }).markings.fade, 0.3);
+  assert.equal(mergeSettings({ markings: {} }).markings.fade, 1);
+  assert.equal(mergeSettings({ version: 1 }).version, 2);
 });

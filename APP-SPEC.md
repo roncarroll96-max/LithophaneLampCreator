@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -18,7 +18,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 0.9 | ~~AI photo tools~~ skipped for now (moved to Later, 2026-11-18). Cut-out photos made with a phone or Windows Photos already work (0.4.1). |
 | 1.0 | Phone and tablet polish, final check against this spec (done) |
 | 1.1 | Flat panel (feature 12b): square, rectangle, circle, heart; curve; frame; light-box base, slot stand and feet |
-| 1.2 | Speed: faster tone sliders and Base tab, lighter big-base and Fine exports, 3D view pauses when idle (from the 1.0.3 review) |
+| 1.2 | Speed: faster tone sliders and Base tab, lighter big-base and Fine exports, 3D view pauses when idle (from the 1.0.3 review) (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -250,6 +250,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Collar wall | 2 mm (opening 50 mm inside, 54 mm outside) | Assumed (Claude's default) |
 | Plain band above collar | First 4 mm of the ball above the collar kept plain (no photo or lines), blending in over 6 mm | Assumed (Claude's default) |
 | Carved line darkness | Lines go up to 0.4 mm past the thickest setting so they show over dark photo areas | Assumed (Claude's default) |
+| Markings over photos | Hidden under photos by default ("Hide lines under photos" 100%, fading back in at the photo's soft edge); the slider can let them show through. Projects saved at the old 30% default switch to hidden | You (2026-11-19) |
 | Basketball line angle | Default turn: spin 60°, tilt 20°; adjustable | Assumed (Claude's guess, check on print) |
 | Line width | Automatic = 2% of ball size (3 mm on Medium) | Assumed (Claude's default) |
 | Detail presets | Draft 0.5 / Standard 0.3 / Fine 0.2 mm for all sizes | Assumed (Claude's default) |
@@ -287,7 +288,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 ## How we'll know it works
 1. Load one of your real photos, choose basketball, and get a print-ready STL in under 5 minutes with only light slider tweaking.
 2. The exported STL opens in your slicer with no repair warnings, and the ball and base fit together on the first print.
-3. Lit on the base, the face in the photo is clear and not too dark, and the basketball lines show as dark lines over the photo.
+3. Lit on the base, the face in the photo is clear and not too dark, and the basketball lines show as dark lines on the ball around the photo, but not across it (changed 2026-11-19).
 4. Save a project, close the browser, reopen it, and continue exactly where you left off. Send the project file to your friend and it opens the same for them.
 5. The Moon in moon-only mode shows recognisable maria and craters when lit.
 6. On a phone, you can load a photo, adjust it, preview, and export at Standard.
@@ -312,6 +313,19 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
 
+### Version 1.2: speed, done (2026-11-19)
+Faster and lighter, with the same results (no change to any STL the app makes):
+- **Tone sliders**: while a slider moves, the app adjusts a small copy of the photo (about 600 px); the full picture follows when the slider stops and always before an export. Adjusting the photo takes about a tenth of the time (an 1800 px photo: 186 → 17 ms per step; 2400 px: 450 → 22 ms).
+- **Base tab**: changing a base setting under a ball or cube rebuilds only the base, not the lamp's preview (on a panel the light box's strip and slot also steer even glow, so the panel still updates). The preview base uses a coarser grid when the base is very big.
+- **3D view**: the surface is rebuilt only when the shape or raised parts change, not after every tone or photo change.
+- **3D view pauses**: it draws only when something changes (a setting, or the view turning and gliding to a stop) instead of 60 times a second, saving battery and heat. The unused "snapshot" copy of each frame is gone.
+- **Base export**: built one layer at a time and skipping empty space. The 250 mm ball's strip base takes 3.6 s instead of 10.8 s and about 60 MB of memory instead of about 470 MB; the biggest base (extra width 40, riser 200) about 110 MB instead of about 1.3 GB. Very big bases get a slightly coarser grid so they finish in seconds.
+- **Ball and panel export**: the mesh is built in compact form (a 250 mm ball at Fine: about 200 MB of working memory instead of about 590 MB, and a third faster), and the file is handed over in pieces, so a 500 MB STL doesn't need one huge block of memory.
+- **Markings stay out of photos** (your request): ball markings now stop at the photos by default and fade back in at a photo's soft edge. The Markings tab slider is now called "Hide lines under photos" (100% = hidden; lower it to let lines show through). Projects saved with the old 30% setting switch to hidden; a value you picked yourself is kept.
+- **Big-file warning**: based on the estimated file size instead of the screen size, so iPads and other tablets see it too (touch screens above about 150 MB, computers above about 400 MB).
+
+Checks passed: 73 automated tests (2 for the markings: inside a photo only the photo sets the thickness, and at 30% the lines show again; old projects at 30% switch to hidden while a chosen value is kept. 4 for speed: the faster base mesher gives exactly the same mesh as before; very big bases get a coarser grid; an STL written in pieces is byte for byte the same file; the small photo copy keeps the picture and its shape). Every base type (puck, strip, bulb, football, panel light box flat/curved/heart, slot stand) compared to the old mesher at two grid sizes: identical. In the browser: the 3D view draws nothing while idle and settles a few seconds after turning; a Standard ball export (149.7 MB, size matches its triangle count) and a strip base export (66 MB, 3.9 s) worked; base changes rebuild just the base; the panel, its light box and the Thickness view work; the phone layout shows the size warning for Fine.
+
 ### Version 1.1: flat panel, done (2026-11-19)
 Built (feature 12b): **Flat panel** on the Shape tab.
 - **Shapes and sizes**: rectangle (Match photo, 4×6, 5×7, 8×10 in, custom; portrait or landscape follows the photo), square, circle and heart (4, 6, 8 in, custom). Sizes are shown in inches and mm. Circles have a flat 40% of their width on the bottom, hearts 16% (an 8 in heart has a 33 mm flat), so they stand up and sit in a slot.
@@ -335,7 +349,7 @@ An independent review of the whole app found that the geometry was solid. It als
 - **Messages:** "Run start.bat" only appears on the local copy; online it says to check the internet. Browsers too old to export, or without 3D graphics (WebGL), get a clear message instead of dead buttons. A damaged autosave or a failed project save gives a message.
 - **Safety:** project files can only carry pictures stored inside them; links to websites are ignored, so a file can't make the app contact the internet. Damaged photo or text entries are skipped. The local server (start.bat) refuses paths outside the app folder and requests that don't come from this PC by name.
 - **Phones:** the Open project button no longer filters by file type, so iPhones and iPads can pick .lithoproj files.
-Still to do (now planned for 1.2): faster tone sliders and Base tab changes, faster and lighter big-base and Fine exports, and pausing the 3D view when nothing moves. There's also a tiny crease where the cube's flat rim beside the collar meets the funnel (about 1 mm, unchanged by this release); check it on the first cube print.
+Speed work followed in 1.2. There's also a tiny crease where the cube's flat rim beside the collar meets the funnel (about 1 mm, unchanged by this release); check it on the first cube print.
 
 ### Version 1.0.2: printer setting tips page (2026-11-18)
 A "Printer Setting Tips" page (tips.html) with slicer settings that generally work well: 100% sparse infill, 3-4 wall loops, 0.12 mm layers, seam at the back, Arachne, slower outer wall, supports (off for the cube), how each file goes on the bed, base settings (normal settings, dark opaque filament), nozzle and filament, a checklist and troubleshooting. Linked from "Print tips" in the header and from the Export and Base tabs; opens in a new tab so the app keeps your work. Checked on desktop and phone (no sideways scrolling; settings stack as cards on phones).

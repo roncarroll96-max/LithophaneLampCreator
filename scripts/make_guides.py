@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.1: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.2: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -303,7 +303,7 @@ def app_guide(path):
         ['Plain ball outside the photos', '"Plain ball brightness" (Photo tab). 100% = Thinnest, 0% = Thickest',
          '55% = 1.79 mm'],
         ['Moon surface', 'NASA\'s brightness map plus "Crater depth", between Thinnest and Thickest', '0.80 to 3.00 mm'],
-        ['Carved lines', 'Pushed toward Thickest + 0.4 mm by "Darkness"; lightened inside photos by "Fade over the photo"',
+        ['Carved lines', 'Pushed toward Thickest + 0.4 mm by "Darkness"; hidden inside photos by "Hide lines under photos"',
          '3.40 mm'],
         ['Soccer pentagons', 'Pushed toward Thickest by "Pentagon darkness"', '50% of the way'],
         ['Football end stripes', 'Thinnest (they glow bright)', '0.80 mm'],
@@ -427,8 +427,8 @@ def app_guide(path):
         ['Line width', 'Auto = 2% of the lamp size (3.0 mm on a 150 mm ball).', 'Wider lines cover more of the lamp.'],
         ['Darkness / Raised height', 'How dark carved lines are, or how far raised ones stick out (0.3 to 3 mm).',
          '100% darkness = Thickest + 0.4 mm.'],
-        ['Fade over the photo', 'How much lines fade where they cross a photo (default 30%).',
-         'At 30%, lines inside a photo go 70% of the way.'],
+        ['Hide lines under photos', 'How much lines fade where they cross a photo. 100% (the default) hides them; '
+         'they fade back in at the photo\'s soft edge.', 'At 70%, lines inside a photo go 30% of the way.'],
         ['Pentagon darkness (soccer)', 'How much darker the 12 pentagons glow.', 'Pushes them toward Thickest.'],
         ['End stripes (football)', 'Bright bands near the tips, like a college ball.', 'Thinnest (they glow bright).'],
         ['Spin, Tilt (not football)', 'Turns the line pattern.', 'None; moves where the lines are.'],
@@ -473,7 +473,8 @@ def app_guide(path):
         ['Setting', 'What it does'],
         ['Printer bed', 'Your printer\'s build size; the app checks the lamp fits, and says when it only fits diagonally.'],
         ['Detail: Draft / Standard / Fine', 'Points on the photo side 0.5 / 0.3 / 0.2 mm apart. Standard is best for '
-         'most prints. Detail does not change wall thickness.'],
+         'most prints. Detail does not change wall thickness. Each choice shows its file size; a very big file gets a '
+         'warning (sooner on phones and tablets, which have less memory).'],
         ['Export ball / panel STL', 'The lamp. The cube comes out upside down (top face on the bed); a panel stands '
          'on its bottom edge. Both are ready to print.'],
     ], [2.2 * inch, 4.8 * inch]))
@@ -490,8 +491,8 @@ def app_guide(path):
         '<b>Print settings matter as much as these sliders.</b> See the companion Printer Settings guide.',
     ])
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.1 - Settings Guide'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.1 - Settings Guide'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.2 - Settings Guide'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.2 - Settings Guide'))
 
 
 # ---------------------------------------------------------------- document 2
@@ -501,7 +502,7 @@ def printer_guide(path):
                             title='Lithophane Lamp - Printer Settings')
     s = []
     s.append(P('Printer Settings for Lithophane Lamps', H1))
-    s.append(P('For Lithophane Lamp Creator 1.1: slicer settings for the lamp and the base, and what each one changes. '
+    s.append(P('For Lithophane Lamp Creator 1.2: slicer settings for the lamp and the base, and what each one changes. '
                'Names match Bambu Studio and OrcaSlicer; other slicers use similar names.', SUB))
 
     s.append(P('Why the slicer matters', H2))
@@ -605,8 +606,8 @@ def printer_guide(path):
     s.append(P('Tip: to test settings quickly, export a Small lamp with the picture shrunk to fit. It prints much faster '
                'and shows the same problems.', SMALL))
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.1 - Printer Settings'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.1 - Printer Settings'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.2 - Printer Settings'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.2 - Printer Settings'))
 
 
 if __name__ == '__main__':
