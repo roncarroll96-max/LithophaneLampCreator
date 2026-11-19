@@ -54,9 +54,22 @@ function blobToDataUrl(blob) {
   });
 }
 
-async function dataUrlToBlob(url) {
-  const res = await fetch(url);
-  return res.blob();
+/**
+ * Turns a saved photo (a data:image/...;base64 string) back into a file. Anything else gives
+ * null: a project file can't make the app fetch from the internet.
+ */
+function dataUrlToBlob(url) {
+  if (typeof url !== 'string') return null;
+  const m = url.match(/^data:(image\/[\w.+-]+);base64,([A-Za-z0-9+/=\s]*)$/);
+  if (!m) return null;
+  try {
+    const bin = atob(m[2].replace(/\s+/g, ''));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: m[1] });
+  } catch {
+    return null;
+  }
 }
 
 export function download(blob, filename) {
@@ -90,15 +103,18 @@ export async function readProjectFile(file) {
   let doc;
   try { doc = JSON.parse(await file.text()); } catch { throw new Error('That file is not a Lithophane Lamp Creator project.'); }
   if (!doc || doc.format !== FILE_TAG) throw new Error('That file is not a Lithophane Lamp Creator project.');
+  // Skip any photo entry that isn't a picture saved by the app
   if (Array.isArray(doc.photos)) {
-    return {
-      settings: doc.settings,
-      photos: await Promise.all(doc.photos.map(async (p) => ({ id: p.id, name: p.name, blob: await dataUrlToBlob(p.data) }))),
-    };
+    const photos = doc.photos
+      .filter((p) => p && typeof p.id === 'string')
+      .map((p) => ({ id: p.id, name: typeof p.name === 'string' ? p.name : 'photo', blob: dataUrlToBlob(p.data) }))
+      .filter((p) => p.blob);
+    return { settings: doc.settings, photos };
   }
   // version 1: a single photo
+  const blob = dataUrlToBlob(doc.photo);
   return {
     settings: doc.settings,
-    photos: doc.photo ? [{ id: 'p1', name: doc.photoName || 'photo', blob: await dataUrlToBlob(doc.photo) }] : [],
+    photos: blob ? [{ id: 'p1', name: typeof doc.photoName === 'string' ? doc.photoName : 'photo', blob }] : [],
   };
 }

@@ -80,6 +80,14 @@ export function buildBase(settings, shape) {
     }
     const toMiddle = col.height + (shape ? -zEdge : 60);
     riserTop = H + (b.riserH > 0 ? b.riserH : Math.max(10, toMiddle - seatD - 5));
+    // A tall riser must stay inside the lamp: at least 5 mm below its inside wall over the riser
+    if (shape) {
+      const centre = zSeat + col.height - zEdge;        // the lamp's centre, in base coordinates
+      const ci = shape.c - (settings.tMax ?? 3) - 0.4;  // inside top above the centre
+      const over = shape.kind === 'cube' ? ci : Math.sqrt(Math.max(0, ci * ci - roT * roT));
+      const maxTop = centre + over - 5;
+      if (riserTop > maxTop) { riserTop = Math.max(H + 10, maxTop); extraInfo.riserLimited = true; }
+    }
     const coneTop = hc0 + (rc - riT);
     sdf = subtract(
       union(outer(R, H), cylinder(roT, zSeat, riserTop)),
@@ -90,7 +98,7 @@ export function buildBase(settings, shape) {
       box(-3, 3, 0, roT + 1, riserTop - 9, riserTop - 3), // wire hole near the top of the riser
       notch(R, Math.min(b.cableH, hc0 - 1)));
     flip = false;
-    extraInfo = { riserD: roT * 2, riserHeight: riserTop - H };
+    extraInfo = { ...extraInfo, riserD: roT * 2, riserHeight: riserTop - H };
   } else { // LED puck
     const rc = b.puckD / 2 + 0.6, hc = b.puckH + 1, floor = 2;
     const rh = Math.max(8, Math.min(col.ri - 1.5, rc - 3));

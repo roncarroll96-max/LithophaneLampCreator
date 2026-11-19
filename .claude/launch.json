@@ -6,6 +6,13 @@
       "runtimeExecutable": "node",
       "runtimeArgs": ["server.js"],
       "port": 5178
+    },
+    {
+      "name": "litho-test",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server.js"],
+      "env": { "PORT": "5179" },
+      "port": 5179
     }
   ]
 }

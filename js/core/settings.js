@@ -136,7 +136,7 @@ export function bodyAxes(settings) {
   const body = SHAPES[settings.shape]?.body || 'sphere';
   if (body === 'cube') {
     const h = (settings.cube?.size ?? 100) / 2;
-    return { a: h, b: h, c: h, kind: 'cube', round: Math.max(1, Math.min(h * 0.4, settings.cube?.round ?? 5)) };
+    return { a: h, b: h, c: h, kind: 'cube', round: cubeRound(settings) };
   }
   if (body === 'football') {
     const a = settings.footballLength / 2, b = settings.footballWidth / 2;
@@ -145,6 +145,28 @@ export function bodyAxes(settings) {
   }
   const r = settings.diameter / 2;
   return { a: r, b: r, c: r, kind: 'sphere' };
+}
+
+/**
+ * Smallest edge rounding that keeps the cube's inside wall from folding over itself: the inside is
+ * the outside pushed in by the wall thickness, so a tighter curve than the thickest wall
+ * (tMax plus carved lines) would turn it inside out.
+ */
+export function minCubeRound(settings) {
+  return Math.ceil(((settings.tMax ?? 3) + 0.5) * 2) / 2;
+}
+
+/** The edge rounding actually used for the cube (the setting, kept within safe limits). */
+export function cubeRound(settings) {
+  const h = (settings.cube?.size ?? 100) / 2;
+  return Math.max(1, Math.min(h * 0.4, Math.max(minCubeRound(settings), settings.cube?.round ?? 5)));
+}
+
+/** Largest opening diameter (0.5 mm steps) that leaves room for the collar on this lamp size. */
+export function maxOpening(settings) {
+  const ax = bodyAxes(settings);
+  const wall = settings.opening?.collarWall ?? 2;
+  return Math.floor((2 * (0.9 * Math.min(ax.a, ax.b) - wall) - 0.5) * 2) / 2;
 }
 
 export function collarDims(settings) {

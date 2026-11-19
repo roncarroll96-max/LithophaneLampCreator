@@ -28,7 +28,8 @@
       <button class="btn primary" id="btnChoosePhoto">Choose photo</button>
     </nav>
     <input type="file" id="filePhoto" accept="image/*,.heic,.heif" hidden>
-    <input type="file" id="fileProject" accept=".lithoproj,application/json" hidden>
+    <!-- No file filter: iPhones and iPads grey out the .lithoproj extension -->
+    <input type="file" id="fileProject" hidden>
   </header>
 
   <main class="workspace">
@@ -71,6 +72,19 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="fatal" id="fatal" role="alert" hidden>
+    <div class="fatal-card">
+      <div class="fatal-title">The app can't start in this browser</div>
+      <p id="fatalMsg">It needs an up-to-date Chrome, Edge, Firefox or Safari with 3D graphics (WebGL) turned on.</p>
+    </div>
+  </div>
   <script type="module" src="js/main.js"></script>
+  <script>
+    // If the app's code didn't run (a browser too old for it, or 3D graphics unavailable),
+    // say so instead of leaving dead buttons.
+    window.addEventListener('load', function () {
+      setTimeout(function () { if (!window.__litho) document.getElementById('fatal').hidden = false; }, 1500);
+    });
+  </script>
 </body>
 </html>

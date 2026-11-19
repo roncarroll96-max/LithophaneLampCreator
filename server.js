@@ -2,7 +2,7 @@
 // No dependencies. Serves the project folder at http://localhost:5178
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize, dirname } from 'node:path';
+import { extname, join, normalize, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
@@ -17,12 +17,19 @@ const TYPES = {
   '.ico': 'image/x-icon', '.md': 'text/plain; charset=utf-8',
 };
 
+// Only answer requests addressed to this PC by name, so a web page can't reach the server by
+// pointing its own domain name at 127.0.0.1 (DNS rebinding).
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
 createServer(async (req, res) => {
   try {
+    const host = (req.headers.host || '').replace(/:\d+$/, '').toLowerCase();
+    if (!LOCAL_HOSTS.has(host)) { res.writeHead(403).end(); return; }
     let path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
     if (path.endsWith('/')) path += 'index.html';
     const file = normalize(join(ROOT, path));
-    if (!file.startsWith(ROOT) || file.includes('node_modules')) { res.writeHead(403).end(); return; }
+    // Must be inside the app folder itself (not a neighbouring folder whose name starts the same)
+    if (!file.startsWith(ROOT + sep) || file.includes('node_modules')) { res.writeHead(403).end(); return; }
     const s = await stat(file);
     if (!s.isFile()) throw new Error('not a file');
     res.writeHead(200, {

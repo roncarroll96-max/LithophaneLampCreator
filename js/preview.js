@@ -175,7 +175,16 @@ export class Preview {
 
   /** Collar, base and floor around the ball (preview only). */
   updateStand(shape, collar, settings) {
+    // Free the old stand's geometry and its own materials (shared ones are kept), but keep the
+    // real base: it is put back below, since it only changes when the base settings change.
+    const shared = new Set([this.plainMat, this.collarGlow, this.baseMat, this.floorMat]);
+    for (const child of [...this.group.children]) {
+      if (child === this._baseMesh) continue;
+      child.geometry?.dispose();
+      if (child.material && !shared.has(child.material)) child.material.dispose();
+    }
     this.group.clear();
+    if (this._baseMesh) this.group.add(this._baseMesh);
     const o = {};
     let zEdge = Infinity;
     for (let i = 0; i < 64; i++) {

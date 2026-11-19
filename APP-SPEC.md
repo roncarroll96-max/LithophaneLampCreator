@@ -272,6 +272,19 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
 
+### Version 1.0.3: fixes from an independent code review (2026-11-19)
+An independent review of the whole app found that the geometry was solid. It also found a number of bugs and gaps around it, all now fixed:
+- **Base in the preview:** no longer disappears after New, opening a project or clicking the selected size. The stand no longer leaks graphics memory as sliders move.
+- **Cube photos:** a new or changed photo now fills its square face straight away (it used to follow the photo's shape until "Fit photos to faces").
+- **Cube edge rounding:** can't go below the thickest wall plus 0.5 mm (3.5 mm at the default 3 mm). Tighter rounding made the inside wall fold over itself at the edges. Older projects with tighter rounding are raised automatically.
+- **Moon:** export waits for the NASA maps (it used to export a plain ball if they hadn't loaded). A failed download shows one message and a "Try again" button instead of a message on every change.
+- **New** asks first whenever there is work to lose (text, markings, Moon or other settings, not only photos). **Remove** on a photo has an Undo.
+- **Limits:** the opening slider stops at the largest opening that fits the size. A size change that leaves the opening too big shrinks it with a message (a 60 mm ball used to fail). A tall strip riser is kept at least 5 mm below the inside of the lamp, with a note. The Base tab says whether the base fits your printer bed.
+- **Messages:** "Run start.bat" only appears on the local copy; online it says to check the internet. Browsers too old to export, or without 3D graphics (WebGL), get a clear message instead of dead buttons. A damaged autosave or a failed project save gives a message.
+- **Safety:** project files can only carry pictures stored inside them; links to websites are ignored, so a file can't make the app contact the internet. Damaged photo or text entries are skipped. The local server (start.bat) refuses paths outside the app folder and requests that don't come from this PC by name.
+- **Phones:** the Open project button no longer filters by file type, so iPhones and iPads can pick .lithoproj files.
+Still to do (planned for 1.1): faster tone sliders and Base tab changes, faster and lighter big-base and Fine exports, and pausing the 3D view when nothing moves. There's also a tiny crease where the cube's flat rim beside the collar meets the funnel (about 1 mm, unchanged by this release); check it on the first cube print.
+
 ### Version 1.0.2: printer setting tips page (2026-11-18)
 A "Printer Setting Tips" page (tips.html) with slicer settings that generally work well: 100% sparse infill, 3-4 wall loops, 0.12 mm layers, seam at the back, Arachne, slower outer wall, supports (off for the cube), how each file goes on the bed, base settings (normal settings, dark opaque filament), nozzle and filament, a checklist and troubleshooting. Linked from "Print tips" in the header and from the Export and Base tabs; opens in a new tab so the app keeps your work. Checked on desktop and phone (no sideways scrolling; settings stack as cards on phones).
 

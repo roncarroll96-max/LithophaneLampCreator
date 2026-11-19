@@ -8,6 +8,7 @@ import { estimateTriangles, stlBytes } from './core/mesh.js';
 import {
   defaultSettings, mergeSettings, SIZE_PRESETS, SHAPES, DETAIL_PRESETS,
   bodyAxes, collarDims, markingWidth, MAX_PHOTOS, defaultPhotoSettings, photoSlot, cubePhotoSlot,
+  minCubeRound, maxOpening,
 } from './core/settings.js';
 import { autosave, loadAutosave, saveProjectFile, readProjectFile, projectPhotos, download } from './storage.js';
 import { TEXT_FONTS, defaultTextItem, placementAt } from './core/textLayer.js';
@@ -43,20 +44,39 @@ const app = {
   baseKey: null,     // settings the preview base was last built from
   showOriginal: false,
   dirty: { tone: false, shape: true, field: true },
+  projectGen: 0,     // goes up on New / Open, so a photo still loading for the old project is dropped
+  pendingPhotos: 0,  // new photos still loading (they count towards the photo limit)
+  moonFailed: false, // the Moon maps could not be loaded (retry from the Shape tab)
 };
 
 const $ = (id) => document.getElementById(id);
 const isPhone = () => matchMedia('(max-width: 820px)').matches && matchMedia('(pointer: coarse)').matches;
-const preview = new Preview($('viewport'));
+let preview;
+try {
+  preview = new Preview($('viewport'));
+} catch (err) {
+  // No WebGL (turned off, blocked, or a very old graphics driver): explain instead of dead buttons
+  $('fatalMsg').textContent = 'Your browser could not start 3D graphics (WebGL). Turn on "Use graphics acceleration" '
+    + 'in the browser settings, update the browser, or try another one (Chrome, Edge, Firefox or Safari).';
+  $('fatal').hidden = false;
+  throw err;
+}
 $('appVersion').textContent = `v${APP_VERSION}`;
+const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
 // ---------- Messages ----------
 let toastTimer;
-function toast(msg, kind = '') {
+function toast(msg, kind = '', action = null) {
   const t = $('toast');
   t.textContent = msg; t.className = 'toast ' + kind; t.hidden = false;
+  if (action) {
+    const b = document.createElement('button');
+    b.className = 'btn small toast-action'; b.textContent = action.label;
+    b.addEventListener('click', () => { t.hidden = true; action.run(); });
+    t.append(b);
+  }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.hidden = true; }, kind === 'err' ? 7000 : 3500);
+  toastTimer = setTimeout(() => { t.hidden = true; }, kind === 'err' || action ? 7000 : 3500);
 }
 
 // ---------- Settings path helpers ----------
@@ -90,6 +110,12 @@ function update(quick) {
     if (toned) { drawThumb(); drawRowThumbs(); }
     let shapeChanged = false;
     if (app.dirty.shape) {
+      const maxOpen = maxOpening(s);
+      if (s.opening.diameter > maxOpen && maxOpen >= 20) {
+        s.opening.diameter = maxOpen;
+        toast(`The opening was made smaller (${maxOpen} mm) to fit this lamp size.`);
+        if (app.tab === 'ball') setTimeout(renderTab);
+      }
       const collar = collarDims(s);
       const shape = buildEllipsoidShape(bodyAxes(s), collar.ro);
       const firstShape = !app.shape;
@@ -146,14 +172,16 @@ async function normalizedBlob(image, w, h, keepAlpha) {
  * with an id it fills that photo (restoring a project, or "Change photo" when fresh).
  */
 async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
-  const s = app.settings;
-  if (!id && s.photos.length >= MAX_PHOTOS) { toast(`A ball can hold up to ${MAX_PHOTOS} photos. Remove one first.`, 'err'); return; }
+  const s = app.settings, gen = app.projectGen;
+  if (!id && s.photos.length + app.pendingPhotos >= MAX_PHOTOS) { toast(`A lamp can hold up to ${MAX_PHOTOS} photos. Remove one first.`, 'err'); return; }
+  if (!id) app.pendingPhotos++;
   $('busy').hidden = false; $('busy').textContent = 'Loading photo…';
   try {
     const image = await decodeImage(blob);
     const base = extractLuma(image);
     const stored = fresh ? await normalizedBlob(image, base.w, base.h, !!base.alpha) : blob;
     image.close?.();
+    if (gen !== app.projectGen || s !== app.settings) return; // a new project was started meanwhile
     let cfg = id ? s.photos.find((p) => p.id === id) : null;
     if (!cfg) {
       const topUp = app.shape ? Math.floor(app.shape.elev(1)) - 2 : 70;
@@ -163,7 +191,9 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
       s.photos.unshift(cfg); // a new photo goes on top
     }
     if (fresh) {
-      Object.assign(cfg, autoAdjust(base), { zoom: 1, panX: 0, panY: 0, rotate: 0, aspect: null, auto: true });
+      // A cube face is square, so its photo window stays square; elsewhere it follows the photo
+      const aspect = cfg.projection === 'planar' ? (cfg.aspect ?? 1) : null;
+      Object.assign(cfg, autoAdjust(base), { zoom: 1, panX: 0, panY: 0, rotate: 0, aspect, auto: true });
       if (Math.max(base.originalW, base.originalH) < 900) {
         toast('This photo is small (low resolution). It may look blurry on the ball.', 'err');
       }
@@ -176,6 +206,7 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
   } catch (err) {
     toast(err.message || 'Could not open that photo.', 'err');
   } finally {
+    if (!id) app.pendingPhotos--;
     $('busy').hidden = true;
   }
 }
@@ -223,7 +254,7 @@ function projectBaseName() {
 function refreshBasePreview() {
   const s = app.settings;
   if (!app.shape) return;
-  const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening]);
+  const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening, s.tMax]);
   if (key === app.baseKey) return;
   app.baseKey = key;
   try {
@@ -244,12 +275,15 @@ const isMoonShape = () => SHAPES[app.settings.shape]?.markings === 'moon';
 function ensureMoon() {
   if (!isMoonShape()) return null;
   if (!app.moonPrep) {
-    if (!moonLoading) {
+    if (!moonLoading && !app.moonFailed) {
       moonLoading = true;
       loadMoon()
-        .then((prep) => { app.moonPrep = prep; changed('field'); if (app.tab === 'ball') renderTab(); })
-        .catch((err) => { console.error(err); toast(`The Moon maps could not be loaded: ${err.message || err}`, 'err'); })
-        .finally(() => { moonLoading = false; });
+        .then((prep) => { app.moonPrep = prep; changed('field'); })
+        .catch((err) => {
+          console.error(err); app.moonFailed = true;
+          toast(`The Moon maps could not be loaded: ${err.message || err}`, 'err');
+        })
+        .finally(() => { moonLoading = false; if (['ball', 'export'].includes(app.tab)) renderTab(); });
     }
     return null;
   }
@@ -392,7 +426,18 @@ function photoTab() {
     }, 'Copy'),
     el('button', {
       class: 'btn small', title: 'Remove this photo',
-      onclick: () => { list.splice(i, 1); delete app.images[c.id]; changed('field'); renderTab(); },
+      onclick: () => {
+        const removedImage = app.images[c.id], gen = app.projectGen;
+        list.splice(i, 1); delete app.images[c.id]; changed('field'); renderTab();
+        toast('Photo removed.', '', {
+          label: 'Undo',
+          run: () => {
+            if (gen !== app.projectGen || list !== app.settings.photos || list.length >= MAX_PHOTOS) return;
+            list.splice(Math.min(i, list.length), 0, c); app.images[c.id] = removedImage;
+            app.selectedPhoto = c.id; $('emptyState').classList.add('hidden'); changed('field'); renderTab();
+          },
+        });
+      },
     }, 'Remove'),
   ));
 
@@ -535,7 +580,7 @@ function ballTab() {
   return [
     section('Shape', shapeSel),
     isCube() ? section('Cube',
-      slider('cube.round', 'Edge rounding', 2, 15, 0.5, { fmt: mm, group: 'shape' }),
+      slider('cube.round', 'Edge rounding', minCubeRound(s), 15, 0.5, { fmt: (v) => mm(Math.max(v, minCubeRound(s))), group: 'shape' }),
       slider('cube.border', 'Photo border', 2, 20, 0.5, { fmt: mm }),
       el('button', { class: 'btn small', onclick: fitPhotosToFaces, disabled: !s.photos.length, title: 'Front, back, left, right, top, in list order' }, 'Fit photos to faces'),
       note('Each photo fills its face, leaving the border plain. Photos go front, back, left, right, top in list order.'),
@@ -550,7 +595,10 @@ function ballTab() {
       ], 'field', () => renderTab()),
       slider('moon.craters', 'Crater depth', 0, 1, 0.01, { fmt: pct }),
       slider('moon.spin', 'Turn the Moon', -180, 180, 1, { fmt: deg }),
-      note(app.moonPrep ? 'Moon maps: NASA Scientific Visualization Studio (CGI Moon Kit).' : 'Loading the Moon maps...'),
+      app.moonPrep ? note('Moon maps: NASA Scientific Visualization Studio (CGI Moon Kit).')
+        : app.moonFailed ? [note('The Moon maps could not be loaded, so the Moon has no surface yet.', 'warn'),
+          el('button', { class: 'btn small', onclick: () => { app.moonFailed = false; changed('field'); renderTab(); } }, 'Try again')]
+        : note('Loading the Moon maps...'),
     ) : null,
     section('Size', sizeSeg,
       isCube()
@@ -565,10 +613,11 @@ function ballTab() {
     ) : null,
     section('Wall thickness',
       slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
-      slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5) }),
+      // The cube's edge rounding can't be tighter than the thickest wall, so tMax reshapes it
+      slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() ? 'shape' : 'field' }),
       note('Typical white PLA: 0.8 mm to 3.0 mm.')),
     section('Opening and collar',
-      slider('opening.diameter', 'Opening diameter', 20, 90, 0.5, { fmt: mm, group: 'shape' }),
+      slider('opening.diameter', 'Opening diameter', 20, Math.max(20, Math.min(90, maxOpening(s))), 0.5, { fmt: mm, group: 'shape' }),
       slider('opening.collarHeight', 'Collar height', 2, 15, 0.5, { fmt: mm, group: 'shape' }),
       slider('opening.collarWall', 'Collar wall', 1.2, 4, 0.1, { fmt: mm, group: 'shape' }),
       note('The collar drops into the base. The light shines up through the opening.')),
@@ -751,6 +800,8 @@ function baseTab() {
     section('Export base',
       info ? note(`Base: ${info.width.toFixed(0)} mm ${info.square ? 'square' : 'across'}, ${info.height.toFixed(0)} mm tall`
         + (info.riserHeight ? `, riser ${info.riserHeight.toFixed(0)} mm above it.` : '.')) : null,
+      info && info.riserLimited ? note(`The riser was kept ${info.riserHeight.toFixed(0)} mm tall so it stays inside the lamp.`, 'warn') : null,
+      info ? (() => { const f = fitCheck([info.width, info.width, info.totalHeight]); return el('div', { class: 'fit ' + f.cls }, f.text); })() : null,
       info ? note(info.flip
         ? 'Prints upside down (top on the bed): the STL is already turned. No supports needed.'
         : 'Prints standing up, as it sits on the table. No supports needed.') : null,
@@ -834,8 +885,40 @@ function exportTab() {
 }
 
 // ---------- Export ----------
+/** Browsers before 2023 (e.g. Firefox before 114) can't run the export code (a module worker). */
+const moduleWorkers = (() => {
+  let ok = false;
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob([''], { type: 'text/javascript' })), { get type() { ok = true; return 'module'; } });
+    w.terminate();
+  } catch { /* not supported */ }
+  return ok;
+})();
+
+/**
+ * A plain-language reason the export worker failed. The export code is loaded when the export
+ * starts: on the local copy that fails if start.bat was closed, online if the internet dropped.
+ */
+async function workerErrorText(workerUrl, e, what, detailHint = false) {
+  const reachable = await fetch(workerUrl, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok, () => false);
+  if (!reachable) {
+    return isLocal
+      ? 'Export could not start: the app\'s local server is not running. Run start.bat again, then export.'
+      : 'Export could not start: the app could not reach its website. Check the internet connection and try again.';
+  }
+  return `${what}${e && e.message ? ': ' + e.message : ''}.${detailHint ? ' Try a lower detail level.' : ''}`;
+}
+
+function cannotExport() {
+  if (!moduleWorkers) {
+    toast('This browser is too old to export. Update it, or use an up-to-date Chrome, Edge, Firefox or Safari.', 'err');
+    return true;
+  }
+  return false;
+}
+
 function exportBaseStl() {
-  if (app.exporting || !app.shape) return;
+  if (app.exporting || !app.shape || cannotExport()) return;
   const s = app.settings;
   app.exporting = true; renderTab();
   const workerUrl = new URL('./exportWorker.js', import.meta.url);
@@ -857,17 +940,22 @@ function exportBaseStl() {
       done();
     }
   };
-  worker.onerror = async () => {
-    const serverUp = await fetch(workerUrl, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok, () => false);
-    toast(serverUp ? 'Base export failed.' : 'Export could not start: the app\'s local server is not running. Run start.bat again, then export.', 'err');
+  worker.onerror = async (e) => {
+    toast(await workerErrorText(workerUrl, e, 'Base export failed'), 'err');
     done();
   };
   worker.postMessage({ kind: 'base', settings: structuredClone(s) });
 }
 
 function exportStl() {
-  if (app.exporting || !app.shape) return;
+  if (app.exporting || !app.shape || cannotExport()) return;
   const s = app.settings;
+  // Without its maps a Moon would export as a smooth ball
+  if (isMoonShape() && !app.moonMap) {
+    toast(app.moonFailed ? 'The Moon maps could not be loaded, so the Moon can\'t be exported yet. Try again from the Shape tab.'
+      : 'The Moon maps are still loading. Export again in a moment.', 'err');
+    return;
+  }
   const step = DETAIL_PRESETS[s.detail]?.step || 0.3;
   app.exporting = true; renderTab();
   const workerUrl = new URL('./exportWorker.js', import.meta.url);
@@ -890,14 +978,7 @@ function exportStl() {
     }
   };
   worker.onerror = async (e) => {
-    // The export code loads from the local server when the export starts. If start.bat
-    // was closed, that load fails, so check the server before blaming the detail level.
-    const serverUp = await fetch(workerUrl, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok, () => false);
-    if (!serverUp) {
-      toast('Export could not start: the app\'s local server is not running. Run start.bat again, then export.', 'err');
-    } else {
-      toast(`Export failed${e.message ? ': ' + e.message : ''}. Try a lower detail level.`, 'err');
-    }
+    toast(await workerErrorText(workerUrl, e, 'Export failed', true), 'err');
     done();
   };
   // Copies of each visible photo's adjusted picture (the copies move to the worker)
@@ -990,8 +1071,13 @@ $('filePhoto').addEventListener('change', (e) => {
 });
 
 $('btnSaveProject').addEventListener('click', async () => {
-  await saveProjectFile({ settings: app.settings, photos: photoFiles() }, `${projectBaseName()}.lithoproj`);
-  toast('Project saved to your downloads.');
+  try {
+    await saveProjectFile({ settings: app.settings, photos: photoFiles() }, `${projectBaseName()}.lithoproj`);
+    toast('Project saved to your downloads.');
+  } catch (err) {
+    console.error(err);
+    toast(`The project could not be saved: ${err.message || err}`, 'err');
+  }
 });
 $('btnOpenProject').addEventListener('click', () => $('fileProject').click());
 $('fileProject').addEventListener('change', async (e) => {
@@ -1003,21 +1089,31 @@ $('fileProject').addEventListener('change', async (e) => {
     toast(`Opened ${f.name}`);
   } catch (err) { toast(err.message, 'err'); }
 });
+/** True when the project has work worth asking about before it's cleared. */
+function hasWork() {
+  const s = app.settings, d = defaultSettings();
+  if (hasPhotos() || (s.texts || []).length) return true;
+  // Anything changed apart from the things New keeps
+  return ['shape', 'markings', 'moon', 'footballTip', 'footballStripes', 'evenGlow', 'photo']
+    .some((k) => JSON.stringify(s[k]) !== JSON.stringify(d[k]));
+}
 $('btnNew').addEventListener('click', () => {
-  if (hasPhotos() && !confirm('Start a new project? The current photos and settings will be cleared (save a project file first if you want to keep them).')) return;
+  if (hasWork() && !confirm('Start a new project? The current photos, text and settings will be cleared (save a project file first if you want to keep them).')) return;
+  app.projectGen++;
   // A new project starts from your own defaults: printer bed, size, wall thickness, opening and base
   const old = app.settings;
   app.settings = defaultSettings();
   for (const k of ['bed', 'sizePreset', 'diameter', 'footballLength', 'footballWidth', 'tMin', 'tMax', 'opening', 'cube', 'base', 'detail']) {
     if (old[k] !== undefined) app.settings[k] = structuredClone(old[k]);
   }
-  app.images = {}; app.selectedPhoto = null;
+  app.images = {}; app.selectedPhoto = null; app.selectedText = null; app.textMasks = null;
   $('emptyState').classList.remove('hidden');
   changed('shape'); renderTab();
 });
 
 const PHOTO_KEYS = Object.keys(defaultPhotoSettings());
 async function applyProject(proj) {
+  app.projectGen++;
   const s = mergeSettings(proj.settings);
   const files = projectPhotos(proj);
   // Projects from before several photos: the one photo's settings lived in settings.photo
@@ -1028,9 +1124,13 @@ async function applyProject(proj) {
     s.photos = [cfg];
   }
   s.photo = { surround: s.photo?.surround ?? 0.55 };
-  if (!Array.isArray(s.photos)) s.photos = [];
+  // Keep only well-formed entries (a damaged or hand-edited file shouldn't break the app)
+  const isItem = (x) => x && typeof x === 'object' && typeof x.id === 'string';
+  s.photos = (Array.isArray(s.photos) ? s.photos : []).filter(isItem).slice(0, MAX_PHOTOS)
+    .map((p) => ({ ...defaultPhotoSettings(), ...p }));
+  s.texts = (Array.isArray(s.texts) ? s.texts : []).filter(isItem).map((t) => ({ ...defaultTextItem(), ...t }));
   app.settings = s;
-  app.images = {}; app.selectedPhoto = null;
+  app.images = {}; app.selectedPhoto = null; app.selectedText = null; app.textMasks = null;
   changed('shape');
   for (const f of files) if (s.photos.some((p) => p.id === f.id)) await loadPhoto(f.blob, f.name, { fresh: false, id: f.id });
   s.photos = s.photos.filter((p) => app.images[p.id]); // drop any photo whose picture is missing
@@ -1048,7 +1148,7 @@ window.addEventListener('drop', async (e) => {
   e.preventDefault(); dragDepth = 0; $('dropHint').hidden = true;
   const f = e.dataTransfer.files[0];
   if (!f) return;
-  if (f.name.endsWith('.lithoproj')) {
+  if (/\.(lithoproj|json)$/i.test(f.name)) {
     try { await applyProject(await readProjectFile(f)); toast(`Opened ${f.name}`); } catch (err) { toast(err.message, 'err'); }
   } else loadPhoto(f, f.name);
 });
@@ -1056,12 +1156,18 @@ window.addEventListener('drop', async (e) => {
 // ---------- Start ----------
 (async function start() {
   renderTab();
-  const saved = await loadAutosave();
-  if (saved && saved.settings) {
-    await applyProject(saved);
-  } else {
-    changed('shape');
+  try {
+    const saved = await loadAutosave();
+    if (saved && saved.settings) {
+      await applyProject(saved);
+      return;
+    }
+  } catch (err) {
+    console.error(err);
+    app.settings = defaultSettings(); app.images = {};
+    toast('Your last session could not be restored, so the app started fresh.', 'err');
   }
+  changed('shape'); renderTab();
 })();
 
 // Debug handles for testing in the console
