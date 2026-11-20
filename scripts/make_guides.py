@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.2: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.3: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -319,8 +319,10 @@ def app_guide(path):
          'down to the picture', '+2 mm (5.0 mm), 6 mm wide'],
         ['Flat panel with the light box', 'Even glow: thinner higher up, farther from the LED strip', 'Strength 50%'],
     ], [1.75 * inch, 3.75 * inch, 1.5 * inch]))
-    s.append(P('On a flat panel the front is smooth and the picture and frame are on the back. Its edge is as thick as '
-               'the frame.', SMALL))
+    s.append(P('"Picture detail on the" (Shape tab) changes which side is bumpy, never the thickness: the light and '
+               'dark come out the same. Inside (the default) keeps a ball smooth outside; Outside presses the picture '
+               'into the outer surface. On a flat panel the default puts the picture and frame on the back; Front puts '
+               'them on the front with a flat back. A panel\'s edge is as thick as the frame.', SMALL))
 
     s.append(P('Photo tab', H2))
     s.append(P('Photos on the ball', H3))
@@ -399,6 +401,10 @@ def app_guide(path):
          'least 0.8 mm with a 0.4 mm nozzle (two printed lines).', '0.4 to 2.0 mm<br/>Default 0.8'],
         ['Thickest (darkest)', 'Thickness used for pure black.', 'Higher = darker shadows. Past about 3 mm in white PLA '
          'little light gets through.', '1.5 to 5.0 mm<br/>Default 3.0'],
+        ['Picture detail on the', 'Inside or Outside (balls, cube); Back or Front (panel). Outside / Front puts the '
+         'bumpy side toward you, which usually looks crisper when lit; the ball is then textured to the touch. The '
+         'collar, and a cube\'s top face (it prints on the bed), keep their detail inside.',
+         'None: same thickness either way.', 'Inside (Back)'],
         ['Opening, collar height, collar wall', 'The hole the light shines through and the collar that drops into the '
          'base.', 'Collar wall also sets the plain band above the opening.', '50 mm, 5 mm, 2 mm'],
         ['Football: tip shape', 'From a smooth oval to pointed.', 'None (shape only).', 'Default 60%'],
@@ -412,7 +418,7 @@ def app_guide(path):
          'Rectangle, matching the photo'],
         ['Flat panel: curve', 'Bends the panel side to side; its edges come toward you.', 'None (shape only).',
          'Flat (0 to 120 degrees)'],
-        ['Flat panel: frame, feet', 'Raised frame on the back; feet on the bottom edge to stand without a base.',
+        ['Flat panel: frame, feet', 'Raised frame (on the picture side); feet on the bottom edge to stand without a base.',
          'The frame is the thickest part.', 'Frame on, 6 mm; feet off'],
     ], [1.35 * inch, 2.3 * inch, 2.15 * inch, 1.2 * inch]))
     s.append(Spacer(1, 4))
@@ -491,8 +497,8 @@ def app_guide(path):
         '<b>Print settings matter as much as these sliders.</b> See the companion Printer Settings guide.',
     ])
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.2 - Settings Guide'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.2 - Settings Guide'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.3 - Settings Guide'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.3 - Settings Guide'))
 
 
 # ---------------------------------------------------------------- document 2
@@ -502,7 +508,7 @@ def printer_guide(path):
                             title='Lithophane Lamp - Printer Settings')
     s = []
     s.append(P('Printer Settings for Lithophane Lamps', H1))
-    s.append(P('For Lithophane Lamp Creator 1.2: slicer settings for the lamp and the base, and what each one changes. '
+    s.append(P('For Lithophane Lamp Creator 1.3: slicer settings for the lamp and the base, and what each one changes. '
                'Names match Bambu Studio and OrcaSlicer; other slicers use similar names.', SUB))
 
     s.append(P('Why the slicer matters', H2))
@@ -606,8 +612,8 @@ def printer_guide(path):
     s.append(P('Tip: to test settings quickly, export a Small lamp with the picture shrunk to fit. It prints much faster '
                'and shows the same problems.', SMALL))
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.2 - Printer Settings'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.2 - Printer Settings'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.3 - Printer Settings'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.3 - Printer Settings'))
 
 
 if __name__ == '__main__':

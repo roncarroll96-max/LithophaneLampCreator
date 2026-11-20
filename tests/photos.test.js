@@ -104,5 +104,5 @@ test('projects saved before 1.2 at the old 30% line fade now hide the lines; a c
   assert.equal(mergeSettings({ version: 1, markings: { fade: 0.6 } }).markings.fade, 0.6);
   assert.equal(mergeSettings({ version: 2, markings: { fade: 0.3 } }).markings.fade, 0.3);
   assert.equal(mergeSettings({ markings: {} }).markings.fade, 1);
-  assert.equal(mergeSettings({ version: 1 }).version, 2);
+  assert.equal(mergeSettings({ version: 1 }).version, 3);
 });

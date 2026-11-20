@@ -29,7 +29,7 @@ export const DETAIL_PRESETS = {
 
 export function defaultSettings() {
   return {
-    version: 2,               // 2 (app 1.2): markings hidden under photos by default
+    version: 3,               // 2 (app 1.2): markings hidden under photos by default; 3 (app 1.3): reliefSide
     shape: 'basketball',
     sizePreset: 'M',
     diameter: 150,
@@ -37,6 +37,7 @@ export function defaultSettings() {
     footballWidth: 150,
     footballTip: 0.6,         // 0 = smooth oval .. 1 = most pointed (still printable)
     footballStripes: true,    // bright end stripes
+    reliefSide: 'inside',     // picture relief: 'inside' (smooth outside; a panel's back) | 'outside' (a panel's front)
     tMin: 0.8,
     tMax: 3.0,
     opening: { diameter: 50, collarHeight: 5, collarWall: 2.0 },
@@ -200,6 +201,9 @@ export function mergeSettings(saved) {
   // Before version 2 the lines showed through photos (fade 30%). Projects still at that old
   // default now hide them, as asked (2026-11-19); a fade someone chose themselves is kept.
   if (!(saved.version >= 2) && d.markings.fade === 0.3) d.markings.fade = 1;
-  d.version = 2;
+  // A 0.2.0 project may still say 'outside' from the option that was removed in 0.2.1
+  if (!(saved.version >= 3)) d.reliefSide = 'inside';
+  if (d.reliefSide !== 'outside') d.reliefSide = 'inside';
+  d.version = 3;
   return d;
 }

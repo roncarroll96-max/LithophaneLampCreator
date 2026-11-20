@@ -166,14 +166,15 @@ function update(quick) {
       : createField(s, app.shape, processedMap(), app.textMasks, ensureMoon());
     // A Moon-only lamp needs no photo, so don't cover it with the "choose a photo" card
     $('emptyState').classList.toggle('hidden', hasPhotos() || (isMoonShape() && s.moon.mode !== 'photo'));
-    // The 3D surface only changes with the shape or raised parts (tone, photos and carved text
-    // change just the glow picture on it); a quick coarse surface gets its sharp one when idle
-    const raised = app.field.hasRaised;
-    if (shapeChanged || raised || app._wasRaised !== raised || (!quick && !app._geomFine)) {
+    // The 3D surface only changes with the shape, raised parts or picture detail on the outside
+    // (otherwise tone, photos and carved text change just the glow picture on it); a quick coarse
+    // surface gets its sharp one when idle
+    const bumpy = app.field.hasRaised || !!app.field.reliefOutside;
+    if (shapeChanged || bumpy || app._wasBumpy !== bumpy || (!quick && !app._geomFine)) {
       preview.updateGeometry(app.field, !quick);
       app._geomFine = !quick;
     }
-    app._wasRaised = raised;
+    app._wasBumpy = bumpy;
     updateThicknessLegend();
     if (quick) preview.updateTexture(app.field, s, 560, 280); // fast while dragging; sharp pass follows
     else preview.updateTexture(app.field, s, 1600, 800);
@@ -706,14 +707,37 @@ function panelSections() {
       slider('panel.curve', 'Curve (side to side)', 0, 120, 1, { fmt: (v) => (+v < 0.5 ? 'Flat' : `${Math.round(v)}°`), group: 'shape' }),
       note('A curved panel stands on its own and spreads the light more evenly. Its left and right edges come toward you.')),
     section('Frame and feet',
-      checkbox('panel.frame', 'Raised frame round the edge (on the back)', 'shape', () => renderTab()),
+      checkbox('panel.frame', `Raised frame round the edge (on the ${s.reliefSide === 'outside' ? 'front' : 'back'})`, 'shape', () => renderTab()),
       pn.frame ? [
         slider('panel.frameWidth', 'Frame width', 2, 20, 0.5, { fmt: mm }),
         slider('panel.frameExtra', 'Frame thickness (above Thickest)', 0.5, 4, 0.1, { fmt: (v) => `+${(+v).toFixed(1)} mm (${(s.tMax + +v).toFixed(1)} mm)` }),
       ] : null,
       checkbox('panel.feet', 'Feet on the bottom edge (to stand without a base)', 'field', () => renderTab()),
       pn.feet && s.base.panelKind !== 'none' ? note('Turn the feet off if the panel goes into a base (Base tab): they won\'t fit the slot.', 'warn') : null,
-      note('The front stays smooth; the picture and the frame are on the back. It prints standing up on its bottom edge.')),
+      note('It prints standing up on its bottom edge.')),
+  ];
+}
+
+/** Which side the picture detail goes on (balls and cubes: inside or outside; panels: back or front). */
+function reliefSideControl() {
+  const s = app.settings, out = s.reliefSide === 'outside';
+  const panel = isPanel();
+  return [
+    el('div', { class: 'ctl' }, el('label', {}, 'Picture detail on the')),
+    segmented('reliefSide', panel
+      ? [{ value: 'inside', label: 'Back', title: 'Smooth front; the picture and frame are on the back' },
+        { value: 'outside', label: 'Front', title: 'The picture detail faces you; flat back' }]
+      : [{ value: 'inside', label: 'Inside', title: 'Smooth outside, like a real ball' },
+        { value: 'outside', label: 'Outside', title: 'The picture detail faces you; the outside is textured' }],
+    'field', () => renderTab()),
+    note(panel
+      ? (out
+        ? 'Front: the picture (and the frame) face you, which usually looks crisper when lit. The back is flat. Stands and light boxes still fit.'
+        : 'Back: the front stays smooth; the picture and the frame are on the back.')
+      : (out
+        ? 'Outside: the picture detail faces you, which usually looks crisper when lit, but the outside is no longer smooth to the touch. The collar is unchanged, so bases still fit.'
+          + (isCube() ? ' The top face keeps its detail inside, because the cube prints top face down and that face must stay flat.' : '')
+        : 'Inside: the outside stays smooth like a real ball.')),
   ];
 }
 
@@ -765,7 +789,8 @@ function ballTab() {
     slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
     // The cube's edge rounding can't be tighter than the thickest wall, so tMax reshapes it
     slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() ? 'shape' : 'field' }),
-    note('Typical white PLA: 0.8 mm to 3.0 mm.'));
+    note('Typical white PLA: 0.8 mm to 3.0 mm.'),
+    reliefSideControl());
   if (isPanel()) return [section('Shape', shapeSel), ...panelSections(), wall];
   return [
     section('Shape', shapeSel),
@@ -914,10 +939,10 @@ function textTab() {
       segmented(`${p}.style`, [
         { value: 'carved', label: 'Carved (dark)', title: 'Thicker plastic: glows dark, outside stays smooth' },
         { value: 'bright', label: 'Bright', title: 'Thinner plastic: glows lighter than around it' },
-        // A panel's front stays smooth, so raised text isn't offered there (it prints as carved)
+        // Raised text isn't offered on a panel (it prints as carved)
         isPanel() ? null : { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
       ].filter(Boolean), 'field', () => renderTab()),
-      isPanel() && it.style === 'raised' ? note('A panel\'s front stays smooth, so raised text prints as carved.', 'warn') : null,
+      isPanel() && it.style === 'raised' ? note('On a panel, raised text prints as carved.', 'warn') : null,
       !isPanel() && it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
       slider(`${p}.size`, 'Letter height', 4, 60, 0.5, { fmt: mm }),
       it.size < font.minSize ? note(`Letters under ${font.minSize} mm may not print cleanly in this font.`, 'warn') : null,
@@ -1108,7 +1133,9 @@ function exportTab() {
   const fit = app.lastExport ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
 
   const raised = app.field ? app.field.hasRaised : s.markings.style === 'raised' && SHAPES[s.shape]?.markings !== 'none';
-  const estBytes = (d) => stlBytes(estimateTriangles(app.shape, d.step, raised ? d.step : OUTER_STEP));
+  // The picture side gets the fine spacing (the outside for outside detail, a panel's front)
+  const outside = app.field ? !!app.field.reliefOutside : s.reliefSide === 'outside';
+  const estBytes = (d) => stlBytes(estimateTriangles(app.shape, outside ? OUTER_STEP : d.step, raised || outside ? d.step : OUTER_STEP));
   const opts = Object.entries(DETAIL_PRESETS).map(([k, d]) => {
     const sizeText = app.shape ? `≈ ${(estBytes(d) / 1e6).toFixed(0)} MB` : '';
     const radio = el('input', { type: 'radio', name: 'detail', value: k });

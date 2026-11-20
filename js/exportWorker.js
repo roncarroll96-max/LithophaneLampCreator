@@ -52,13 +52,22 @@ self.onmessage = (e) => {
       // The panel stands on its bottom edge, as exported
       const panel = buildPanel(settings);
       const field = createPanelField(settings, panel, photos || null, textMasks || null);
-      mesh = buildPanelMesh({ panel, field, stepInner, stepOuter, feet: panelFeet(settings, panel), onProgress });
+      // stepInner is the fine (detail) spacing; the picture side gets it, the flat side the coarse one
+      const front = field.reliefOutside ? stepInner : stepOuter, back = field.reliefOutside ? stepOuter : stepInner;
+      mesh = buildPanelMesh({ panel, field, stepInner: back, stepOuter: front, feet: panelFeet(settings, panel), onProgress });
       label = `Lithophane panel ${panel.outline} ${Math.round(panel.W)}x${Math.round(panel.H)}mm`;
     } else {
       const collar = collarDims(settings);
       const shape = buildEllipsoidShape(bodyAxes(settings), collar.ro);
       const field = createField(settings, shape, photos || null, textMasks || null, moon || null);
-      mesh = buildShellMesh({ shape, field, stepInner, stepOuter: field.hasRaised ? stepInner : stepOuter, collar, onProgress });
+      // stepInner is the fine (detail) spacing, stepOuter the coarse one for smooth surfaces;
+      // the picture relief (and raised parts) need the fine one on whichever side they are
+      const out = field.reliefOutside;
+      mesh = buildShellMesh({
+        shape, field, collar, onProgress,
+        stepInner: out ? stepOuter : stepInner,
+        stepOuter: field.hasRaised || out ? stepInner : stepOuter,
+      });
       if (shape.kind === 'cube') flipUpsideDown(mesh); // prints with its top face on the bed
       const ax = bodyAxes(settings);
       label = `Lithophane ${settings.shape} ${Math.round(ax.a * 2)}x${Math.round(ax.b * 2)}x${Math.round(ax.c * 2)}mm`;

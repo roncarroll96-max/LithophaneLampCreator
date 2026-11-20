@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -19,6 +19,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 1.0 | Phone and tablet polish, final check against this spec (done) |
 | 1.1 | Flat panel (feature 12b): square, rectangle, circle, heart; curve; frame; light-box base, slot stand and feet |
 | 1.2 | Speed: faster tone sliders and Base tab, lighter big-base and Fine exports, 3D view pauses when idle (from the 1.0.3 review) (done) |
+| 1.3 | "Picture detail on the" choice is back: inside or outside for balls and cubes, back or front for panels (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -74,7 +75,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
     - **Sizes**: rectangles 4×6, 5×7 and 8×10 inch; squares, circles and hearts 4, 6 and 8 inch; all with custom width and height. Sizes show both units, e.g. "5×7 in (127×178 mm)". A rectangle starts in the photo's own shape and orientation (portrait or landscape) so nothing is cropped; typing a size or picking a print size overrides it, and zoom and pan pick what shows.
     - **Curve slider**: starts flat; sliding it bends the panel side to side, like a section of a tall cylinder (left and right edges come toward you). Works for every shape.
     - **Raised frame** round the edge, following the shape (round for circles, heart-shaped for hearts): adjustable width, can be turned off. It makes the panel stiffer and hides the photo's edge.
-    - **Front smooth, picture relief on the back**, the same rule as the lamps (smooth outside, relief inside). The frame stands out on the back too, so the front lies flat against a window or frame.
+    - **Front smooth, picture relief on the back** by default, the same rule as the lamps (smooth outside, relief inside). The frame stands out on the back too, so the front lies flat against a window or frame. Since 1.3 a "Picture detail on the: Back / Front" choice puts the picture and the frame on the front instead, with a flat back.
     - **Photos**: one photo fills the panel; up to 6 photos make a collage with soft edges, using the same multi-photo tools as the lamps. Tone, cut-out background, zoom, pan and drag work as on the lamps.
     - **Text**: names, dates or captions, placed by clicking on the panel.
     - **No markings** (the Markings tab says markings are for the ball shapes).
@@ -157,7 +158,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 
 ## Rules and edge cases
 - **Light vs. thickness:** brighter photo pixels = thinner plastic (min thickness); darker = thicker (max thickness). Defaults are 0.8 mm min, 3.0 mm max *(assumed)*.
-- **Photo relief is on the inside** of the shell, so the outside stays smooth like a real ball. Only "raised" markings and text stick out *(assumed)*.
+- **Photo relief is on the inside** of the shell by default, so the outside stays smooth like a real ball. Only "raised" markings and text stick out *(assumed)*. Since 1.3 "Picture detail on the: Outside" presses the picture into the outer surface instead (same wall thickness, smooth inside). The collar band stays as it was, and a cube's top face keeps its detail inside because it prints face down on the bed.
 - **Carved markings and text** use max thickness (or a set darkness) so they show dark when lit, layered over the photo.
 - **Opening and collar** are kept clear of photo relief and markings so the ball seats cleanly.
 - **Cube printing:** one piece printed upside down (top face on the bed), no supports. Thicknesses on the top face are built from flat layers, so very fine shading there is limited by layer height.
@@ -246,7 +247,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Opening / collar | 50 mm opening, 5 mm collar | You |
 | Printing | White PLA, 0.4 mm nozzle, opening-down | Assumed (you accepted defaults) |
 | Thickness | 0.8 mm min, 3.0 mm max | Assumed (you accepted defaults) |
-| Relief side | Photo relief always on the inside, smooth outside. An "outside" option was tried in 0.2.0 and removed in 0.2.1: it has no good use for these lamps | You (2026-11-18) |
+| Relief side | Inside (smooth outside) by default; an "Outside" choice is offered again since 1.3. It was tried in 0.2.0 and removed in 0.2.1, then brought back after you saw how crisp a print looks with the detail facing you | You (2026-11-18, changed 2026-11-19) |
 | Collar wall | 2 mm (opening 50 mm inside, 54 mm outside) | Assumed (Claude's default) |
 | Plain band above collar | First 4 mm of the ball above the collar kept plain (no photo or lines), blending in over 6 mm | Assumed (Claude's default) |
 | Carved line darkness | Lines go up to 0.4 mm past the thickest setting so they show over dark photo areas | Assumed (Claude's default) |
@@ -268,7 +269,8 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | LED strip | Designed for a common 10 mm USB strip; width adjustable | You accepted Claude's suggestion (2026-11-19) |
 | Units | Inch print sizes shown with mm next to them | You accepted Claude's suggestion (2026-11-19) |
 | Version order | Flat panel is 1.1; speed work becomes 1.2 | You (2026-11-19) |
-| Panel relief side | Front smooth, relief and frame on the back | Assumed (Claude's default, same rule as the lamps) |
+| Panel relief side | Back by default (smooth front); "Front" offered since 1.3, which moves the frame to the front too and keeps the back flat | You (2026-11-19) |
+| Cube top face with outside detail | Keeps its detail inside, so the face that prints on the bed stays flat | Assumed (Claude's default) |
 | Panel print direction | Upright on its bottom edge; circles and hearts get a small flat; brim suggested | Assumed (Claude's default) |
 | Panel feet | Optional, off by default | Assumed (Claude's default) |
 | Panel even glow | On by default with the light box | Assumed (Claude's default) |
@@ -312,6 +314,15 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 1.3: picture detail on the outside or front, done (2026-11-19)
+Brought back at your request, after a print looked crisper seen from the side the detail is on:
+- **Balls and cubes**: Shape tab, Wall thickness, "Picture detail on the: Inside / Outside". Outside presses the picture into the outer surface; the inner surface is smooth (Thickest + 0.4 mm in); the wall thickness at every spot, and so the lit picture, is the same as Inside. Raised markings and text sit on top. The collar band is unchanged, so bases fit as before. A cube's top face keeps its detail inside, because the cube prints top face down and that face must stay flat on the bed.
+- **Panels**: "Picture detail on the: Back / Front". Front puts the picture and the frame on the front and leaves the back flat. With a frame the edge sits exactly where it did, so stands and light boxes fit as before; without one the edge sits at the back of the slot.
+- The fine detail spacing goes on whichever side has the picture, so file sizes stay about the same; the Export tab's size estimate follows.
+- Projects saved before 1.3 open with the detail inside.
+
+Checks passed: 78 automated tests (5 new: an outside-detail ball is watertight with or without raised lines, its collar edge is unchanged, the wall thickness is the same as inside detail, the inside is a smooth sphere and nothing goes past the ball size; an outside-detail cube is watertight, its sides are pressed in and its top face still lies flat on the bed; a front-picture panel, curved heart with and without a frame, is watertight with a flat back, the same thickness and, with a frame, the same edge; old projects open with the detail inside). In the browser: the ball's Plain view shows the picture pressed into the outside, the panel shows the picture and frame on the front, and Draft exports of a 200 mm basketball (61.9 MB, estimate 62 MB) and a curved 5×7 panel (16.8 MB, estimate 17 MB) came back closed with no bad edges.
 
 ### Version 1.2: speed, done (2026-11-19)
 Faster and lighter, with the same results (no change to any STL the app makes):

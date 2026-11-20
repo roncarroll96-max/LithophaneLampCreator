@@ -26,7 +26,9 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    The **Thickness** button above the preview shows the walls as a grey map; point at the ball to read the thickness in mm.
 3. **Shape** tab: shape (basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon or cube),
    size (Small 100 / Medium 150 / Large 200 mm; footballs 160 × 100 / 240 × 150 / 280 × 175 mm),
-   wall thickness, opening and collar. For the football: tip shape, from oval to pointed.
+   wall thickness, opening and collar. "Picture detail on the" puts the picture's bumps inside (smooth ball, the
+   default) or outside (facing you, often crisper when lit); on a panel, back or front.
+   For the football: tip shape, from oval to pointed.
    For the Moon: Moon only or Photo + Moon, crater depth, and turning the Moon.
    For the cube (5 photos): size, edge rounding, photo border, "Fit photos to faces", even glow.
    The cube STL comes out upside down, top face on the bed, ready to print without supports.

@@ -2,8 +2,10 @@
 // thick the plastic is. Shares the lamps' photo blending and text masks, adds the raised frame
 // and the light box's even glow. The preview and the STL export both use it.
 //
-// Brighter photo pixel -> thinner plastic -> more light gets through. The front stays smooth;
-// the relief and the frame are on the back.
+// Brighter photo pixel -> thinner plastic -> more light gets through. By default the front stays
+// smooth and the relief and the frame are on the back. With reliefSide 'outside' it is the other
+// way round: the back is flat and the picture (and the frame) face the front. The edge then sits
+// in the same place as before when there is a frame, so the stand's slot still fits.
 
 import { preparePhotoLayer, blendLayers, LINE_EXTRA } from './field.js';
 import { createPanelTextLayer } from './textLayer.js';
@@ -29,6 +31,8 @@ export function createPanelField(settings, panel, photos, textMasks = null) {
   const { tMin, tMax } = settings;
   const pp = { ...defaultPanelSettings(), ...(settings.panel || {}) };
   const surround = settings.photo?.surround ?? 0.55;
+  const reliefFront = settings.reliefSide === 'outside';
+  const tRef = panelEdgeThickness(settings); // the thickest the panel gets (frame or carved text)
 
   // ---- Photos: a window on the panel; "fill" (no width set) covers the whole panel
   const layers = (settings.photos || [])
@@ -107,10 +111,13 @@ export function createPanelField(settings, panel, photos, textMasks = null) {
 
     out.t = t; out.raise = 0; out.mask = pr.mask; out.photoId = pr.photoId; out.light = light;
     out.u = u; out.v = v;
-    out.x = out.sx = S.x; out.y = out.sy = S.y; out.z = out.sz = S.z;
-    out.ix = S.x - S.nx * t; out.iy = S.y - S.ny * t; out.iz = S.z - S.nz * t;
+    out.sx = S.x; out.sy = S.y; out.sz = S.z;
+    // Picture on the front: the back is a flat sheet tRef behind the front, the front sinks in
+    const sink = reliefFront ? Math.max(0, tRef - t) : 0, back = t + sink;
+    out.x = S.x - S.nx * sink; out.y = S.y - S.ny * sink; out.z = S.z - S.nz * sink;
+    out.ix = S.x - S.nx * back; out.iy = S.y - S.ny * back; out.iz = S.z - S.nz * back;
     return out;
   }
 
-  return { eval: evalAt, layers: layers.map((L) => ({ id: L.id, W: L.W, H: L.H })), hasRaised: false, tMount: tF };
+  return { eval: evalAt, layers: layers.map((L) => ({ id: L.id, W: L.W, H: L.H })), hasRaised: false, tMount: tF, reliefOutside: reliefFront };
 }
