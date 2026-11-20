@@ -197,3 +197,26 @@ test('every top style has a sensible height', () => {
   const g3 = lanternGeometry(lantern({ top: 'lid', topH: 5 }));
   assert.ok(g3.top.hRing >= g3.top.hF);
 });
+
+test('the base can hold the puck in a tray: closed floor, a rim round the puck, a gap for the cord', () => {
+  const s = lantern(); s.base.puckHold = 'tray';
+  const g = lanternGeometry(s), base = baseSdf(g);
+  assert.ok(g.tray && g.puckZ === 2);
+  const r = Math.min(g.puckR, g.inner - 2.5);
+  assert.ok(base(0, 0, 1) < 0, 'closed floor under the puck');
+  assert.ok(base(0, 0, 3) > 0, 'room for the puck above the floor');
+  assert.ok(base(r + 1, 0, 2 + g.trayRim / 2) < 0, 'rim round the puck (side)');
+  assert.ok(base(0, -(r + 1), 2 + g.trayRim / 2) < 0, 'rim round the puck (front)');
+  assert.ok(base(0, r + 1, 2 + g.trayRim / 2) > 0, 'gap in the rim at the back for the cord');
+  assert.ok(base(0, r + 1, 1) < 0, 'the gap leaves the floor whole');
+  // The hole version is still open under the puck
+  const h = baseSdf(lanternGeometry(lantern()));
+  assert.ok(h(0, 0, 1) > 0);
+  // Closed and printable
+  const p = lanternPart(s, 'base');
+  const m = meshSdf(p.sdf, p.bounds, 0.5);
+  assert.ok(checkWatertight(m.indices, m.positions.length / 3).ok);
+  assert.ok(overhangArea(m, g.cableH + 1) < 200);
+  // The puck sits 2 mm higher, so the light is a little higher too
+  assert.ok(lanternLight(g, 0, -g.H / 2) !== lanternLight(lanternGeometry(lantern()), 0, -g.H / 2));
+});

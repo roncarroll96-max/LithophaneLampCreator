@@ -21,6 +21,7 @@ export function defaultBaseSettings() {
   return {
     light: 'puck',     // 'puck' | 'strip' | 'bulb'
     puckD: 70, puckH: 20, // LED puck size, mm
+    puckHold: 'hole',  // lantern only: 'hole' (the puck stands on the table) | 'tray' (closed floor with a rim)
     socket: 'E12',     // bulb socket type
     riserD: 30,        // strip riser outside diameter, mm
     riserH: 0,         // strip riser height above the base top, mm; 0 = up to the middle of the lamp

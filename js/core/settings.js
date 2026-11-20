@@ -83,7 +83,7 @@ export function defaultSettings() {
     panel: defaultPanelSettings(), // flat panel (see core/panel.js)
     lantern: defaultLanternSettings(), // lantern (see core/lantern.js)
     base: {
-      light: 'puck', puckD: 70, puckH: 20, socket: 'E12', riserD: 30, riserH: 0,
+      light: 'puck', puckD: 70, puckH: 20, puckHold: 'hole', socket: 'E12', riserD: 30, riserH: 0,
       clearance: 0.4, shape: 'auto', extra: 0, cableW: 10, cableH: 8,
       panelKind: 'lightbox', stripW: 10, // flat panel: 'lightbox' | 'stand' | 'none'; LED strip width (mm)
     },                        // the lamp or panel base (see core/base.js)

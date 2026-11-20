@@ -479,8 +479,8 @@ def app_guide(path):
          'shines up its back (set the strip width; even glow on/off). <b>Slot stand</b>: just the slot. <b>None</b>: '
          'feet, a window or a frame.'],
         ['Flat panel: slot fit', 'Extra room in the slot (default 0.4 mm). The app shows the slot width.'],
-        ['Lantern: light', 'Your puck\'s diameter and height (it sits on the table in a hole in the base\'s floor; lift '
-         'the lantern off to switch it on), the cable notch width, and even glow on/off and strength.'],
+        ['Lantern: light', 'Your puck\'s diameter and height (it stands on the table in a hole in the base\'s floor, or sits '
+         'in a tray: a closed floor with a rim round it and a gap for the cord; lift the lantern off to switch it on), the cable notch width, and even glow on/off and strength.'],
     ], [1.6 * inch, 5.4 * inch]))
 
     s.append(P('Export tab', H2))

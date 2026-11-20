@@ -1187,7 +1187,13 @@ function lanternBaseTab() {
     section('Light: LED puck',
       numberInput('base.puckD', 'Puck diameter (mm)', 30, 160),
       numberInput('base.puckH', 'Puck height (mm)', 5, 60),
-      note('Measure your puck with calipers. It sits on the table in the round hole in the base\'s floor, so you lift the lantern off to switch it on or change its batteries.'),
+      segmented('base.puckHold', [
+        { value: 'hole', label: 'Hole in the floor', title: 'A round hole in the base\'s floor; the puck stands on the table' },
+        { value: 'tray', label: 'Tray', title: 'A closed floor with a low rim round the puck and a gap for the cord' },
+      ], undefined, () => renderTab()),
+      geo.tray
+        ? note(`Measure your puck with calipers. It sits in a tray on the base's closed floor: a ${geo.trayRim} mm rim keeps it in the middle, with a gap at the back for the cord. Lift the lantern off to switch it on or change its batteries.`)
+        : note('Measure your puck with calipers. It sits on the table in the round hole in the base\'s floor, so you lift the lantern off to switch it on or change its batteries.'),
       geo.puckFits ? null : note(`This puck is too wide for the lantern (the inside is ${Math.round(2 * geo.inner)} mm across). Use a smaller puck or bigger panels.`, 'warn'),
       slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }),
       note('A USB puck\'s cable leaves through the notch at the back of the base.'),

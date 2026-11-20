@@ -93,6 +93,11 @@ export function lanternGeometry(settings) {
   const puckD = settings.base?.puckD ?? 70, puckH = settings.base?.puckH ?? 20;
   const puckR = puckD / 2 + 1;
   const puckFits = puckR <= inner - 2;
+  // Puck holder: a round hole in the floor (the puck stands on the table) or a tray (a closed floor
+  // with a low rim round the puck and a gap in the rim for the cord)
+  const tray = settings.base?.puckHold === 'tray';
+  const trayFloor = 2, trayRim = Math.min(8, Math.max(3, Math.round(puckH * 0.4)));
+  const puckZ = tray ? trayFloor : 0;                  // where the puck's bottom sits
   const top = LANTERN_TOPS[L.top] ? L.top : 'classic';
   const hF = FRAME_H[top];
   const ov = clamp(L.overhang, 0, 30);
@@ -116,7 +121,7 @@ export function lanternGeometry(settings) {
   const reach = half + Math.max(FEET, t.ov) + 2;
   return {
     W, H, T, sw, slotFit, P, o, xe, c, Dm, Dout: Dm + T / 2, half, inner, insert, hB, zG, zT, pillarL,
-    peg, pegFit, puckD, puckH, puckR, puckFits, top: t, reach,
+    peg, pegFit, puckD, puckH, puckR, puckFits, tray, trayFloor, trayRim, puckZ, top: t, reach,
     totalHeight: zT + t.height, width: 2 * reach - 4,
     cableW: settings.base?.cableW ?? 10, cableH: settings.base?.cableH ?? 8,
   };
@@ -134,7 +139,7 @@ export function sideOf(W, u) {
 export function lanternLight(geo, ul, v) {
   // The puck's top shines up from the middle of the lantern; a panel catches light best head-on
   const irr = (x, vv) => {
-    const dz = geo.zG + geo.H / 2 + vv - geo.puckH;
+    const dz = geo.zG + geo.H / 2 + vv - geo.puckH - (geo.puckZ ?? 0);
     const d2 = geo.Dm * geo.Dm + x * x + dz * dz, d = Math.sqrt(d2);
     const emit = 0.35 + 0.65 * Math.max(0, dz / d); // a puck's diffuser also lights sideways
     return (emit * (geo.Dm / d)) / d2;
@@ -263,8 +268,17 @@ export function baseSdf(geo) {
   const { half, inner, P, hB, zG } = geo;
   const ring = subtract(box(-half, half, -half, half, 0, hB), box(-inner, inner, -inner, inner, -1, hB + 1));
   const feet = atCorners(geo, box(-P / 2 - FEET, P / 2 + FEET, -P / 2 - FEET, P / 2 + FEET, 0, hB - 3));
-  const floor = subtract(box(-inner - 0.5, inner + 0.5, -inner - 0.5, inner + 0.5, 0, 2),
-    cylinder(Math.min(geo.puckR, inner - 3), -1, 3));
+  const floorSlab = box(-inner - 0.5, inner + 0.5, -inner - 0.5, inner + 0.5, 0, 2);
+  let floor;
+  if (geo.tray) {
+    // A closed floor with a rim round the puck; the rim has a gap at the back for the cord
+    const r = Math.min(geo.puckR, inner - 2.5), zr = geo.trayFloor + geo.trayRim;
+    const rim = subtract(cylinder(r + 2, 1.5, zr), cylinder(r, 1, zr + 1),
+      box(-geo.cableW / 2, geo.cableW / 2, 0, r + 3, 1, zr + 1));
+    floor = union(floorSlab, rim);
+  } else {
+    floor = subtract(floorSlab, cylinder(Math.min(geo.puckR, inner - 3), -1, 3));
+  }
   const notch = box(-geo.cableW / 2, geo.cableW / 2, inner - 1, half + FEET + 2, -1, geo.cableH);
   const body = subtract(union(ring, floor, ...feet), notch, ...allSides(groove(geo, zG, hB + 1)));
   return union(body, ...atCorners(geo, pegSolid(geo, -0.5, geo.peg.len, true), hB));

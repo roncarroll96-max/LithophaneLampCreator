@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20 · Version 1.4.2 (puck tray in the lantern base) 2026-11-20_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -22,6 +22,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 1.3 | "Picture detail on the" choice is back: inside or outside for balls and cubes, back or front for panels (done) |
 | 1.4 | Lantern (feature 12c): 4 flat panels in a frame of pillars, a base with a puck light, and a choice of 3 tops (done) |
 | 1.4.1 | Light colour in the Lit view: white, warm white, yellow or amber (done) |
+| 1.4.2 | Lantern base: the puck can sit in a tray (closed floor, rim, gap for the cord) instead of a hole (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -95,7 +96,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
     - **Even glow** (from the cube and light box): the puck sits low in the middle, so the bottoms of the panels are nearest the light. The app makes the plastic thinner higher up to even it out. On by default at 50%, with a strength slider.
     - **Frame parts** (separate files, printed in any colour; a dark colour looks like your photo):
       - **Pillar** (one file, print 4): square, with a slot down two neighbouring faces at a right angle, so two panels meet at each corner. The slots stop short of each other, so the pillar stays one piece, and each panel edge goes about 6 mm in (never less than 4 mm: very thick panels get thicker pillars). A peg hole in its foot and a peg on its head (as built: a peg on the foot would leave the pillar standing on its peg, which can't be printed). It prints standing up on its foot when it fits the printer, and lying on an outer face when it's too tall.
-      - **Base**: a frame round the bottom of the panels, with a groove each panel's bottom edge drops into and square pegs that stand up from its corners into the pillars' feet. Its corner blocks stand out a little past the pillars, like the feet in your photo. A thin floor on the table has a round hole for the **puck light** (70 × 20 mm until you measure yours; the Base tab has boxes for both): the puck sits on the table in the hole, so you lift the lantern off to switch it on or change its batteries. A notch at the back lets a USB cable out.
+      - **Base**: a frame round the bottom of the panels, with a groove each panel's bottom edge drops into and square pegs that stand up from its corners into the pillars' feet. Its corner blocks stand out a little past the pillars, like the feet in your photo. A thin floor on the table has a round hole for the **puck light** (70 × 20 mm until you measure yours; the Base tab has boxes for both): the puck sits on the table in the hole, so you lift the lantern off to switch it on or change its batteries. Or choose **Tray** (1.4.2): the floor is closed and a low rim (40% of the puck's height, 3 to 8 mm) holds the puck in the middle, with a gap at the back of the rim for the cord. A notch at the back lets a USB cable out.
       - **Top** (a choice of 3): **Like your photo**: a frame with crossed beams, short posts above the pillars, corner caps that stick out and an open lattice in the middle. **Pagoda roof**: a 45-degree four-sided roof whose eaves come down outside the frame, with vents in the frame under the eaves; a lower top leaves a square opening at the peak. **Simple lid**: a flat cap with a pattern of vent holes. Every top has holes for the pillar pegs and a groove that holds the panels' top edges. It lifts off.
     - **Putting it together**: push the pillars onto the base's pegs, slide the four panels down the slots into the base groove, then press the top onto the pillar pegs. Holds without glue and comes apart to swap panels; a drop of glue makes it permanent.
     - **Sizing**: everything follows the panel size and thickness. The slots and grooves are as wide as the panel (Thickest + 0.4 mm, so 3.4 mm by default) plus "Slot fit". A few sliders: **pillar thickness, base height, top height, top overhang, slot fit, peg fit.**
@@ -306,6 +307,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Lantern: print direction of frame parts | The app lays out each part to print without supports: pillars on their foot (or lying down when too tall), the base as it sits, the photo-style and pagoda tops as they sit (their overhangs are cut at 45 degrees), the lid upside down | Assumed (Claude's default) |
 | Lantern: base feet | The base's corner blocks stand 3 mm out past the pillars, like feet, instead of the pillars running through the base | Assumed (Claude's default, found while building: simpler and prints without supports) |
 | Lantern: puck | Sits on the table in a round hole in the base's floor, so the lantern lifts off it | Assumed (Claude's default) |
+| Lantern: puck tray | A choice on the Base tab: Hole in the floor (default, as before) or Tray (closed 2 mm floor, a rim 40% of the puck's height (3 to 8 mm) and 2 mm thick, 1 mm room round the puck, a gap in the rim at the back as wide as the cable notch) | You asked for the tray (2026-11-20); its sizes are Claude's |
 | Lantern: text | Placed round the lantern by clicking it; raised text prints as carved, as on a panel | Assumed (Claude's default) |
 | Panel print direction | Upright on its bottom edge; circles and hearts get a small flat; brim suggested | Assumed (Claude's default) |
 | Panel feet | Optional, off by default | Assumed (Claude's default) |
@@ -337,6 +339,11 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 9. A lantern with four 4×6 in panels: every part prints without supports and fits your printer. The pillars push into the base, the panels slide down the slots, and the top presses on and lifts off again. With the puck switched on, all four pictures glow clearly and evenly. Changing to 5×7 panels and the pagoda roof resizes everything, and it still fits together.
 
 ## Build progress
+
+### Version 1.4.2: puck tray in the lantern base, done (2026-11-20)
+Built: on the lantern's Base tab, "Hole in the floor" or "Tray". The tray has a closed floor with a low rim round the puck (using the puck size you enter) and a gap in the rim at the back for the cord, lined up with the cable notch. The even glow allows for the puck sitting 2 mm higher.
+
+Checks passed: 86 automated tests (1 new: closed floor under the puck, rim round it, gap at the back, floor whole under the gap, closed solid that prints without supports). In the browser: the choice switches and is kept after a reload, and the tray base exported at 127 × 127 × 30 mm.
 
 ### Version 1.4.1: light colour in the Lit view, done (2026-11-20)
 Built: four colour dots under the Lit / Plain / Thickness buttons (shown only in the Lit view) change the colour of the light: White, Warm white (new default), Yellow, Amber (the old colour). The ball, collar, glow ring and the pool of light on the floor all follow it. The choice is remembered in this browser; it changes only the preview, not the files.
