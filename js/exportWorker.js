@@ -1,122 +1,52 @@
-// Builds the STL in the background so the page stays responsive.
+// Builds the STL (or 3MF) in the background so the page stays responsive.
 // Message in:  { settings, photos: { [id]: { w, h, data, alpha? } }, textMasks | null, moon | null, stepInner, stepOuter }
 //   or { kind: 'base', settings }
 //   or { kind: 'lantern', part: 'panel' | 'pillar' | 'base' | 'top', side (0..3, for a panel), settings, photos, textMasks, stepInner, stepOuter }
+//   or { kind: '3mf', title, settings, photos, textMasks, moon, stepInner, stepOuter } (every part in one 3MF file)
 // Messages out: { type: 'progress', value } and { type: 'done', stl: [ArrayBuffer parts], stats } or { type: 'error', message }
+//   (for a 3MF, 'stl' holds the 3MF file's parts)
 
-import { buildEllipsoidShape } from './core/shapes.js';
-import { createField } from './core/field.js';
-import { buildShellMesh, diagonalFootprint, flipUpsideDown } from './core/mesh.js';
+import { diagonalFootprint } from './core/mesh.js';
 import { writeBinarySTLParts } from './core/stl.js';
-import { bodyAxes, collarDims, SHAPES } from './core/settings.js';
-import { buildPanel, panelFeet } from './core/panel.js';
-import { createPanelField } from './core/panelField.js';
-import { buildPanelMesh } from './core/panelMesh.js';
-import { buildBase } from './core/base.js';
-import { meshSdf, gridStep } from './core/sdf.js';
-import { lanternGeometry, buildLanternStrip, createLanternField, lanternSidePanel, lanternPart, LANTERN_SIDES } from './core/lantern.js';
+import { lampMesh, baseMesh, lanternMesh, build3MF } from './core/exportParts.js';
 
-const BASE_STEP = 0.45; // mm grid for the base mesh
-const BASE_MAX_CELLS = 2e8; // a bigger base gets a slightly coarser grid (seconds, not minutes)
+const progress = (v) => self.postMessage({ type: 'progress', value: v });
 
-/** Sends the finished STL (as parts, so no one huge block of memory is needed). */
+/** Sends the finished file (as parts, so no one huge block of memory is needed). */
 function sendDone(parts, stats) {
   stats.bytes = parts.reduce((n, p) => n + p.byteLength, 0);
-  self.postMessage({ type: 'progress', value: 1 });
-  self.postMessage({ type: 'done', stl: parts, stats }, parts);
+  progress(1);
+  const transfer = [...new Set(parts.map((p) => p.buffer || p))];
+  self.postMessage({ type: 'done', stl: parts, stats }, transfer);
 }
 
-const isPanel = (settings) => SHAPES[settings.shape]?.body === 'panel';
-const lampShape = (settings) => (isPanel(settings) ? buildPanel(settings) : buildEllipsoidShape(bodyAxes(settings), collarDims(settings).ro));
-
-function exportBase(settings) {
-  const shape = lampShape(settings);
-  const base = buildBase(settings, shape);
-  if (!base) throw new Error('No base is chosen for this panel.');
-  self.postMessage({ type: 'progress', value: 0.1 });
-  const mesh = meshSdf(base.sdf, base.bounds, gridStep(base.bounds, BASE_STEP, BASE_MAX_CELLS));
-  if (base.info.flip) flipUpsideDown(mesh); // puck and bulb bases print with the top on the bed
-  self.postMessage({ type: 'progress', value: 0.9 });
-  const parts = writeBinarySTLParts(mesh.positions, mesh.indices, base.info.panel ? `Panel ${base.info.light}` : `Lamp base ${base.info.light}`);
-  const size = mesh.bbox.max.map((v, i) => v - mesh.bbox.min[i]);
-  sendDone(parts, { triangles: mesh.triangles, size, diagonal: diagonalFootprint(mesh.positions), volumeCm3: mesh.volume / 1000 });
-}
-
-const FRAME_STEP = 0.4; // mm grid for the lantern's frame parts (pegs and slots need a fine fit)
-
-function exportLantern({ part, side, settings, photos, textMasks, stepInner, stepOuter }) {
-  const geo = lanternGeometry(settings);
-  let mesh, label;
-  if (part === 'panel') {
-    const strip = buildLanternStrip(settings, geo);
-    const field = createLanternField(settings, strip, photos || null, textMasks || null);
-    const panel = lanternSidePanel(settings, geo);
-    // The picture faces out (the front), so the front gets the fine spacing
-    mesh = buildPanelMesh({ panel, field: field.sideField(side, panel), stepInner: stepOuter, stepOuter: stepInner,
-      onProgress: (v) => self.postMessage({ type: 'progress', value: v * 0.9 }) });
-    label = `Lantern ${LANTERN_SIDES[side].toLowerCase()} panel ${Math.round(geo.W)}x${Math.round(geo.H)}mm`;
-  } else {
-    const p = lanternPart(settings, part, geo);
-    self.postMessage({ type: 'progress', value: 0.1 });
-    mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, FRAME_STEP, BASE_MAX_CELLS));
-    self.postMessage({ type: 'progress', value: 0.9 });
-    label = `Lantern ${part}`;
-  }
+/** Sends one mesh as an STL, with its size and plastic. */
+function sendStl({ mesh, label }) {
   const stats = {
     triangles: mesh.triangles, size: mesh.bbox.max.map((v, i) => v - mesh.bbox.min[i]),
     diagonal: diagonalFootprint(mesh.positions), volumeCm3: mesh.volume / 1000,
   };
   const parts = writeBinarySTLParts(mesh.positions, mesh.indices, label);
-  mesh = null;
   sendDone(parts, stats);
 }
 
-self.onmessage = (e) => {
-  const { settings, photos, textMasks, moon, stepInner, stepOuter } = e.data;
-  if (e.data.kind === 'lantern') {
-    try { exportLantern(e.data); } catch (err) { self.postMessage({ type: 'error', message: err.message || String(err) }); }
-    return;
-  }
-  if (e.data.kind === 'base') {
-    try { exportBase(settings); } catch (err) { self.postMessage({ type: 'error', message: err.message || String(err) }); }
-    return;
-  }
+self.onmessage = async (e) => {
+  const d = e.data;
   try {
-    const onProgress = (v) => self.postMessage({ type: 'progress', value: v * 0.9 });
-    let mesh, label;
-    if (isPanel(settings)) {
-      // The panel stands on its bottom edge, as exported
-      const panel = buildPanel(settings);
-      const field = createPanelField(settings, panel, photos || null, textMasks || null);
-      // stepInner is the fine (detail) spacing; the picture side gets it, the flat side the coarse one
-      const front = field.reliefOutside ? stepInner : stepOuter, back = field.reliefOutside ? stepOuter : stepInner;
-      mesh = buildPanelMesh({ panel, field, stepInner: back, stepOuter: front, feet: panelFeet(settings, panel), onProgress });
-      label = `Lithophane panel ${panel.outline} ${Math.round(panel.W)}x${Math.round(panel.H)}mm`;
+    if (d.kind === '3mf') {
+      const { parts, stats } = await build3MF(d, progress, d.title);
+      sendDone(parts, stats);
+    } else if (d.kind === 'lantern') {
+      sendStl(lanternMesh(d, d.part, d.side, (v) => progress(v * 0.9)));
+    } else if (d.kind === 'base') {
+      progress(0.1);
+      const b = baseMesh(d.settings);
+      if (!b) throw new Error('No base is chosen for this panel.');
+      progress(0.9);
+      sendStl(b);
     } else {
-      const collar = collarDims(settings);
-      const shape = buildEllipsoidShape(bodyAxes(settings), collar.ro);
-      const field = createField(settings, shape, photos || null, textMasks || null, moon || null);
-      // stepInner is the fine (detail) spacing, stepOuter the coarse one for smooth surfaces;
-      // the picture relief (and raised parts) need the fine one on whichever side they are
-      const out = field.reliefOutside;
-      mesh = buildShellMesh({
-        shape, field, collar, onProgress,
-        stepInner: out ? stepOuter : stepInner,
-        stepOuter: field.hasRaised || out ? stepInner : stepOuter,
-      });
-      if (shape.kind === 'cube') flipUpsideDown(mesh); // prints with its top face on the bed
-      const ax = bodyAxes(settings);
-      label = `Lithophane ${settings.shape} ${Math.round(ax.a * 2)}x${Math.round(ax.b * 2)}x${Math.round(ax.c * 2)}mm`;
+      sendStl(lampMesh(d, (v) => progress(v * 0.9)));
     }
-    const stats = {
-      triangles: mesh.triangles,
-      size: mesh.bbox.max.map((v, i) => v - mesh.bbox.min[i]),
-      diagonal: diagonalFootprint(mesh.positions),
-      volumeCm3: mesh.volume / 1000,
-    };
-    const parts = writeBinarySTLParts(mesh.positions, mesh.indices, label);
-    mesh = null; // let the mesh go before the file is handed over
-    sendDone(parts, stats);
   } catch (err) {
     self.postMessage({ type: 'error', message: err.message || String(err) });
   }

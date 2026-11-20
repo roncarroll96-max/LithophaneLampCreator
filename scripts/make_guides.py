@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.4: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.5: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -494,6 +494,9 @@ def app_guide(path):
          'on its bottom edge. Both are ready to print.'],
         ['Lantern', 'A button for each panel (Front, Right, Back, Left), the pillar (print 4), the base and the top, '
          'each with its own printer-fit check, already turned for printing without supports.'],
+        ['Export all parts as one 3MF', 'Every part in one file: the lamp and its base, or the lantern\'s 4 panels, 4 pillars, '
+         'base and top. Each part is named and already turned for printing; press Arrange in your slicer to place them '
+         '(on more plates if needed). Uses the detail chosen above; about a fifth the size of the STLs.'],
     ], [2.2 * inch, 4.8 * inch]))
 
     s.append(P('Getting a clearer picture', H2))
@@ -508,8 +511,8 @@ def app_guide(path):
         '<b>Print settings matter as much as these sliders.</b> See the companion Printer Settings guide.',
     ])
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.4 - Settings Guide'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.4 - Settings Guide'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.5 - Settings Guide'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.5 - Settings Guide'))
 
 
 # ---------------------------------------------------------------- document 2
@@ -519,7 +522,7 @@ def printer_guide(path):
                             title='Lithophane Lamp - Printer Settings')
     s = []
     s.append(P('Printer Settings for Lithophane Lamps', H1))
-    s.append(P('For Lithophane Lamp Creator 1.4: slicer settings for the lamp and the base, and what each one changes. '
+    s.append(P('For Lithophane Lamp Creator 1.5: slicer settings for the lamp and the base, and what each one changes. '
                'Names match Bambu Studio and OrcaSlicer; other slicers use similar names.', SUB))
 
     s.append(P('Why the slicer matters', H2))
@@ -631,8 +634,8 @@ def printer_guide(path):
     s.append(P('Tip: to test settings quickly, export a Small lamp with the picture shrunk to fit. It prints much faster '
                'and shows the same problems.', SMALL))
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.4 - Printer Settings'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.4 - Printer Settings'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.5 - Printer Settings'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.5 - Printer Settings'))
 
 
 if __name__ == '__main__':

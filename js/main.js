@@ -1342,14 +1342,11 @@ function lanternExportTab() {
     section('Frame parts',
       ...partRow('pillar', 'Pillar (print 4)'), ...partRow('base', 'Base'), ...partRow('top', `Top: ${LANTERN_TOPS[geo.top.style]}`),
       note('The frame isn\'t a lithophane: normal slicer settings are fine. Dark, opaque filament looks like your photo.')),
+    section('All parts in one file', ...threeMfBlock()),
     section('Progress',
       el('div', { class: 'progress', hidden: !busy }, el('div', { id: 'exportBar' })),
       busy ? note('Building…') : null,
-      st ? el('div', { class: 'stats' },
-        'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
-        'Size', el('b', {}, `${st.size.map((v) => v.toFixed(1)).join(' × ')} mm`),
-        'Plastic', el('b', {}, `≈ ${Math.round(st.volumeCm3 * 1.24)} g PLA at 100% infill (${st.volumeCm3.toFixed(0)} cm³)`),
-      ) : null,
+      exportStats(st, false),
       note('Put it together: push the pillars onto the base\'s pegs, slide the panels down the slots into the base, then press the top on.'),
       tipsLink()),
   ];
@@ -1377,7 +1374,7 @@ function exportTab() {
     estSize = [width, depth, panel.H];
     estDiag = [(estSize[0] + depth) * Math.SQRT1_2, (estSize[0] + depth) * Math.SQRT1_2];
   }
-  const fit = app.lastExport ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
+  const fit = app.lastExport?.size ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
 
   const raised = app.field ? app.field.hasRaised : s.markings.style === 'raised' && SHAPES[s.shape]?.markings !== 'none';
   // The picture side gets the fine spacing (the outside for outside detail, a panel's front)
@@ -1398,25 +1395,20 @@ function exportTab() {
     app.exporting ? 'Building STL…' : `Export ${where()} STL`);
 
   const st = app.lastExport;
-  const stats = st ? el('div', { class: 'stats' },
-    'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
-    'Triangles', el('b', {}, st.triangles.toLocaleString()),
-    'Size', el('b', {}, `${st.size.map((v) => v.toFixed(1)).join(' × ')} mm`),
-    'Plastic', el('b', {}, `≈ ${Math.round(st.volumeCm3 * 1.24)} g PLA (${st.volumeCm3.toFixed(0)} cm³)`),
-  ) : null;
+  const stats = exportStats(st);
 
   return [
     section('Printer bed (mm)', el('div', { class: 'row' }, bedInput('x'), bedInput('y'), bedInput('z')),
       el('div', { class: 'fit ' + fit.cls }, fit.text)),
     section('Detail', ...opts, bigFileNote(app.shape && DETAIL_PRESETS[s.detail] ? estBytes(DETAIL_PRESETS[s.detail]) : 0)),
-    section('Export', btn, progress, stats,
+    section('Export', btn, ...threeMfBlock(), progress, stats,
       panel
         ? note('Prints standing up on its bottom edge, as exported. No supports needed; a brim helps tall or thin panels stay put.')
         : isCube()
         ? note('The cube STL is already turned upside down: top face on the bed. No supports needed.')
         : note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
       !hasPhotos() ? note(panel ? 'No photo yet: this exports a plain panel.' : 'No photo yet: this exports a plain ball with markings.', 'warn') : null,
-      panel && s.base.panelKind === 'none' ? null : note('The base is a separate file: Base tab, Export base STL.'),
+      panel && s.base.panelKind === 'none' ? null : note('As STLs, the base is a separate file: Base tab, Export base STL.'),
       tipsLink()),
   ];
 }
@@ -1574,6 +1566,70 @@ function exportLanternPart(part, side = 0) {
   };
   const { photos, transfer } = part === 'panel' ? photoPayload() : { photos: {}, transfer: [] };
   worker.postMessage({ kind: 'lantern', part, side, settings: structuredClone(s), photos, textMasks: app.textMasks, stepInner: step, stepOuter: OUTER_STEP }, transfer);
+}
+
+/** Exports every part (the lamp and its base, or all the lantern's parts) as one 3MF file. */
+function export3mf() {
+  if (app.exporting || !app.shape || cannotExport()) return;
+  const s = app.settings;
+  if (isMoonShape() && !app.moonMap) {
+    toast(app.moonFailed ? 'The Moon maps could not be loaded, so the Moon can\'t be exported yet. Try again from the Shape tab.'
+      : 'The Moon maps are still loading. Export again in a moment.', 'err');
+    return;
+  }
+  const step = DETAIL_PRESETS[s.detail]?.step || 0.3;
+  app.exporting = true; renderTab();
+  const workerUrl = new URL('./exportWorker.js', import.meta.url);
+  const worker = new Worker(workerUrl, { type: 'module' });
+  const done = () => { app.exporting = false; worker.terminate(); renderTab(); };
+  worker.onmessage = (e) => {
+    const msg = e.data;
+    if (msg.type === 'progress') {
+      const bar = document.getElementById('exportBar');
+      if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
+    } else if (msg.type === 'done') {
+      const fileName = `${projectBaseName()}-all-parts-${s.detail}.3mf`;
+      download(new Blob(msg.stl, { type: 'model/3mf' }), fileName);
+      app.lastExport = { ...msg.stats, fileName, kind: '3mf' };
+      toast(`Saved ${fileName}`);
+      done();
+    } else if (msg.type === 'error') {
+      toast(`3MF export failed: ${msg.message}`, 'err');
+      done();
+    }
+  };
+  worker.onerror = async (e) => {
+    toast(await workerErrorText(workerUrl, e, '3MF export failed', true), 'err');
+    done();
+  };
+  const { photos, transfer } = photoPayload();
+  const moon = isMoonShape() ? app.moonMap : null;
+  worker.postMessage({ kind: '3mf', title: projectBaseName(), settings: structuredClone(s), photos, textMasks: app.textMasks, moon,
+    stepInner: step, stepOuter: OUTER_STEP }, transfer);
+}
+
+/** The 3MF button and what goes in the file. */
+function threeMfBlock() {
+  const s = app.settings;
+  const parts = isLantern() ? '4 panels, 4 pillars, the base and the top'
+    : isPanel() && s.base.panelKind === 'none' ? `the ${where()}` : `the ${where()} and its base`;
+  return [
+    el('button', { class: 'btn block', style: 'margin-top:8px', disabled: app.exporting || !app.shape, onclick: export3mf },
+      app.exporting ? 'Building…' : 'Export all parts as one 3MF'),
+    note(`One file with ${parts}, each named and already turned for printing, at the detail chosen above. In your slicer, press Arrange (A) to sort them onto the plate, or onto more plates if they don't all fit. The 3MF is much smaller than the STLs (often a fifth of the size).`),
+  ];
+}
+
+/** File, size and plastic of the last export (a 3MF lists its parts instead of a size). */
+function exportStats(st, withTriangles = true) {
+  if (!st) return null;
+  return el('div', { class: 'stats' },
+    'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
+    ...(st.kind === '3mf' ? ['Parts', el('b', {}, st.names.join(', '))] : []),
+    ...(withTriangles ? ['Triangles', el('b', {}, st.triangles.toLocaleString())] : []),
+    ...(st.size ? ['Size', el('b', {}, `${st.size.map((v) => v.toFixed(1)).join(' × ')} mm`)] : []),
+    'Plastic', el('b', {}, `≈ ${Math.round(st.volumeCm3 * 1.24)} g PLA at 100% infill (${st.volumeCm3.toFixed(0)} cm³)`),
+  );
 }
 
 // ---------- Wiring ----------

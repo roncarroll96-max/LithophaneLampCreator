@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20 · Version 1.4.2 (puck tray in the lantern base) 2026-11-20_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20 · Version 1.4.2 (puck tray in the lantern base) 2026-11-20 · Version 1.5 (3MF export) 2026-11-20_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -23,6 +23,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 1.4 | Lantern (feature 12c): 4 flat panels in a frame of pillars, a base with a puck light, and a choice of 3 tops (done) |
 | 1.4.1 | Light colour in the Lit view: white, warm white, yellow or amber (done) |
 | 1.4.2 | Lantern base: the puck can sit in a tray (closed floor, rim, gap for the cord) instead of a hole (done) |
+| 1.5 | 3MF export: every part in one file (the lamp and its base, or all the lantern's parts), moved up from the Later list (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -142,6 +143,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 18. **3D preview** (rotate and zoom) with a toggle between **simulated backlit glow** (roughly how it looks on the base), **plain grey model** (for checking shape and markings) and **thickness map** (white = thinnest, black = thickest, with a legend; pointing at the ball shows the wall thickness there in mm). *(Thickness map added in 0.2.)*
 19. **Lithophane thickness settings**: minimum (brightest) and maximum (darkest) wall thickness.
 20. **STL export** with a detail level chosen at export: **Draft / Standard / Fine**. Detail is the spacing between points on the photo side: Draft 0.5 mm, Standard 0.3 mm, Fine 0.2 mm (same for every size; the smooth outside uses 1 mm unless lines are raised). Measured sizes: Medium Standard ≈ 83 MB, Large Standard ≈ 150 MB, Medium Fine ≈ 178 MB; raised lines roughly double the file. It shows an estimated file size first. The ball and base export as separate files.
+    - **3MF export** (version 1.5): one more button, **Export all parts as one 3MF**, puts every part in one file: the lamp and its base (just the panel when it has no base), or the lantern's 4 panels, 4 pillars, base and top. Each part is a named object, already turned for printing, set out side by side; the slicer's Arrange button sorts them onto plates. It uses the detail level chosen for the STL. Standard 3MF (core spec), so Elegoo Slicer, OrcaSlicer, Bambu Studio, PrusaSlicer and Cura all open it. The file is compressed: about a fifth the size of the STLs.
 21. **Exported shells are watertight** (no holes or flipped faces), so slicers accept them without repair.
 
 **Saving**
@@ -157,7 +159,6 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - AI photo tools: background removal or dimming, and face brightening, with in-browser models (skipped for now, 2026-11-18)
 - Splitting the shell into two halves for support-free printing
 - Customer-facing features on the hosted site (ads placement, help pages, sample gallery)
-- 3MF export (smaller files than STL)
 - More shapes (golf ball, tennis ball, hockey puck, custom-made shapes)
 
 ### Out of scope
@@ -307,6 +308,10 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Lantern: print direction of frame parts | The app lays out each part to print without supports: pillars on their foot (or lying down when too tall), the base as it sits, the photo-style and pagoda tops as they sit (their overhangs are cut at 45 degrees), the lid upside down | Assumed (Claude's default) |
 | Lantern: base feet | The base's corner blocks stand 3 mm out past the pillars, like feet, instead of the pillars running through the base | Assumed (Claude's default, found while building: simpler and prints without supports) |
 | Lantern: puck | Sits on the table in a round hole in the base's floor, so the lantern lifts off it | Assumed (Claude's default) |
+| 3MF: what goes in | Every shape: the lamp and its base in one file; the lantern's 7 parts in one file | You (2026-11-20) |
+| 3MF: layout | All parts in one file, set out side by side; the slicer arranges them onto plates | You (2026-11-20) |
+| 3MF: lantern pillars | Four copies in the file | You (2026-11-20) |
+| 3MF: slicer | Elegoo Slicer (based on OrcaSlicer); the file is plain standard 3MF so other slicers open it too. The STL buttons stay | You use Elegoo Slicer (2026-11-20); standard format and keeping the STLs are Claude's |
 | Lantern: puck tray | A choice on the Base tab: Hole in the floor (default, as before) or Tray (closed 2 mm floor, a rim 40% of the puck's height (3 to 8 mm) and 2 mm thick, 1 mm room round the puck, a gap in the rim at the back as wide as the cable notch) | You asked for the tray (2026-11-20); its sizes are Claude's |
 | Lantern: text | Placed round the lantern by clicking it; raised text prints as carved, as on a panel | Assumed (Claude's default) |
 | Panel print direction | Upright on its bottom edge; circles and hearts get a small flat; brim suggested | Assumed (Claude's default) |
@@ -339,6 +344,11 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 9. A lantern with four 4×6 in panels: every part prints without supports and fits your printer. The pillars push into the base, the panels slide down the slots, and the top presses on and lifts off again. With the puck switched on, all four pictures glow clearly and evenly. Changing to 5×7 panels and the pagoda roof resizes everything, and it still fits together.
 
 ## Build progress
+
+### Version 1.5: 3MF export, done (2026-11-20)
+Built: **Export all parts as one 3MF** on the Export tab for every shape. The file is a ZIP holding the standard 3MF model, written and compressed part by part in the export worker (each part is built, written and let go before the next, to save memory). Part names: the shape (e.g. "Basketball", "Panel"), "Base", "Front panel" ... "Left panel", "Pillar" (4 copies), "Top (style)". Triangles with a repeated corner are left out, as 3MF requires. The part-building code moved from the export worker into js/core/exportParts.js, shared by the STL and 3MF exports.
+
+Checks passed: 90 automated tests (4 new: the ZIP opens with correct checksums, names, closed parts, copies, everything on the bed and nothing overlapping; the layout; a full lantern 3MF with 7 objects and 10 placements, all closed; which parts go in for a ball and for a panel with no base). In the browser: a Draft lantern 3MF in 9 s (20 MB, about 118 MB as STLs) and a ball 3MF in 2 s (8.8 MB, about 46 MB as STL). **Elegoo Slicer 1.5.3** (its command-line reader) opened the lantern file with all 10 pieces closed ("manifold = yes") and the ball file with the ball and base, and kept the part names when it re-saved it.
 
 ### Version 1.4.2: puck tray in the lantern base, done (2026-11-20)
 Built: on the lantern's Base tab, "Hole in the floor" or "Tray". The tray has a closed floor with a low rim round the puck (using the puck size you enter) and a gap in the rim at the back for the cord, lined up with the cable notch. The even glow allows for the puck sitting 2 mm higher.

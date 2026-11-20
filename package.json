@@ -1,6 +1,6 @@
 {
   "name": "lithophane-lamp-creator",
-  "version": "1.4.2",
+  "version": "1.5.0",
   "private": true,
   "description": "Browser tool that turns a photo into a printable lithophane ball lamp (STL).",
   "type": "module",
