@@ -18,7 +18,26 @@ export const SHAPES = {
   moon: { label: 'Moon', body: 'sphere', markings: 'moon', ready: true },
   cube: { label: 'Cube (5 photos)', body: 'cube', markings: 'none', ready: true },
   panel: { label: 'Flat panel', body: 'panel', markings: 'none', ready: true },
+  lantern: { label: 'Lantern (4 panels)', body: 'lantern', markings: 'none', ready: true },
 };
+
+/** The lantern's own settings (see core/lantern.js). */
+export function defaultLanternSettings() {
+  return {
+    outline: 'rect',      // 'rect' | 'square'
+    size: '4x6',          // rect: '4x6' | '5x7' | '8x10' | 'custom'; square: '4' | '6' | '8' | 'custom'
+    orient: 'portrait',   // rect print sizes: 'portrait' | 'landscape'
+    width: 101.6, height: 152.4, // rect, size 'custom' (mm)
+    side: 152.4,          // square, size 'custom' (mm)
+    pillar: 16,           // pillar thickness, mm
+    baseH: 24,            // base height, mm
+    top: 'classic',       // 'classic' (like the photo) | 'pagoda' | 'lid'
+    topH: 32,             // top height, mm
+    overhang: 10,         // how far the top sticks out past the frame, mm
+    slotFit: 0.4,         // extra room in the slots and grooves, mm
+    pegFit: 0.25,         // extra room round the pegs, mm (each side)
+  };
+}
 
 /** Export detail presets: spacing between mesh points on the photo surface (mm). */
 export const DETAIL_PRESETS = {
@@ -62,6 +81,7 @@ export function defaultSettings() {
     },
     evenGlow: { on: true, strength: 0.5 }, // cube and panel light box: thinner plastic farther from the light
     panel: defaultPanelSettings(), // flat panel (see core/panel.js)
+    lantern: defaultLanternSettings(), // lantern (see core/lantern.js)
     base: {
       light: 'puck', puckD: 70, puckH: 20, socket: 'E12', riserD: 30, riserH: 0,
       clearance: 0.4, shape: 'auto', extra: 0, cableW: 10, cableH: 8,
@@ -100,6 +120,7 @@ export function defaultPhotoSettings() {
     edgeSoft: 2,            // cut-out photos: how gently the subject's outline fades (mm)
     panelX: 0, panelY: 0,   // flat panel: window centre, mm right of / above the middle
     panelW: null,           // flat panel: window width (mm); null = the photo fills the panel
+    side: null,             // lantern: which panel the photo fills (0 front, 1 right, 2 back, 3 left)
   };
 }
 

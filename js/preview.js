@@ -191,8 +191,8 @@ export class Preview {
   /** Collar, base and floor around the ball (preview only). */
   updateStand(shape, collar, settings) {
     this._dirty = true;
-    // Panels can be turned round, so show both sides; lamps are only seen from outside
-    const side = shape.kind === 'panel' ? THREE.DoubleSide : THREE.FrontSide;
+    // Panels (and the lantern's panels) can be seen from both sides; lamps only from outside
+    const side = shape.kind === 'panel' || shape.kind === 'lantern' ? THREE.DoubleSide : THREE.FrontSide;
     if (this.glowMat.side !== side) { this.glowMat.side = side; this.plainMat.side = side; this.glowMat.needsUpdate = true; this.plainMat.needsUpdate = true; }
     // Free the old stand's geometry and its own materials (shared ones are kept), but keep the
     // real base: it is put back below, since it only changes when the base settings change.
@@ -205,6 +205,7 @@ export class Preview {
     this.group.clear();
     if (this._baseMesh) this.group.add(this._baseMesh);
     if (shape.kind === 'panel') { this._panelStand(shape); return; }
+    if (shape.kind === 'lantern') { this._lanternStand(shape); return; }
     this.collar = null;
     const o = {};
     let zEdge = Infinity;
@@ -274,6 +275,25 @@ export class Preview {
     Object.assign(this, { _zBot: zBot, _standBase: base, _ring: null, _floor: floor, _pool: pool, _lampTop: panel.c, _lampW: panel.chordHalf });
     this._frameBox = { w: panel.chordHalf * 2, h: panel.H };
     this.controls.target.set(0, 0, 0);
+    if (this._baseMesh) this._placeBase();
+  }
+
+  /** The lantern: its panels stand on the base (the frame arrives through setBase), on a floor. */
+  _lanternStand(strip) {
+    this.collar = null;
+    const g = strip.geo, zBot = -g.H / 2, table = zBot - g.zG;
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(900, 64), this.floorMat);
+    floor.position.z = table;
+    this.group.add(floor);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(g.width * 1.4, 64), new THREE.MeshBasicMaterial({
+      color: AMBER, transparent: true, opacity: 0.07, depthWrite: false,
+    }));
+    pool.position.z = table + 0.2;
+    this.group.add(pool);
+    const top = g.totalHeight + table;
+    Object.assign(this, { _zBot: zBot, _standBase: null, _ring: null, _floor: floor, _pool: pool, _lampTop: top, _lampW: g.width / 2 });
+    this._frameBox = { w: g.width, h: g.totalHeight };
+    this.controls.target.set(0, 0, (table + top) / 2);
     if (this._baseMesh) this._placeBase();
   }
 

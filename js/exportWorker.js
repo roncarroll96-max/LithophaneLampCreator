@@ -1,5 +1,7 @@
 // Builds the STL in the background so the page stays responsive.
 // Message in:  { settings, photos: { [id]: { w, h, data, alpha? } }, textMasks | null, moon | null, stepInner, stepOuter }
+//   or { kind: 'base', settings }
+//   or { kind: 'lantern', part: 'panel' | 'pillar' | 'base' | 'top', side (0..3, for a panel), settings, photos, textMasks, stepInner, stepOuter }
 // Messages out: { type: 'progress', value } and { type: 'done', stl: [ArrayBuffer parts], stats } or { type: 'error', message }
 
 import { buildEllipsoidShape } from './core/shapes.js';
@@ -12,6 +14,7 @@ import { createPanelField } from './core/panelField.js';
 import { buildPanelMesh } from './core/panelMesh.js';
 import { buildBase } from './core/base.js';
 import { meshSdf, gridStep } from './core/sdf.js';
+import { lanternGeometry, buildLanternStrip, createLanternField, lanternSidePanel, lanternPart, LANTERN_SIDES } from './core/lantern.js';
 
 const BASE_STEP = 0.45; // mm grid for the base mesh
 const BASE_MAX_CELLS = 2e8; // a bigger base gets a slightly coarser grid (seconds, not minutes)
@@ -39,8 +42,41 @@ function exportBase(settings) {
   sendDone(parts, { triangles: mesh.triangles, size, diagonal: diagonalFootprint(mesh.positions), volumeCm3: mesh.volume / 1000 });
 }
 
+const FRAME_STEP = 0.4; // mm grid for the lantern's frame parts (pegs and slots need a fine fit)
+
+function exportLantern({ part, side, settings, photos, textMasks, stepInner, stepOuter }) {
+  const geo = lanternGeometry(settings);
+  let mesh, label;
+  if (part === 'panel') {
+    const strip = buildLanternStrip(settings, geo);
+    const field = createLanternField(settings, strip, photos || null, textMasks || null);
+    const panel = lanternSidePanel(settings, geo);
+    // The picture faces out (the front), so the front gets the fine spacing
+    mesh = buildPanelMesh({ panel, field: field.sideField(side, panel), stepInner: stepOuter, stepOuter: stepInner,
+      onProgress: (v) => self.postMessage({ type: 'progress', value: v * 0.9 }) });
+    label = `Lantern ${LANTERN_SIDES[side].toLowerCase()} panel ${Math.round(geo.W)}x${Math.round(geo.H)}mm`;
+  } else {
+    const p = lanternPart(settings, part, geo);
+    self.postMessage({ type: 'progress', value: 0.1 });
+    mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, FRAME_STEP, BASE_MAX_CELLS));
+    self.postMessage({ type: 'progress', value: 0.9 });
+    label = `Lantern ${part}`;
+  }
+  const stats = {
+    triangles: mesh.triangles, size: mesh.bbox.max.map((v, i) => v - mesh.bbox.min[i]),
+    diagonal: diagonalFootprint(mesh.positions), volumeCm3: mesh.volume / 1000,
+  };
+  const parts = writeBinarySTLParts(mesh.positions, mesh.indices, label);
+  mesh = null;
+  sendDone(parts, stats);
+}
+
 self.onmessage = (e) => {
   const { settings, photos, textMasks, moon, stepInner, stepOuter } = e.data;
+  if (e.data.kind === 'lantern') {
+    try { exportLantern(e.data); } catch (err) { self.postMessage({ type: 'error', message: err.message || String(err) }); }
+    return;
+  }
   if (e.data.kind === 'base') {
     try { exportBase(settings); } catch (err) { self.postMessage({ type: 'error', message: err.message || String(err) }); }
     return;

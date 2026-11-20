@@ -24,10 +24,14 @@ export function lightBoxStrip(settings, panel) {
 
 /**
  * photos: { [photo id]: { w, h, data, alpha? } } (the adjusted pictures), textMasks as for the lamps.
- * Returns { eval(theta, s, out), layers, hasRaised: false, tMount } where out receives
- * x,y,z (front), ix,iy,iz (back), sx,sy,sz, t (mm), raise (0), mask, photoId, light, u, v.
+ * opts (the lantern uses these): layers = photo layers already placed (each with cx, cy), and
+ * light(u, v) = how much light reaches that spot compared with the middle (for even glow).
+ * Returns { eval(theta, s, out), evalUV(u, v, out, S?), layers, hasRaised: false, tMount } where
+ * out receives x,y,z (front), ix,iy,iz (back), sx,sy,sz, t (mm), raise (0), mask, photoId, light,
+ * u, v. evalUV works on panel coordinates directly; S (optional) is the front surface point and
+ * normal to build on, instead of the panel's own.
  */
-export function createPanelField(settings, panel, photos, textMasks = null) {
+export function createPanelField(settings, panel, photos, textMasks = null, opts = {}) {
   const { tMin, tMax } = settings;
   const pp = { ...defaultPanelSettings(), ...(settings.panel || {}) };
   const surround = settings.photo?.surround ?? 0.55;
@@ -35,7 +39,7 @@ export function createPanelField(settings, panel, photos, textMasks = null) {
   const tRef = panelEdgeThickness(settings); // the thickest the panel gets (frame or carved text)
 
   // ---- Photos: a window on the panel; "fill" (no width set) covers the whole panel
-  const layers = (settings.photos || [])
+  const layers = opts.layers || (settings.photos || [])
     .filter((c) => !c.hidden && photos && photos[c.id])
     .map((c) => {
       const p = { ...defaultPhotoSettings(), ...c };
@@ -57,8 +61,9 @@ export function createPanelField(settings, panel, photos, textMasks = null) {
   const fw = Math.max(0, pp.frameWidth), tF = tMax + Math.max(0, pp.frameExtra);
 
   // ---- Even glow (light box): an LED strip along the bottom, behind the panel, leaning toward it
-  const lightBox = (settings.base?.panelKind ?? 'lightbox') === 'lightbox';
-  const glowOn = lightBox && settings.evenGlow?.on !== false;
+  const lightFn = opts.light || null;
+  const lightBox = !lightFn && (settings.base?.panelKind ?? 'lightbox') === 'lightbox';
+  const glowOn = (lightBox || !!lightFn) && settings.evenGlow?.on !== false;
   const glowK = glowOn ? Math.max(0, Math.min(1, settings.evenGlow?.strength ?? 0.5)) / MU : 0;
   const strip = lightBox ? lightBoxStrip(settings, panel) : null;
   const ex = -Math.sin(STRIP_TILT), ey = Math.cos(STRIP_TILT); // (depth, up) the strip faces
@@ -73,11 +78,13 @@ export function createPanelField(settings, panel, photos, textMasks = null) {
   }
   const lightRef = lightBox ? irradiance(0) : 1;
 
-  const P = {}, S = {};
+  const P = {}, Sbuf = {};
   function evalAt(theta, s, out) {
     panel.pointAt(theta, s, P);
-    const u = P.u, v = P.v;
-    panel.surfAt(u, v, S);
+    return evalUV(P.u, P.v, out);
+  }
+  function evalUV(u, v, out, Sgiven = null) {
+    const S = Sgiven || panel.surfAt(u, v, Sbuf);
 
     curU = u; curV = v;
     blendLayers(layers, surround, xyOf, pr);
@@ -98,8 +105,8 @@ export function createPanelField(settings, panel, photos, textMasks = null) {
 
     // Even glow
     let light = 1;
-    if (lightBox) {
-      light = irradiance(v) / lightRef;
+    if (lightBox || lightFn) {
+      light = lightFn ? lightFn(u, v) : irradiance(v) / lightRef;
       if (glowOn) t = Math.min(tMax + LINE_EXTRA, Math.max(tMin, t + glowK * Math.log(light)));
     }
 
@@ -119,5 +126,5 @@ export function createPanelField(settings, panel, photos, textMasks = null) {
     return out;
   }
 
-  return { eval: evalAt, layers: layers.map((L) => ({ id: L.id, W: L.W, H: L.H })), hasRaised: false, tMount: tF, reliefOutside: reliefFront };
+  return { eval: evalAt, evalUV, layers: layers.map((L) => ({ id: L.id, W: L.W, H: L.H })), hasRaised: false, tMount: tF, reliefOutside: reliefFront };
 }

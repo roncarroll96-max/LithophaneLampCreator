@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.3: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.4: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -318,6 +318,7 @@ def app_guide(path):
         ['Flat panel: frame', '"Frame thickness" above Thickest, within "Frame width" of the edge, then a 45-degree slope '
          'down to the picture', '+2 mm (5.0 mm), 6 mm wide'],
         ['Flat panel with the light box', 'Even glow: thinner higher up, farther from the LED strip', 'Strength 50%'],
+        ['Lantern panels', 'Even glow: thinner higher up, farther from the puck in the base', 'Strength 50%'],
     ], [1.75 * inch, 3.75 * inch, 1.5 * inch]))
     s.append(P('"Picture detail on the" (Shape tab) changes which side is bumpy, never the thickness: the light and '
                'dark come out the same. Inside (the default) keeps a ball smooth outside; Outside presses the picture '
@@ -420,7 +421,13 @@ def app_guide(path):
          'Flat (0 to 120 degrees)'],
         ['Flat panel: frame, feet', 'Raised frame (on the picture side); feet on the bottom edge to stand without a base.',
          'The frame is the thickest part.', 'Frame on, 6 mm; feet off'],
-    ], [1.35 * inch, 2.3 * inch, 2.15 * inch, 1.2 * inch]))
+        ['Lantern: panels', 'Rectangle (4x6, 5x7, 8x10 in, portrait or landscape, or custom) or square (4, 6, 8 in or '
+         'custom); all four the same, flat, picture detail facing out.', 'None (size only).', '4x6 in portrait'],
+        ['Lantern: frame', 'Pillar thickness, base height, slot fit and peg fit (extra room).', 'None: the frame is not a '
+         'lithophane.', '16 mm, 24 mm, 0.4 mm, 0.25 mm'],
+        ['Lantern: top', 'Like the photo (crossed beams, capped posts, open lattice), Pagoda roof or Simple lid; top '
+         'height and overhang.', 'None.', 'Like the photo, 32 mm, 10 mm'],
+    ],[1.35 * inch, 2.3 * inch, 2.15 * inch, 1.2 * inch]))
     s.append(Spacer(1, 4))
     s.append(P('Thinnest and Thickest always stay at least 0.5 mm apart. New projects keep your sizes, thicknesses, '
                'opening and base settings.', SMALL))
@@ -472,6 +479,8 @@ def app_guide(path):
          'shines up its back (set the strip width; even glow on/off). <b>Slot stand</b>: just the slot. <b>None</b>: '
          'feet, a window or a frame.'],
         ['Flat panel: slot fit', 'Extra room in the slot (default 0.4 mm). The app shows the slot width.'],
+        ['Lantern: light', 'Your puck\'s diameter and height (it sits on the table in a hole in the base\'s floor; lift '
+         'the lantern off to switch it on), the cable notch width, and even glow on/off and strength.'],
     ], [1.6 * inch, 5.4 * inch]))
 
     s.append(P('Export tab', H2))
@@ -483,6 +492,8 @@ def app_guide(path):
          'warning (sooner on phones and tablets, which have less memory).'],
         ['Export ball / panel STL', 'The lamp. The cube comes out upside down (top face on the bed); a panel stands '
          'on its bottom edge. Both are ready to print.'],
+        ['Lantern', 'A button for each panel (Front, Right, Back, Left), the pillar (print 4), the base and the top, '
+         'each with its own printer-fit check, already turned for printing without supports.'],
     ], [2.2 * inch, 4.8 * inch]))
 
     s.append(P('Getting a clearer picture', H2))
@@ -497,8 +508,8 @@ def app_guide(path):
         '<b>Print settings matter as much as these sliders.</b> See the companion Printer Settings guide.',
     ])
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.3 - Settings Guide'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.3 - Settings Guide'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.4 - Settings Guide'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.4 - Settings Guide'))
 
 
 # ---------------------------------------------------------------- document 2
@@ -508,7 +519,7 @@ def printer_guide(path):
                             title='Lithophane Lamp - Printer Settings')
     s = []
     s.append(P('Printer Settings for Lithophane Lamps', H1))
-    s.append(P('For Lithophane Lamp Creator 1.3: slicer settings for the lamp and the base, and what each one changes. '
+    s.append(P('For Lithophane Lamp Creator 1.4: slicer settings for the lamp and the base, and what each one changes. '
                'Names match Bambu Studio and OrcaSlicer; other slicers use similar names.', SUB))
 
     s.append(P('Why the slicer matters', H2))
@@ -563,12 +574,20 @@ def printer_guide(path):
         ['Flat panel', 'Standing up on its bottom edge, as exported, with the front facing the seam-free side. Brim on, '
          'no supports.'],
         ['Panel light box, slot stand', 'Standing up, as it sits on the table. No supports.'],
+        ['Lantern panels', 'Standing up on the bottom edge, as exported, picture side out. Brim on, no supports.'],
+        ['Lantern pillar (print 4)', 'Standing on its foot (the end with the hole), as exported; a pillar too tall for '
+         'your printer comes out lying on its side. No supports.'],
+        ['Lantern base, top', 'As exported: the base and the photo-style and pagoda tops as they sit (overhangs cut at '
+         '45 degrees), the simple lid upside down. No supports.'],
     ], [1.9 * inch, 5.1 * inch]))
 
     s.append(P('Printing the base', H2))
     s.append(P('The base is not a lithophane, so it does not need solid walls: normal settings are fine (0.2 mm layers, '
                '2 to 3 wall loops, 15 to 20% sparse infill). Use <b>black or another dark, opaque filament</b> so light '
                'only comes out through the lamp, not the base.', BODY))
+    s.append(P('The lantern\'s pillars, base and top print the same way. Print the base and one pillar first and push them '
+               'together: if the peg is too tight or too loose, change Peg fit (Shape tab); if a panel won\'t slide down a '
+               'slot, add Slot fit.', BODY))
 
     s.append(P('Printer and material', H2))
     s.append(table([
@@ -612,8 +631,8 @@ def printer_guide(path):
     s.append(P('Tip: to test settings quickly, export a Small lamp with the picture shrunk to fit. It prints much faster '
                'and shows the same problems.', SMALL))
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.3 - Printer Settings'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.3 - Printer Settings'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.4 - Printer Settings'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.4 - Printer Settings'))
 
 
 if __name__ == '__main__':

@@ -20,6 +20,10 @@ import { buildBase, SOCKETS, PANEL_BASE_KINDS } from './core/base.js';
 import { buildPanel, resolvePanelSize, sizeLabel, RECT_SIZES, SIDE_SIZES, PANEL_OUTLINES, IN, panelEdgeThickness } from './core/panel.js';
 import { createPanelField } from './core/panelField.js';
 import { meshSdf, gridStep } from './core/sdf.js';
+import {
+  lanternGeometry, buildLanternStrip, createLanternField, lanternFrameMesh, lanternPart, lanternSidePanel,
+  LANTERN_SIDES, LANTERN_TOPS, sideCenterU, sideOf,
+} from './core/lantern.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
 
@@ -92,7 +96,7 @@ let rafPending = false, idleTimer = null, baseTimer = null;
 function changed(group) {
   // A base setting doesn't change a ball or cube, only the base under it: rebuild just that.
   // (On a panel the light box's strip and slot also steer even glow, so the panel updates too.)
-  if (group === 'base' && !isPanel()) {
+  if (group === 'base' && !isPanel() && !isLantern()) {
     clearTimeout(baseTimer);
     baseTimer = setTimeout(refreshBasePreview, 280);
     scheduleAutosave();
@@ -144,6 +148,17 @@ function update(quick) {
       if (sizeChanged && app.tab === 'ball') setTimeout(renderTab);
       app.dirty.shape = false; shapeChanged = true;
     }
+    if (isLantern()) ensureLanternSides();
+    if (app.dirty.shape && isLantern()) {
+      const strip = buildLanternStrip(s);
+      const reframe = !app.shape || app.shape.kind !== 'lantern';
+      const sizeChanged = !reframe && (app.shape.sideW !== strip.sideW || app.shape.H !== strip.H);
+      app.shape = strip; app.collar = null;
+      preview.updateStand(strip, null, s);
+      if (reframe || sizeChanged) preview.frame();
+      if (sizeChanged && app.tab === 'ball') setTimeout(renderTab);
+      app.dirty.shape = false; shapeChanged = true;
+    }
     if (app.dirty.shape) {
       const maxOpen = maxOpening(s);
       if (s.opening.diameter > maxOpen && maxOpen >= 20) {
@@ -153,7 +168,7 @@ function update(quick) {
       }
       const collar = collarDims(s);
       const shape = buildEllipsoidShape(bodyAxes(s), collar.ro);
-      const firstShape = !app.shape || app.shape.kind === 'panel';
+      const firstShape = !app.shape || app.shape.kind === 'panel' || app.shape.kind === 'lantern';
       app.shape = shape; app.collar = collar;
       preview.updateStand(shape, collar, s);
       if (firstShape) preview.frame();
@@ -161,7 +176,9 @@ function update(quick) {
     }
     if (!app.shape) return;
     ensureTextMasks();
-    app.field = isPanel()
+    app.field = isLantern()
+      ? createLanternField(s, app.shape, processedMap(), app.textMasks)
+      : isPanel()
       ? createPanelField(s, app.shape, processedMap(), app.textMasks)
       : createField(s, app.shape, processedMap(), app.textMasks, ensureMoon());
     // A Moon-only lamp needs no photo, so don't cover it with the "choose a photo" card
@@ -189,8 +206,24 @@ function update(quick) {
 const hasPhotos = () => app.settings.photos.some((p) => app.images[p.id]);
 const isCube = () => SHAPES[app.settings.shape]?.body === 'cube';
 const isPanel = () => SHAPES[app.settings.shape]?.body === 'panel';
-/** "ball" or "panel", for labels. */
-const where = () => (isPanel() ? 'panel' : 'ball');
+const isLantern = () => SHAPES[app.settings.shape]?.body === 'lantern';
+/** A flat shape (panel or lantern): photos and text are placed by panel coordinates. */
+const isFlatShape = (shape) => !!shape && (shape.kind === 'panel' || shape.kind === 'lantern');
+/** "ball", "panel" or "lantern", for labels. */
+const where = () => (isLantern() ? 'lantern' : isPanel() ? 'panel' : 'ball');
+/** How many photos the current shape takes: one per side on a lantern. */
+const maxPhotos = () => (isLantern() ? 4 : MAX_PHOTOS);
+/** Lantern: gives every photo without a side the next free one (photos past four get none). */
+function ensureLanternSides() {
+  const list = app.settings.photos, used = new Set();
+  for (const c of list) if (c.side >= 0 && c.side <= 3 && !used.has(c.side)) used.add(c.side); else c.side = null;
+  for (const c of [...list].reverse()) {
+    if (c.side != null) continue;
+    const free = [0, 1, 2, 3].find((k) => !used.has(k));
+    if (free == null) break;
+    c.side = free; used.add(free);
+  }
+}
 /** Height / width of the photo a rectangle panel takes its shape from (the first one added). */
 function panelPhotoAspect() {
   const list = app.settings.photos;
@@ -265,7 +298,10 @@ async function normalizedBlob(image, w, h, keepAlpha) {
  */
 async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
   const s = app.settings, gen = app.projectGen;
-  if (!id && s.photos.length + app.pendingPhotos >= MAX_PHOTOS) { toast(`A lamp can hold up to ${MAX_PHOTOS} photos. Remove one first.`, 'err'); return; }
+  if (!id && s.photos.length + app.pendingPhotos >= maxPhotos()) {
+    toast(isLantern() ? 'A lantern holds 4 photos, one on each side. Remove one first.' : `A lamp can hold up to ${MAX_PHOTOS} photos. Remove one first.`, 'err');
+    return;
+  }
   if (!id) app.pendingPhotos++;
   $('busy').hidden = false; $('busy').textContent = 'Loading photo…';
   try {
@@ -277,7 +313,8 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
     let cfg = id ? s.photos.find((p) => p.id === id) : null;
     if (!cfg) {
       const topUp = app.shape?.elev ? Math.floor(app.shape.elev(1)) - 2 : 70;
-      const slot = isPanel() ? panelPhotoSlot(s.photos.length)
+      const slot = isLantern() ? { side: [0, 1, 2, 3].find((k) => !s.photos.some((c) => c.side === k)) ?? null, panelW: null }
+        : isPanel() ? panelPhotoSlot(s.photos.length)
         : isCube() && app.shape && app.shape.kind === 'cube'
         ? cubePhotoSlot(s.photos.length, s, app.shape) : photoSlot(s.photos.length, topUp);
       cfg = { ...defaultPhotoSettings(), ...slot, id: id || newPhotoId() };
@@ -338,6 +375,9 @@ function projectBaseName() {
   const s = app.settings;
   const first = app.settings.photos.find((p) => app.images[p.id]);
   const n = ((first && app.images[first.id].name) || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
+  if (isLantern() && app.shape && app.shape.kind === 'lantern') {
+    return `${n}-lantern-${Math.round(app.shape.sideW)}x${Math.round(app.shape.H)}mm`;
+  }
   if (isPanel() && app.shape && app.shape.kind === 'panel') {
     return `${n}-panel-${app.shape.outline}-${Math.round(app.shape.W)}x${Math.round(app.shape.H)}mm`;
   }
@@ -351,10 +391,18 @@ function refreshBasePreview() {
   const s = app.settings;
   if (!app.shape) return;
   const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening, s.tMax,
-    isPanel() ? s.panel : null]);
+    isPanel() ? s.panel : null, isLantern() ? s.lantern : null]);
   if (key === app.baseKey) return;
   app.baseKey = key;
   try {
+    if (isLantern()) { // the lantern's frame: base, pillars and top
+      if (app.shape.kind !== 'lantern') { app.baseKey = null; return; }
+      const fm = lanternFrameMesh(s, meshSdf);
+      app.baseInfo = fm.info;
+      preview.setBase(fm.positions, fm.indices, fm.info);
+      if (app.tab === 'base') renderTab();
+      return;
+    }
     const base = buildBase(s, app.shape);
     if (!base) { // a panel with no base
       app.baseInfo = null; app.lastBaseExport = null; preview.clearBase();
@@ -515,11 +563,11 @@ function photoTab() {
   const rows = list.map((c, i) => el('div', { class: 'text-row photo-row' + (c.id === app.selectedPhoto ? ' active' : '') },
     el('button', { class: 'text-pick', title: 'Edit this photo', onclick: () => { app.selectedPhoto = c.id; renderTab(); } },
       el('canvas', { 'data-photo-thumb': c.id, class: 'row-thumb' }),
-      el('span', {}, (app.images[c.id] && app.images[c.id].name) || 'photo')),
+      el('span', {}, (isLantern() ? `${c.side != null ? LANTERN_SIDES[c.side] : 'Not shown'}: ` : '') + ((app.images[c.id] && app.images[c.id].name) || 'photo'))),
     el('button', { class: 'btn small', title: 'Bring forward (in front of the photo below)', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
     el('button', { class: 'btn small', title: 'Send backward', disabled: i === list.length - 1, onclick: () => move(i, 1) }, '↓'),
     el('button', { class: 'btn small', title: c.hidden ? `Show on the ${where()}` : `Hide from the ${where()}`, onclick: () => { c.hidden = !c.hidden; changed('field'); renderTab(); } }, c.hidden ? 'Show' : 'Hide'),
-    el('button', {
+    isLantern() ? null : el('button', {
       class: 'btn small', title: 'Make a copy a little further round', disabled: list.length >= MAX_PHOTOS,
       onclick: () => {
         const src = app.images[c.id]; if (!src) return;
@@ -539,7 +587,7 @@ function photoTab() {
         toast('Photo removed.', '', {
           label: 'Undo',
           run: () => {
-            if (gen !== app.projectGen || list !== app.settings.photos || list.length >= MAX_PHOTOS) return;
+            if (gen !== app.projectGen || list !== app.settings.photos || list.length >= maxPhotos()) return;
             list.splice(Math.min(i, list.length), 0, c); app.images[c.id] = removedImage;
             app.selectedPhoto = c.id; $('emptyState').classList.add('hidden'); changed('field'); renderTab();
           },
@@ -559,9 +607,12 @@ function photoTab() {
     section(`Photos on the ${where()}`,
       list.length ? el('div', { class: 'text-list' }, rows) : note('No photo yet. Choose one, or drop it on the preview.'),
       el('div', { class: 'row', style: 'margin-top:8px' },
-        el('button', { class: 'btn small', disabled: list.length >= MAX_PHOTOS, onclick: addPhoto }, '+ Add photo'),
-        el('span', { class: 'note', style: 'margin:0' }, `${list.length} of ${MAX_PHOTOS}`)),
-      list.length ? note(list.length > 1
+        el('button', { class: 'btn small', disabled: list.length >= maxPhotos(), onclick: addPhoto }, '+ Add photo'),
+        el('span', { class: 'note', style: 'margin:0' }, `${list.length} of ${maxPhotos()}`)),
+      isLantern() && list.length ? note('Each photo fills one side of the lantern. Pick its side below; drag it on the lantern to choose what shows.')
+        : null,
+      isLantern() && list.some((c) => c.side == null) ? note('A lantern shows 4 photos, one per side. Remove the extra ones (marked "Not shown").', 'warn') : null,
+      list.length && !isLantern() ? note(list.length > 1
         ? `Drag the selected photo on the ${where()} to move it (pick it in this list first). Where photos overlap, the one higher in the list is in front.`
         : `Drag the photo on the ${where()} to move it.`) : null,
       isPanel() && list.length > 1
@@ -617,7 +668,7 @@ function photoTab() {
       slider(P('panY'), 'Move up / down', -0.5, 0.5, 0.005, { fmt: num2 }),
       slider(P('rotate'), 'Rotate', -180, 180, 0.5, { fmt: deg }),
     ),
-    isPanel() ? panelWindowSection(p, P) : section('Photo window on the ball',
+    isLantern() ? lanternSideSection(p) : isPanel() ? panelWindowSection(p, P) : section('Photo window on the ball',
       slider(P('around'), 'Around the ball', -180, 180, 0.5, { fmt: deg }),
       slider(P('centerY'), 'Up / down', upMin, upMax, 0.5, { fmt: mm }),
       slider(P('coverage'), 'Size (how far around)', 10, 360, 0.5, {
@@ -641,6 +692,22 @@ function photoTab() {
     plainBall,
   );
   return out;
+}
+
+/** Photo tab, lantern: which side the selected photo fills (swaps with the photo already there). */
+function lanternSideSection(p) {
+  const list = app.settings.photos;
+  const bar = el('div', { class: 'segbar', role: 'group' });
+  LANTERN_SIDES.forEach((label, k) => {
+    const other = list.find((c) => c !== p && c.side === k);
+    bar.append(el('button', {
+      class: 'seg' + (p.side === k ? ' active' : ''),
+      title: other ? `Swap with the photo on the ${label.toLowerCase()}` : `Put this photo on the ${label.toLowerCase()}`,
+      onclick: () => { if (other) other.side = p.side; p.side = k; changed('field'); renderTab(); },
+    }, label));
+  });
+  return section('Side of the lantern', bar,
+    note('Use Zoom and Move above (or drag the photo on the lantern) to choose what shows. The edges of each panel sit in the pillars\' slots, about 6 mm on each side.'));
 }
 
 /** Photo tab, flat panel: where the selected photo sits on the panel. */
@@ -718,6 +785,60 @@ function panelSections() {
   ];
 }
 
+/** Each top style's starting height (mm). */
+const TOP_HEIGHTS = { classic: 32, pagoda: 60, lid: 14 };
+
+/** Shape tab, lantern: panel size, frame and top. */
+function lanternSections() {
+  const s = app.settings, L = s.lantern;
+  const geo = lanternGeometry(s);
+  const rect = L.outline !== 'square';
+  const sizeOpts = rect
+    ? [...Object.keys(RECT_SIZES).map((k) => ({ value: k, label: k.replace('x', '×'), title: `${k.replace('x', '×')} inch photo print size` })), { value: 'custom', label: 'Custom' }]
+    : [...Object.keys(SIDE_SIZES).map((k) => ({ value: k, label: `${k} in` })), { value: 'custom', label: 'Custom' }];
+  const num = (path, label, lo, hi) => {
+    const i = el('input', { type: 'number', min: lo, max: hi, step: 1, value: Math.round(getPath(s, path)), style: 'width:76px', 'aria-label': label });
+    i.addEventListener('change', () => {
+      const v = Math.min(hi, Math.max(lo, parseFloat(i.value) || getPath(s, path)));
+      i.value = v; setPath(s, path, v); changed('shape'); renderTab();
+    });
+    return el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, label), i);
+  };
+  const t = geo.top;
+  const topMax = t.style === 'pagoda' ? Math.floor(t.zA) : 80;
+  const topMin = t.style === 'classic' ? Math.ceil(t.hF + t.bh + t.capH + 4) : t.style === 'pagoda' ? t.hF + 14 : t.hF + 3;
+  return [
+    section('Panels (all four the same)',
+      segmented('lantern.outline', [{ value: 'rect', label: 'Rectangle' }, { value: 'square', label: 'Square' }], 'shape', (v) => {
+        L.size = v === 'square' ? '6' : '4x6'; changed('shape'); renderTab();
+      }),
+      segmented('lantern.size', sizeOpts, 'shape', () => renderTab()),
+      rect && L.size !== 'custom' ? segmented('lantern.orient', [{ value: 'portrait', label: 'Portrait (tall)' }, { value: 'landscape', label: 'Landscape (wide)' }], 'shape', () => renderTab()) : null,
+      rect && L.size === 'custom' ? [num('lantern.width', 'Panel width (mm)', 50, 250), num('lantern.height', 'Panel height (mm)', 50, 250)] : null,
+      !rect && L.size === 'custom' ? num('lantern.side', 'Panel size (mm)', 60, 250) : null,
+      note(`Each panel: ${sizeLabel(geo.W, geo.H)}, flat, no frame. The lantern: ${Math.round(geo.width)} × ${Math.round(geo.width)} mm, ${Math.round(geo.totalHeight)} mm tall.`)),
+    section('Frame',
+      slider('lantern.pillar', 'Pillar thickness', 14, 24, 0.5, { fmt: (v) => mm(Math.max(+v, geo.P)), group: 'shape' }),
+      geo.P > L.pillar + 0.01 ? note(`The pillars are ${geo.P.toFixed(1)} mm thick at least, so these ${geo.T.toFixed(1)} mm panels sit 4 mm deep in their slots.`) : null,
+      slider('lantern.baseH', 'Base height', 20, 50, 1, { fmt: mm, group: 'shape' }),
+      slider('lantern.slotFit', 'Slot fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm, group: 'shape' }),
+      note(`The slots are ${geo.sw.toFixed(1)} mm wide for ${geo.T.toFixed(1)} mm panels; each panel edge goes ${geo.insert.toFixed(1)} mm into its slot.`),
+      slider('lantern.pegFit', 'Peg fit (extra room)', 0.05, 0.6, 0.05, { fmt: mm, group: 'shape' }),
+      note('Print the base and one pillar first to check the fit: too tight, add room; too loose, take some away.')),
+    section('Top',
+      segmented('lantern.top', Object.entries(LANTERN_TOPS).map(([k, label]) => ({
+        value: k, label,
+        title: { classic: 'Crossed beams, posts with caps and an open lattice', pagoda: 'A sloped roof with eaves and vents', lid: 'A flat cap with vent holes' }[k],
+      })), 'shape', (v) => { L.topH = TOP_HEIGHTS[v]; changed('shape'); renderTab(); }),
+      slider('lantern.topH', 'Top height', topMin, topMax, 1, { fmt: (v) => mm(Math.min(topMax, Math.max(topMin, v))), group: 'shape' }),
+      slider('lantern.overhang', 'Overhang', 0, 30, 0.5, { fmt: mm, group: 'shape' }),
+      t.style === 'pagoda' && L.overhang > t.ov ? note(`The pagoda's eaves reach out ${t.ov.toFixed(0)} mm at most (so they print without supports).`, 'warn') : null,
+      t.style === 'pagoda' ? note('The roof rises at 45 degrees; a lower top leaves a square opening at the peak that lets heat and light out.') : null,
+      t.style === 'classic' ? note('The beams and caps stick out by the overhang; their undersides slope at 45 degrees so they print without supports.') : null,
+      t.style === 'lid' ? note('A flat cap with vent holes. It prints upside down.') : null),
+  ];
+}
+
 /** Which side the picture detail goes on (balls and cubes: inside or outside; panels: back or front). */
 function reliefSideControl() {
   const s = app.settings, out = s.reliefSide === 'outside';
@@ -787,10 +908,12 @@ function ballTab() {
 
   const wall = section('Wall thickness',
     slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
-    // The cube's edge rounding can't be tighter than the thickest wall, so tMax reshapes it
-    slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() ? 'shape' : 'field' }),
+    // The cube's edge rounding can't be tighter than the thickest wall, so tMax reshapes it; on the
+    // lantern it sets the panels' thickness, so the slots
+    slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() || isLantern() ? 'shape' : 'field' }),
     note('Typical white PLA: 0.8 mm to 3.0 mm.'),
-    reliefSideControl());
+    isLantern() ? note('The picture detail faces out, toward the room; the smooth side faces the light.') : reliefSideControl());
+  if (isLantern()) return [section('Shape', shapeSel), ...lanternSections(), wall];
   if (isPanel()) return [section('Shape', shapeSel), ...panelSections(), wall];
   return [
     section('Shape', shapeSel),
@@ -839,7 +962,7 @@ function markingsTab() {
   const s = app.settings, m = s.markings;
   const kind = SHAPES[s.shape]?.markings;
   if (!kind || kind === 'none') {
-    const what = isPanel() ? 'Markings are for the ball shapes; a flat panel has none. Add words on the Text tab.'
+    const what = isPanel() || isLantern() ? `Markings are for the ball shapes; a ${isLantern() ? 'lantern' : 'flat panel'} has none. Add words on the Text tab.`
       : isCube() ? 'The cube has no markings.' : 'The plain sphere has no markings.';
     return [section('Markings', note(what))];
   }
@@ -890,6 +1013,7 @@ function textTab() {
 
   const add = () => {
     const n = defaultTextItem(items.length);
+    if (isLantern() && app.shape?.kind === 'lantern') n.panelX = sideCenterU(app.shape.sideW, 0); // on the front
     items.push(n); app.selectedText = n.id; changed('field'); renderTab();
   };
   const list = items.map((t, i) => el('div', { class: 'text-row' + (t.id === app.selectedText ? ' active' : '') },
@@ -905,7 +1029,7 @@ function textTab() {
     el('button', {
       class: 'btn small', title: 'Make a copy just below',
       onclick: () => {
-        const c = { ...structuredClone(t), id: defaultTextItem().id, up: t.up - t.size * 1.6 };
+        const c = { ...structuredClone(t), id: defaultTextItem().id, up: t.up - t.size * 1.6, panelY: (t.panelY ?? 0) - t.size * 1.6 };
         items.splice(i + 1, 0, c); app.selectedText = c.id; changed('field'); renderTab();
       },
     }, 'Copy'),
@@ -940,16 +1064,24 @@ function textTab() {
         { value: 'carved', label: 'Carved (dark)', title: 'Thicker plastic: glows dark, outside stays smooth' },
         { value: 'bright', label: 'Bright', title: 'Thinner plastic: glows lighter than around it' },
         // Raised text isn't offered on a panel (it prints as carved)
-        isPanel() ? null : { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
+        isPanel() || isLantern() ? null : { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
       ].filter(Boolean), 'field', () => renderTab()),
-      isPanel() && it.style === 'raised' ? note('On a panel, raised text prints as carved.', 'warn') : null,
-      !isPanel() && it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
+      (isPanel() || isLantern()) && it.style === 'raised' ? note('On a panel, raised text prints as carved.', 'warn') : null,
+      !isPanel() && !isLantern() && it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
       slider(`${p}.size`, 'Letter height', 4, 60, 0.5, { fmt: mm }),
       it.size < font.minSize ? note(`Letters under ${font.minSize} mm may not print cleanly in this font.`, 'warn') : null,
       slider(`${p}.arc`, 'Bend (smile to arch)', -180, 180, 1, { fmt: deg }),
       checkbox(`${p}.outline`, 'Bright outline around letters (helps over dark photo areas)'),
     ),
-    isPanel() ? section('Place on the panel',
+    isLantern() && app.shape?.kind === 'lantern' ? section('Place on the lantern',
+      note('Click the lantern in the preview to move this text there, then fine-tune:'),
+      slider(`${p}.panelX`, 'Around the lantern', Math.round(-2 * app.shape.sideW), Math.round(2 * app.shape.sideW), 0.5, {
+        fmt: (v) => { const W = app.shape.sideW, k = sideOf(W, +v); return `${LANTERN_SIDES[k]}, ${(+v - sideCenterU(W, k)).toFixed(0)} mm`; },
+      }),
+      slider(`${p}.panelY`, 'Up / down', Math.round(-app.shape.H / 2), Math.round(app.shape.H / 2), 0.5, { fmt: mm }),
+      slider(`${p}.rotate`, 'Rotate', -180, 180, 1, { fmt: deg }),
+      note('Keep text about 6 mm away from the side edges of a panel: they sit in the pillars\' slots.'),
+    ) : isPanel() ? section('Place on the panel',
       note('Click the panel in the preview to move this text there, then fine-tune:'),
       slider(`${p}.panelX`, 'Left / right', Math.round(-(app.shape?.W ?? 150) / 2), Math.round((app.shape?.W ?? 150) / 2), 0.5, { fmt: mm }),
       slider(`${p}.panelY`, 'Up / down', Math.round(-(app.shape?.H ?? 150) / 2), Math.round((app.shape?.H ?? 150) / 2), 0.5, { fmt: mm }),
@@ -1022,7 +1154,30 @@ function panelBaseTab() {
   ];
 }
 
+/** Base tab, lantern: the puck light and even glow (the frame parts export on the Export tab). */
+function lanternBaseTab() {
+  const s = app.settings, geo = lanternGeometry(s);
+  return [
+    section('Light: LED puck',
+      numberInput('base.puckD', 'Puck diameter (mm)', 30, 160),
+      numberInput('base.puckH', 'Puck height (mm)', 5, 60),
+      note('Measure your puck with calipers. It sits on the table in the round hole in the base\'s floor, so you lift the lantern off to switch it on or change its batteries.'),
+      geo.puckFits ? null : note(`This puck is too wide for the lantern (the inside is ${Math.round(2 * geo.inner)} mm across). Use a smaller puck or bigger panels.`, 'warn'),
+      slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }),
+      note('A USB puck\'s cable leaves through the notch at the back of the base.'),
+    ),
+    section('Even glow',
+      checkbox('evenGlow.on', 'Even glow (thinner plastic farther from the light)', 'field', () => renderTab()),
+      s.evenGlow.on ? slider('evenGlow.strength', 'Even glow strength', 0, 1, 0.01, { fmt: pct }) : null,
+      note('The puck sits low in the middle, so the bottoms of the panels get the most light. Even glow makes the plastic thinner higher up to balance it.'),
+    ),
+    section('Frame parts',
+      note(`Base ${Math.round(2 * (geo.half + 3))} mm square and ${geo.hB.toFixed(0)} mm tall, pillars ${geo.P.toFixed(1)} mm thick. Sizes and fit are on the Shape tab; export every part on the Export tab.`)),
+  ];
+}
+
 function baseTab() {
+  if (isLantern()) return lanternBaseTab();
   if (isPanel()) return panelBaseTab();
   const s = app.settings, b = s.base, info = app.baseInfo;
   const col = collarDims(s);
@@ -1109,7 +1264,67 @@ function fitCheck(size, diag) {
   return { cls: 'err', text: `Too big for your bed (${x.toFixed(0)} × ${y.toFixed(0)} mm on ${b.x} × ${b.y} mm).` };
 }
 
+/** Export tab, lantern: four panels and three frame parts, each its own file. */
+function lanternExportTab() {
+  const s = app.settings;
+  const bedInput = (k) => {
+    const i = el('input', { type: 'number', min: 50, max: 1000, step: 1, value: s.bed[k], 'aria-label': `Bed ${k}` });
+    i.addEventListener('change', () => { s.bed[k] = Math.max(50, parseFloat(i.value) || 256); scheduleAutosave(); renderTab(); });
+    return el('label', { class: 'row', style: 'gap:6px' }, k.toUpperCase(), i);
+  };
+  const geo = lanternGeometry(s);
+  const sidePanel = lanternSidePanel(s, geo);
+  const estBytes = (d) => stlBytes(estimateTriangles(sidePanel, OUTER_STEP, d.step));
+  const opts = Object.entries(DETAIL_PRESETS).map(([k, d]) => {
+    const radio = el('input', { type: 'radio', name: 'detail', value: k });
+    radio.checked = s.detail === k;
+    radio.addEventListener('change', () => { s.detail = k; scheduleAutosave(); renderTab(); });
+    const desc = { draft: 'Quick test prints', standard: 'Best for most prints', fine: 'Close-up portraits; big file' }[k];
+    return el('label', { class: 'detail-opt' + (s.detail === k ? ' active' : '') },
+      radio, el('span', {}, `${d.label} (${d.step} mm)`, el('small', {}, desc)), el('span', { class: 'size' }, `≈ ${(estBytes(d) / 1e6).toFixed(0)} MB each`));
+  });
+  const busy = app.exporting;
+  const fitEl = (size) => { const f = fitCheck(size); return el('div', { class: 'fit ' + f.cls }, f.text); };
+  const panelRows = LANTERN_SIDES.map((label, k) => {
+    const cfg = s.photos.find((c) => c.side === k && app.images[c.id]);
+    return el('div', { class: 'row', style: 'margin-top:6px' },
+      el('span', { class: 'grow' }, `${label}: ${cfg ? app.images[cfg.id].name : 'no photo (plain panel)'}`),
+      el('button', { class: 'btn small', disabled: busy || !app.shape, onclick: () => exportLanternPart('panel', k) }, 'Export'));
+  });
+  const partRow = (part, label) => {
+    const p = lanternPart(s, part, geo);
+    return [
+      el('div', { class: 'row', style: 'margin-top:10px' }, el('b', { class: 'grow' }, label),
+        el('button', { class: 'btn small', disabled: busy || !app.shape, onclick: () => exportLanternPart(part) }, 'Export')),
+      fitEl(p.size), note(p.how),
+    ];
+  };
+  const st = app.lastExport;
+  return [
+    section('Printer bed (mm)', el('div', { class: 'row' }, bedInput('x'), bedInput('y'), bedInput('z'))),
+    section('Panels',
+      ...opts, bigFileNote(DETAIL_PRESETS[s.detail] ? estBytes(DETAIL_PRESETS[s.detail]) : 0),
+      ...panelRows,
+      fitEl([geo.W, geo.T, geo.H]),
+      note('Each panel prints standing up on its bottom edge, picture side out. No supports needed; a brim helps tall panels stay put.')),
+    section('Frame parts',
+      ...partRow('pillar', 'Pillar (print 4)'), ...partRow('base', 'Base'), ...partRow('top', `Top: ${LANTERN_TOPS[geo.top.style]}`),
+      note('The frame isn\'t a lithophane: normal slicer settings are fine. Dark, opaque filament looks like your photo.')),
+    section('Progress',
+      el('div', { class: 'progress', hidden: !busy }, el('div', { id: 'exportBar' })),
+      busy ? note('Building…') : null,
+      st ? el('div', { class: 'stats' },
+        'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
+        'Size', el('b', {}, `${st.size.map((v) => v.toFixed(1)).join(' × ')} mm`),
+        'Plastic', el('b', {}, `≈ ${Math.round(st.volumeCm3 * 1.24)} g PLA at 100% infill (${st.volumeCm3.toFixed(0)} cm³)`),
+      ) : null,
+      note('Put it together: push the pillars onto the base\'s pegs, slide the panels down the slots into the base, then press the top on.'),
+      tipsLink()),
+  ];
+}
+
 function exportTab() {
+  if (isLantern()) return lanternExportTab();
   const s = app.settings;
   const bedInput = (k) => {
     const i = el('input', { type: 'number', min: 50, max: 1000, step: 1, value: s.bed[k], 'aria-label': `Bed ${k}` });
@@ -1271,7 +1486,14 @@ function exportStl() {
     toast(await workerErrorText(workerUrl, e, 'Export failed', true), 'err');
     done();
   };
-  // Copies of each visible photo's adjusted picture (the copies move to the worker), always at full size
+  const { photos, transfer } = photoPayload();
+  const moon = isMoonShape() ? app.moonMap : null;
+  worker.postMessage({ settings: structuredClone(s), photos, textMasks: app.textMasks, moon, stepInner: step, stepOuter: OUTER_STEP }, transfer);
+}
+
+/** Copies of each visible photo's adjusted picture (the copies move to the worker), always at full size. */
+function photoPayload() {
+  const s = app.settings;
   const photos = {}, transfer = [];
   for (const cfg of s.photos) {
     const im = app.images[cfg.id];
@@ -1284,8 +1506,42 @@ function exportStl() {
     photos[cfg.id] = { w: pr.w, h: pr.h, data, alpha };
     transfer.push(data.buffer); if (alpha) transfer.push(alpha.buffer);
   }
-  const moon = isMoonShape() ? app.moonMap : null;
-  worker.postMessage({ settings: structuredClone(s), photos, textMasks: app.textMasks, moon, stepInner: step, stepOuter: OUTER_STEP }, transfer);
+  return { photos, transfer };
+}
+
+/** Exports one lantern part: a panel (side 0..3), the pillar, the base or the top. */
+function exportLanternPart(part, side = 0) {
+  if (app.exporting || !app.shape || app.shape.kind !== 'lantern' || cannotExport()) return;
+  const s = app.settings;
+  const step = DETAIL_PRESETS[s.detail]?.step || 0.3;
+  app.exporting = true; renderTab();
+  const workerUrl = new URL('./exportWorker.js', import.meta.url);
+  const worker = new Worker(workerUrl, { type: 'module' });
+  const done = () => { app.exporting = false; worker.terminate(); renderTab(); };
+  const name = part === 'panel' ? `${LANTERN_SIDES[side].toLowerCase()}-panel-${s.detail}`
+    : part === 'pillar' ? 'pillar-print-4' : part === 'top' ? `top-${lanternGeometry(s).top.style}` : 'base';
+  worker.onmessage = (e) => {
+    const msg = e.data;
+    if (msg.type === 'progress') {
+      const bar = document.getElementById('exportBar');
+      if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
+    } else if (msg.type === 'done') {
+      const fileName = `${projectBaseName()}-${name}.stl`;
+      download(new Blob(msg.stl, { type: 'model/stl' }), fileName);
+      app.lastExport = { ...msg.stats, fileName };
+      toast(`Saved ${fileName}`);
+      done();
+    } else if (msg.type === 'error') {
+      toast(`Export failed: ${msg.message}`, 'err');
+      done();
+    }
+  };
+  worker.onerror = async (e) => {
+    toast(await workerErrorText(workerUrl, e, 'Export failed', part === 'panel'), 'err');
+    done();
+  };
+  const { photos, transfer } = part === 'panel' ? photoPayload() : { photos: {}, transfer: [] };
+  worker.postMessage({ kind: 'lantern', part, side, settings: structuredClone(s), photos, textMasks: app.textMasks, stepInner: step, stepOuter: OUTER_STEP }, transfer);
 }
 
 // ---------- Wiring ----------
@@ -1332,12 +1588,13 @@ preview.onDragStart = (h) => {
   if (!ev.photoId || ev.photoId !== app.selectedPhoto) return false;
   const cfg = app.settings.photos.find((p) => p.id === ev.photoId);
   if (!cfg) return false;
-  if (app.shape.kind === 'panel') {
-    // A window moves on the panel; a photo filling the panel slides inside it instead
+  if (isFlatShape(app.shape)) {
+    // A window moves on the panel; a photo filling the panel (or a lantern side) slides inside it instead
     const im = app.images[cfg.id];
     const imgAspect = im ? im.base.h / im.base.w : 1;
-    const cover = Math.max(1, (app.shape.H / app.shape.W) / imgAspect);
-    grab = { cfg, panel: true, u0: ev.u, v0: ev.v, x0: cfg.panelX, y0: cfg.panelY, px0: cfg.panX, py0: cfg.panY, k: app.shape.W * Math.max(0.05, cfg.zoom) * cover, imgAspect };
+    const W = app.shape.kind === 'lantern' ? app.shape.sideW : app.shape.W;
+    const cover = Math.max(1, (app.shape.H / W) / imgAspect);
+    grab = { cfg, panel: true, u0: ev.u, v0: ev.v, x0: cfg.panelX, y0: cfg.panelY, px0: cfg.panX, py0: cfg.panY, k: W * Math.max(0.05, cfg.zoom) * cover, imgAspect };
     return true;
   }
   const at = placementAt(app.shape, h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)));
@@ -1350,7 +1607,7 @@ preview.onDragMove = (h) => {
     const ev = {};
     app.field.eval(h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)), ev);
     const du = ev.u - grab.u0, dv = ev.v - grab.v0, c = grab.cfg;
-    if (c.panelW > 0) {
+    if (c.panelW > 0 && app.shape.kind === 'panel') {
       const W = app.shape.W / 2, H = app.shape.H / 2;
       c.panelX = +Math.max(-W, Math.min(W, grab.x0 + du)).toFixed(1);
       c.panelY = +Math.max(-H, Math.min(H, grab.y0 + dv)).toFixed(1);
@@ -1373,7 +1630,7 @@ preview.onPick = (h) => {
   if (app.tab !== 'text' || !app.shape) return;
   const it = (app.settings.texts || []).find((t) => t.id === app.selectedText);
   if (!it) return;
-  if (app.shape.kind === 'panel') {
+  if (isFlatShape(app.shape)) {
     const ev = {};
     app.field.eval(h.u * 2 * Math.PI, Math.min(1, Math.max(0, h.v)), ev);
     Object.assign(it, { panelX: +ev.u.toFixed(1), panelY: +ev.v.toFixed(1) });
@@ -1424,7 +1681,7 @@ $('btnNew').addEventListener('click', () => {
   // A new project starts from your own defaults: printer bed, size, wall thickness, opening and base
   const old = app.settings;
   app.settings = defaultSettings();
-  for (const k of ['bed', 'sizePreset', 'diameter', 'footballLength', 'footballWidth', 'tMin', 'tMax', 'opening', 'cube', 'panel', 'base', 'detail']) {
+  for (const k of ['bed', 'sizePreset', 'diameter', 'footballLength', 'footballWidth', 'tMin', 'tMax', 'opening', 'cube', 'panel', 'lantern', 'base', 'detail']) {
     if (old[k] !== undefined) app.settings[k] = structuredClone(old[k]);
   }
   app.images = {}; app.selectedPhoto = null; app.selectedText = null; app.textMasks = null;

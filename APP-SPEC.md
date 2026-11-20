@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -20,6 +20,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 1.1 | Flat panel (feature 12b): square, rectangle, circle, heart; curve; frame; light-box base, slot stand and feet |
 | 1.2 | Speed: faster tone sliders and Base tab, lighter big-base and Fine exports, 3D view pauses when idle (from the 1.0.3 review) (done) |
 | 1.3 | "Picture detail on the" choice is back: inside or outside for balls and cubes, back or front for panels (done) |
+| 1.4 | Lantern (feature 12c): 4 flat panels in a frame of pillars, a base with a puck light, and a choice of 3 tops (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -86,6 +87,19 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
       - **Slot stand**: a small stand with a slot and no light, for a window or with a lamp behind.
     - **Even glow** (from the cube): with the light box, the bottom of the panel is nearest the light, so the app can make the plastic thinner higher up to even it out. On by default when the light box is chosen; strength slider.
     - Wall thickness, detail levels, preview modes, Thickness view, export, saving and project files work the same as for the lamps. The print tips page and both PDF guides get a panel section.
+
+12c. **Lantern** (version 1.4): four flat lithophane panels, one on each side, held in a printed frame, inspired by the Japanese-style lantern in your photo (2026-11-19). A new choice on the Shape tab.
+    - **One project, four photos**: the Photo tab shows four places, **Front, Right, Back, Left**, one photo each. Each photo has the usual tone, zoom, pan, cut-out and text tools. The 3D preview shows the whole lantern put together and lit, so you can turn it and see every side.
+    - **Panels**: all four the same size. Rectangle (portrait or landscape: 4×6, 5×7, 8×10 in or custom) or square (4, 6, 8 in or custom). **4×6 in portrait to start.** Flat (no curve), no raised frame (the pillars, base and top hide the edges) and no feet. **Picture detail facing out** (the Front setting from 1.3), smooth back toward the light. Each panel prints standing up on its bottom edge, like a flat panel.
+    - **Even glow** (from the cube and light box): the puck sits low in the middle, so the bottoms of the panels are nearest the light. The app makes the plastic thinner higher up to even it out. On by default at 50%, with a strength slider.
+    - **Frame parts** (separate files, printed in any colour; a dark colour looks like your photo):
+      - **Pillar** (one file, print 4): square, with a slot down two neighbouring faces at a right angle, so two panels meet at each corner. The slots stop short of each other, so the pillar stays one piece, and each panel edge goes about 6 mm in (never less than 4 mm: very thick panels get thicker pillars). A peg hole in its foot and a peg on its head (as built: a peg on the foot would leave the pillar standing on its peg, which can't be printed). It prints standing up on its foot when it fits the printer, and lying on an outer face when it's too tall.
+      - **Base**: a frame round the bottom of the panels, with a groove each panel's bottom edge drops into and square pegs that stand up from its corners into the pillars' feet. Its corner blocks stand out a little past the pillars, like the feet in your photo. A thin floor on the table has a round hole for the **puck light** (70 × 20 mm until you measure yours; the Base tab has boxes for both): the puck sits on the table in the hole, so you lift the lantern off to switch it on or change its batteries. A notch at the back lets a USB cable out.
+      - **Top** (a choice of 3): **Like your photo**: a frame with crossed beams, short posts above the pillars, corner caps that stick out and an open lattice in the middle. **Pagoda roof**: a 45-degree four-sided roof whose eaves come down outside the frame, with vents in the frame under the eaves; a lower top leaves a square opening at the peak. **Simple lid**: a flat cap with a pattern of vent holes. Every top has holes for the pillar pegs and a groove that holds the panels' top edges. It lifts off.
+    - **Putting it together**: push the pillars onto the base's pegs, slide the four panels down the slots into the base groove, then press the top onto the pillar pegs. Holds without glue and comes apart to swap panels; a drop of glue makes it permanent.
+    - **Sizing**: everything follows the panel size and thickness. The slots and grooves are as wide as the panel (Thickest + 0.4 mm, so 3.4 mm by default) plus "Slot fit". A few sliders: **pillar thickness, base height, top height, top overhang, slot fit, peg fit.**
+    - **Export**: separate buttons for each part: Front, Right, Back and Left panels, Pillar (print 4), Base, Top. Each part has its own size estimate and printer-fit check, and is laid out the way it should print, without supports.
+    - Wall thickness, detail levels, preview modes, Thickness view, saving and project files work as for the other shapes. The print tips page and both PDF guides get a lantern section.
 
 13. **Markings per design**: each marking set (lines, panels, laces, seams) can be **carved in** (thicker plastic, glows dark, smooth outside), **raised** (sticks out from the surface), or **off**. Line width and darkness are adjustable.
 14. **Size presets** plus a custom size field. The football scales with the preset:
@@ -271,6 +285,26 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Version order | Flat panel is 1.1; speed work becomes 1.2 | You (2026-11-19) |
 | Panel relief side | Back by default (smooth front); "Front" offered since 1.3, which moves the frame to the front too and keeps the back flat | You (2026-11-19) |
 | Cube top face with outside detail | Keeps its detail inside, so the face that prints on the bed stays flat | Assumed (Claude's default) |
+| Lantern: what the app makes | One project with 4 photos; exports 4 panels plus the frame parts | You (2026-11-19) |
+| Lantern: panel shapes | Rectangle and square, all four the same size, flat | You (2026-11-19) |
+| Lantern: starting panel size | 4×6 in portrait | You (2026-11-19, accepted default) |
+| Lantern: light | Puck light in a floor pocket, 70 × 20 mm until measured; lift the lantern to reach it; USB cable notch | You (2026-11-19) |
+| Lantern: assembly | Pegs and holes, no glue needed; panels slide down from the top and the top lifts off | You (2026-11-19) |
+| Lantern: where the pegs are | On the base (pointing up) and on each pillar's head; holes in the pillar's foot and under the top, so every pillar prints standing on a flat end | Assumed (Claude's default, found while building) |
+| Lantern: panel picture side and frame | Picture detail facing out; no raised frame on the panels | You (2026-11-19) |
+| Lantern: top styles | Like your photo, pagoda roof and simple lid, all in 1.4 | You (2026-11-19) |
+| Lantern: base style | Like your photo: bottom frame, pillars run down as legs, puck on a floor inside | You (2026-11-19) |
+| Lantern: export | A separate button per part (4 panels, pillar, base, top) | You (2026-11-19) |
+| Lantern: adjustments | Pillar thickness, base height, top height, top overhang, slot fit, peg fit | You (2026-11-19) |
+| Lantern: photos per side | One photo per side; collages per side later | You (2026-11-19, accepted default) |
+| Lantern: version | 1.4 | You (2026-11-19) |
+| Lantern: printer | Fit checked against 256 × 256 × 256 mm; pillars lie down when too tall to stand | You (2026-11-19, accepted default) |
+| Lantern: even glow | On by default at 50% (thinner higher up, as the puck sits low) | Assumed (Claude's default) |
+| Lantern: pillar slots | One pillar file printed 4 times, slots on two neighbouring faces, panel edges about 6 mm deep in the slot | Assumed (Claude's default) |
+| Lantern: print direction of frame parts | The app lays out each part to print without supports: pillars on their foot (or lying down when too tall), the base as it sits, the photo-style and pagoda tops as they sit (their overhangs are cut at 45 degrees), the lid upside down | Assumed (Claude's default) |
+| Lantern: base feet | The base's corner blocks stand 3 mm out past the pillars, like feet, instead of the pillars running through the base | Assumed (Claude's default, found while building: simpler and prints without supports) |
+| Lantern: puck | Sits on the table in a round hole in the base's floor, so the lantern lifts off it | Assumed (Claude's default) |
+| Lantern: text | Placed round the lantern by clicking it; raised text prints as carved, as on a panel | Assumed (Claude's default) |
 | Panel print direction | Upright on its bottom edge; circles and hearts get a small flat; brim suggested | Assumed (Claude's default) |
 | Panel feet | Optional, off by default | Assumed (Claude's default) |
 | Panel even glow | On by default with the light box | Assumed (Claude's default) |
@@ -285,6 +319,8 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Even glow for balls too?** The same distance correction could help Large balls. Decide after seeing it on the cube. (You, after 0.7)
 - **Light-box light:** how even the glow is from a strip in the base, and whether the default even-glow strength is right. (You, at the first panel print)
 - **Heart and circle on the bed:** whether the small flat on the bottom is enough for them to print upright without tipping, or whether they need a brim or a wider flat. (You, at the first heart/circle print)
+- **Lantern peg and slot fit:** the default fit is a guess. Print the base and one pillar first and adjust "Peg fit" and "Slot fit" before printing everything. (You, at the first lantern print)
+- **Lantern light:** whether one puck lights all four sides evenly enough, and whether the even-glow strength is right for it. (You, at the first lantern print)
 - **File sizes:** measured (see feature 20). Still to confirm: does your slicer handle the Standard file comfortably? (You, at test print)
 
 ## How we'll know it works
@@ -296,6 +332,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 6. On a phone, you can load a photo, adjust it, preview, and export at Standard.
 7. A Medium cube with five different photos exports in one STL, prints upside down with no supports, sits on your current base, and glows evenly from bottom to top.
 8. A 5×7 in flat panel from one of your photos prints standing up with no supports, drops into its light-box base, and glows with a clear, even picture. The same works for a curved panel and a 6 in heart.
+9. A lantern with four 4×6 in panels: every part prints without supports and fits your printer. The pillars push into the base, the panels slide down the slots, and the top presses on and lifts off again. With the puck switched on, all four pictures glow clearly and evenly. Changing to 5×7 panels and the pagoda roof resizes everything, and it still fits together.
 
 ## Build progress
 
@@ -314,6 +351,18 @@ Checks passed: 10 automated tests (2 new: outside relief is watertight, keeps th
 ### Version 0.2.1: done (2026-11-18)
 Removed the "Photo detail on the inside / outside" option at your request; photo detail is always on the inside. Saved projects that used Outside open as Inside.
 "Plain ball brightness" now also shows the wall it makes in mm, e.g. "55% (1.79 mm)", matching the Thickness view readout.
+
+### Version 1.4: lantern, done (2026-11-19)
+Built (feature 12c): **Lantern (4 panels)** on the Shape tab.
+- **Panels**: rectangle (4×6, 5×7, 8×10 in, portrait or landscape, or custom) or square (4, 6, 8 in or custom), all four the same, flat, no frame, picture detail facing out. The four panels are handled as one strip that folds round the lantern, so photos, text, the Thickness view and dragging work just as on a flat panel. Each panel exports on its own as a normal flat panel, standing on its bottom edge.
+- **Photos**: one per side (Front, Right, Back, Left), up to 4; the Photo tab has a side picker that swaps photos between sides. Dragging a photo slides it within its side.
+- **Frame**: pillars (one file, print 4), base and top, all sized from the panel size and thickness. Shape tab: pillar thickness, base height, slot fit, peg fit, top style (Like the photo, Pagoda roof, Simple lid), top height and overhang. Base tab: puck size, cable notch, even glow.
+- **Preview**: the whole lantern put together and lit, frame and all (each part meshed once, the pillar copied to the corners: about half a second).
+- **Export tab**: a button for each panel and each frame part, each with its own printer-fit check and a note on how it prints.
+
+Checks passed: 85 automated tests (7 new: the slots hold the panels at least 4 mm deep and the pillar stays one piece for every pillar, wall and fit setting; every point of all four panels is clear of the frame for three sizes and all three tops, with pillar lips in front and groove floors and roofs above and below; pegs clear their holes by the fit and no more; every frame part is a closed solid with nothing needing supports beyond short bridges, including a tall pillar lying down; the preview frame matches the parts; the strip puts each photo on its own side, even glow thins the panels higher up, and a panel exports as a closed W × T × H solid; every top keeps a sensible height). In the browser: the lantern showed with all three tops, landscape and square panels; all seven files exported closed with no bad edges (four 102 × 152 mm panels at 11.8 MB Draft, the pillar 16 × 16 × 149 mm, the base 127 × 127 × 30 mm, the top 141 × 141 × 32 mm); swapping sides, dragging a photo, clicking to place text and switching to a ball and back all worked; the phone layout fits without sideways scrolling.
+
+Not tried yet: a real print. Print the base and one pillar first to check the peg and slot fit.
 
 ### Version 1.3: picture detail on the outside or front, done (2026-11-19)
 Brought back at your request, after a print looked crisper seen from the side the detail is on:

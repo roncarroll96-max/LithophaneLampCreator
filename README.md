@@ -1,8 +1,8 @@
 # Lithophane Lamp Creator
 
 Turn photos into 3D-printable lithophane lamps (STL): balls (basketball, soccer, football,
-baseball/softball, volleyball, plain), a Moon, or a cube with a photo on each side, plus a
-matching base for an LED puck, an LED strip or a bulb. Everything runs in your browser;
+baseball/softball, volleyball, plain), a Moon, a cube with a photo on each side, flat panels, or a
+lantern of four panels in a frame, plus a matching base for an LED puck, an LED strip or a bulb. Everything runs in your browser;
 photos never leave your computer. Works on desktop, tablet and phone.
 
 See [APP-SPEC.md](APP-SPEC.md) for the full specification.
@@ -34,6 +34,10 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    The cube STL comes out upside down, top face on the bed, ready to print without supports.
    For a **flat panel**: rectangle (match the photo, 4×6, 5×7, 8×10 in or custom), square, circle or heart;
    a curve slider; a raised frame; optional feet. Several photos can make a collage ("Arrange as collage").
+   For a **lantern** (4 panels): the panel size (4×6, 5×7, 8×10 in or square), pillar thickness, base height,
+   slot and peg fit, and the top (like a Japanese lantern, a pagoda roof or a simple lid). Each photo fills one
+   side; the Base tab takes your puck light's size. The Export tab has a button for each panel, the pillar
+   (print 4), the base and the top, each already turned for printing without supports.
    On the Base tab, choose a light box (with an LED strip), a slot stand or none. The panel STL stands
    on its bottom edge, ready to print without supports (use a brim).
 4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
