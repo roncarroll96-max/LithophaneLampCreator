@@ -84,6 +84,17 @@ button, input, select { font: inherit; color: inherit; }
   border: 0; background: transparent; padding: 5px 12px; border-radius: 6px; cursor: pointer; color: var(--muted);
 }
 .seg.active { background: var(--panel-2); color: var(--amber); box-shadow: inset 0 0 0 1px #4a3a2a; }
+.light-pick {
+  position: absolute; top: 56px; left: 12px; z-index: 2; display: flex; gap: 8px; align-items: center;
+  background: rgba(20, 16, 22, .85); border: 1px solid var(--line); border-radius: 9px; padding: 6px 8px;
+}
+.light-pick[hidden] { display: none; }
+.light-dot {
+  width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35);
+}
+.light-dot.active { border-color: #fff; }
+.light-dot:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 .view-reset { position: absolute; top: 12px; right: 12px; z-index: 2; background: rgba(20, 16, 22, .85); }
 .text-list { display: flex; flex-direction: column; gap: 6px; }
 .text-row { display: flex; gap: 6px; align-items: center; }
@@ -251,6 +262,8 @@ input[type=number] { width: 90px; }
   input[type=range]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -9px; }
   /* Bigger targets for fingers */
   .btn.small, .seg { min-height: 40px; }
+  .light-pick { top: 66px; }
+  .light-dot { width: 28px; height: 28px; }
   .btn.small { padding-left: 12px; padding-right: 12px; }
   .check { min-height: 40px; align-items: center; }
   .check input[type=checkbox] { width: 22px; height: 22px; flex: none; }

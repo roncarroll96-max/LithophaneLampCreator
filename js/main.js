@@ -1,6 +1,6 @@
 // Lithophane Lamp Creator: app wiring (state, panels, preview updates, export, saving).
 
-import { Preview } from './preview.js';
+import { Preview, LIGHT_COLORS } from './preview.js';
 import { decodeImage, extractLuma, shrinkBase, autoAdjust, processPhoto, drawGray } from './image.js';
 import { buildEllipsoidShape } from './core/shapes.js';
 import { createField } from './core/field.js';
@@ -67,6 +67,32 @@ try {
   throw err;
 }
 $('appVersion').textContent = `v${APP_VERSION}`;
+
+// Light colour for the Lit view: a viewer preference, remembered in this browser (not saved in projects)
+(function lightPicker() {
+  let pick = 'warm';
+  try { const v = localStorage.getItem('lightColor'); if (LIGHT_COLORS[v]) pick = v; } catch { /* storage blocked */ }
+  const box = $('lightPick');
+  for (const [key, c] of Object.entries(LIGHT_COLORS)) {
+    const b = document.createElement('button');
+    b.className = 'light-dot' + (key === pick ? ' active' : '');
+    b.dataset.light = key;
+    b.title = `${c.label} light`;
+    b.setAttribute('aria-label', `${c.label} light`);
+    b.setAttribute('aria-pressed', String(key === pick));
+    b.style.background = `rgb(${c.rgb.map((x) => Math.round(x * 255)).join(',')})`;
+    b.addEventListener('click', () => {
+      box.querySelectorAll('.light-dot').forEach((x) => {
+        x.classList.toggle('active', x === b);
+        x.setAttribute('aria-pressed', String(x === b));
+      });
+      preview.setLightColor(key);
+      try { localStorage.setItem('lightColor', key); } catch { /* storage blocked */ }
+    });
+    box.appendChild(b);
+  }
+  preview.setLightColor(pick);
+})();
 const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 
 // ---------- Messages ----------
@@ -1555,6 +1581,7 @@ document.querySelectorAll('.view-toggle .seg').forEach((b) => b.addEventListener
   document.querySelectorAll('.view-toggle .seg').forEach((x) => x.classList.toggle('active', x === b));
   preview.setMode(b.dataset.view);
   $('thickLegend').hidden = b.dataset.view !== 'thickness';
+  $('lightPick').hidden = b.dataset.view !== 'glow';
   updateThicknessLegend();
 }));
 

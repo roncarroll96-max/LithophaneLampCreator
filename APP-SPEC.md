@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -21,6 +21,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 1.2 | Speed: faster tone sliders and Base tab, lighter big-base and Fine exports, 3D view pauses when idle (from the 1.0.3 review) (done) |
 | 1.3 | "Picture detail on the" choice is back: inside or outside for balls and cubes, back or front for panels (done) |
 | 1.4 | Lantern (feature 12c): 4 flat panels in a frame of pillars, a base with a puck light, and a choice of 3 tops (done) |
+| 1.4.1 | Light colour in the Lit view: white, warm white, yellow or amber (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -300,6 +301,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Lantern: version | 1.4 | You (2026-11-19) |
 | Lantern: printer | Fit checked against 256 × 256 × 256 mm; pillars lie down when too tall to stand | You (2026-11-19, accepted default) |
 | Lantern: even glow | On by default at 50% (thinner higher up, as the puck sits low) | Assumed (Claude's default) |
+| Lit view light colour | Four choices (white, warm white, yellow, amber), picked with colour dots under the view buttons; warm white is the default instead of amber. Remembered in the browser, not saved in projects, as it only changes the preview | You asked for white or yellowish (2026-11-20); the choices and default are Claude's |
 | Lantern: pillar slots | One pillar file printed 4 times, slots on two neighbouring faces, panel edges about 6 mm deep in the slot | Assumed (Claude's default) |
 | Lantern: print direction of frame parts | The app lays out each part to print without supports: pillars on their foot (or lying down when too tall), the base as it sits, the photo-style and pagoda tops as they sit (their overhangs are cut at 45 degrees), the lid upside down | Assumed (Claude's default) |
 | Lantern: base feet | The base's corner blocks stand 3 mm out past the pillars, like feet, instead of the pillars running through the base | Assumed (Claude's default, found while building: simpler and prints without supports) |
@@ -335,6 +337,11 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 9. A lantern with four 4×6 in panels: every part prints without supports and fits your printer. The pillars push into the base, the panels slide down the slots, and the top presses on and lifts off again. With the puck switched on, all four pictures glow clearly and evenly. Changing to 5×7 panels and the pagoda roof resizes everything, and it still fits together.
 
 ## Build progress
+
+### Version 1.4.1: light colour in the Lit view, done (2026-11-20)
+Built: four colour dots under the Lit / Plain / Thickness buttons (shown only in the Lit view) change the colour of the light: White, Warm white (new default), Yellow, Amber (the old colour). The ball, collar, glow ring and the pool of light on the floor all follow it. The choice is remembered in this browser; it changes only the preview, not the files.
+
+Checks passed: all automated tests; in the browser, all four colours change the preview, the choice survives a reload, the dots hide in Plain and Thickness, and the phone layout has no overlap or sideways scroll.
 
 ### Milestone 1: done (2026-11-18, git commit 278a773)
 Built and tested: photo loading with automatic adjustments and tone sliders; photo placement and window settings; basketball and plain sphere; carved, raised or no lines; Small/Medium/Large sizes; opening and collar; Lit and Plain preview; STL export with detail choice, bed-fit check and plastic estimate; browser auto-save and project files; desktop and phone layouts.

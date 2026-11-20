@@ -24,6 +24,7 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    choose whether the empty area blends into the ball, glows bright or stays dark.
 2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes.
    The **Thickness** button above the preview shows the walls as a grey map; point at the ball to read the thickness in mm.
+   In the **Lit** view, the colour dots under the buttons change the colour of the light (white, warm white, yellow or amber). It only changes the preview.
 3. **Shape** tab: shape (basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon or cube),
    size (Small 100 / Medium 150 / Large 200 mm; footballs 160 × 100 / 240 × 150 / 280 × 175 mm),
    wall thickness, opening and collar. "Picture detail on the" puts the picture's bumps inside (smooth ball, the

@@ -5,7 +5,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
 import { buildPreviewGrid, buildGlowTexture, MU } from './core/previewData.js';
 
-const AMBER = new THREE.Color(1.0, 0.62, 0.25);
+// Colours of the light in the Lit view (the viewer picks one; it only changes the preview)
+export const LIGHT_COLORS = {
+  white:  { label: 'White',      rgb: [1.0, 0.97, 0.92] },
+  warm:   { label: 'Warm white', rgb: [1.0, 0.88, 0.68] },
+  yellow: { label: 'Yellow',     rgb: [1.0, 0.84, 0.42] },
+  amber:  { label: 'Amber',      rgb: [1.0, 0.62, 0.25] },
+};
+const AMBER = new THREE.Color(...LIGHT_COLORS.warm.rgb); // the current light colour (changed by setLightColor)
 
 export class Preview {
   constructor(container) {
@@ -129,6 +136,16 @@ export class Preview {
     this.camera.updateProjectionMatrix();
   }
 
+  /** Changes the colour of the light in the Lit view (one of LIGHT_COLORS). */
+  setLightColor(name) {
+    const c = LIGHT_COLORS[name] || LIGHT_COLORS.warm;
+    AMBER.setRGB(...c.rgb);
+    if (this.mode !== 'thickness') this.glowMat.color.copy(AMBER);
+    this.collarGlow.color.copy(AMBER).multiplyScalar(this._collarDim ?? 0.55);
+    for (const m of [this._ring, this._pool]) if (m) m.material.color.copy(AMBER);
+    this._dirty = true;
+  }
+
   setMode(mode) {
     this._dirty = true;
     const wasThickness = this.mode === 'thickness';
@@ -224,7 +241,8 @@ export class Preview {
     const collarGeom = new THREE.LatheGeometry(prof, 96);
     collarGeom.rotateX(Math.PI / 2);
     const tCol = Math.exp(-MU * (settings.opening.collarWall - settings.tMin));
-    this.collarGlow.color.copy(AMBER).multiplyScalar(Math.max(0.15, tCol));
+    this._collarDim = Math.max(0.15, tCol);
+    this.collarGlow.color.copy(AMBER).multiplyScalar(this._collarDim);
     this.collar = new THREE.Mesh(collarGeom, this.mode === 'plain' ? this.plainMat : this.collarGlow);
     this.group.add(this.collar);
 
