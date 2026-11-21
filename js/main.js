@@ -1,6 +1,9 @@
 // Lithophane Lamp Creator: app wiring (state, panels, preview updates, export, saving).
 
 import { Preview, LIGHT_COLORS } from './preview.js';
+import {
+  trimPreviewMesh, trimPartList, trimPart, DECOR_LABELS, ROOF_LABELS, TOPPER_LABELS, BODY_COLORS, TRIM_COLORS, DECOR_COLORS,
+} from './core/christmas.js';
 import { decodeImage, extractLuma, shrinkBase, autoAdjust, processPhoto, drawGray } from './image.js';
 import { buildEllipsoidShape } from './core/shapes.js';
 import { createField } from './core/field.js';
@@ -417,11 +420,20 @@ function projectBaseName() {
 }
 
 // ---------- Base preview (a quick, coarse version of the base under the lamp) ----------
+/** The Christmas lantern's preview colours (body and trim). */
+function applyLanternColors() {
+  const L = app.settings.lantern;
+  preview.setLanternColors(BODY_COLORS[L.bodyColor] ?? BODY_COLORS.green, TRIM_COLORS[L.trimColor] ?? TRIM_COLORS.gold);
+}
+
 function refreshBasePreview() {
   const s = app.settings;
   if (!app.shape) return;
+  // (the preview colours only recolour; they don't rebuild the frame)
+  const lanternKey = isLantern() ? { ...s.lantern, bodyColor: null, trimColor: null } : null;
   const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening, s.tMax,
-    isPanel() ? s.panel : null, isLantern() ? s.lantern : null]);
+    isPanel() ? s.panel : null, lanternKey]);
+  if (isLantern()) applyLanternColors();
   if (key === app.baseKey) return;
   app.baseKey = key;
   try {
@@ -429,7 +441,9 @@ function refreshBasePreview() {
       if (app.shape.kind !== 'lantern') { app.baseKey = null; return; }
       const fm = lanternFrameMesh(s, meshSdf);
       app.baseInfo = fm.info;
-      preview.setBase(fm.positions, fm.indices, fm.info);
+      const xmas = s.lantern.theme === 'christmas';
+      preview.setBase(fm.positions, fm.indices, { ...fm.info, colored: xmas, trim: xmas ? trimPreviewMesh(s, meshSdf) : null });
+      applyLanternColors();
       if (app.tab === 'base') renderTab();
       return;
     }
@@ -861,7 +875,13 @@ function lanternSections() {
       note(`The slots are ${geo.sw.toFixed(1)} mm wide for ${geo.T.toFixed(1)} mm panels; each panel edge goes ${geo.insert.toFixed(1)} mm into its slot.`),
       slider('lantern.pegFit', 'Peg fit (extra room)', 0.05, 0.6, 0.05, { fmt: mm, group: 'shape' }),
       note('Print the base and one pillar first to check the fit: too tight, add room; too loose, take some away.')),
-    section('Top',
+    section('Theme',
+      segmented('lantern.theme', [
+        { value: 'plain', label: 'Plain', title: 'The lantern with one of the three tops' },
+        { value: 'christmas', label: 'Christmas', title: 'A Christmas roof, a topper and trim pieces to glue on' },
+      ], 'shape', () => renderTab()),
+      L.theme === 'christmas' ? note('Christmas: the lantern prints in your main colour; the trim pieces print flat in a second colour and glue on afterwards.') : null),
+    L.theme === 'christmas' ? christmasSection(geo) : section('Top',
       segmented('lantern.top', Object.entries(LANTERN_TOPS).map(([k, label]) => ({
         value: k, label,
         title: { classic: 'Crossed beams, posts with caps and an open lattice', pagoda: 'A sloped roof with eaves and vents', lid: 'A flat cap with vent holes' }[k],
@@ -874,6 +894,34 @@ function lanternSections() {
       t.style === 'classic' ? note('The beams and caps stick out by the overhang; their undersides slope at 45 degrees so they print without supports.') : null,
       t.style === 'lid' ? note('A flat cap with vent holes. It prints upside down.') : null),
   ];
+}
+
+/** Shape tab, Christmas lantern: roof, topper, decoration, frame width, overhang and preview colours. */
+function christmasSection(geo) {
+  const L = app.settings.lantern, t = geo.top;
+  const segs = (path, labels, after) => segmented(path, Object.entries(labels).map(([value, label]) => ({ value, label })), 'shape', after || (() => renderTab()));
+  const colorSegs = (path, colors) => {
+    const bar = el('div', { class: 'segbar', role: 'group' });
+    for (const [k, hex] of Object.entries(colors)) {
+      const b = el('button', { class: 'seg' + (L[path] === k ? ' active' : ''), title: `${k} (preview only)` }, k[0].toUpperCase() + k.slice(1));
+      b.style.borderBottom = `3px solid #${hex.toString(16).padStart(6, '0')}`;
+      b.addEventListener('click', () => { L[path] = k; scheduleAutosave(); applyLanternColors(); renderTab(); });
+      bar.append(b);
+    }
+    return bar;
+  };
+  return section('Christmas',
+    el('div', { class: 'row' }, el('span', { class: 'grow' }, 'Roof')), segs('lantern.xRoof', ROOF_LABELS),
+    el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, 'Topper')), segs('lantern.topper', TOPPER_LABELS),
+    el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, 'Decoration')),
+    segs('lantern.decor', DECOR_LABELS, (v) => { [L.bodyColor, L.trimColor] = DECOR_COLORS[v]; applyLanternColors(); renderTab(); }),
+    slider('lantern.trimCover', 'Frame over the picture', 6, 25, 1, { fmt: mm, group: 'shape' }),
+    note(`The side frames cover the outer ${geo.xmas.cover.toFixed(0)} mm of each picture. Keep faces and words away from the edges.`),
+    slider('lantern.overhang', 'Eaves', 3, 30, 0.5, { fmt: mm, group: 'shape' }),
+    note(`The roof is ${Math.round(t.height)} mm tall at ${Math.round((Math.atan(t.k) * 180) / Math.PI)} degrees${t.k > 0.6 ? ' (a little steeper, so the inside still prints without supports)' : ''}.`),
+    el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, 'Preview colours: body')), colorSegs('bodyColor', BODY_COLORS),
+    el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, 'Preview colours: trim')), colorSegs('trimColor', TRIM_COLORS),
+    note('The colours only change the preview: choose your filaments in your slicer.'));
 }
 
 /** Which side the picture detail goes on (balls and cubes: inside or outside; panels: back or front). */
@@ -1117,7 +1165,9 @@ function textTab() {
       }),
       slider(`${p}.panelY`, 'Up / down', Math.round(-app.shape.H / 2), Math.round(app.shape.H / 2), 0.5, { fmt: mm }),
       slider(`${p}.rotate`, 'Rotate', -180, 180, 1, { fmt: deg }),
-      note('Keep text about 6 mm away from the side edges of a panel: they sit in the pillars\' slots.'),
+      note(app.settings.lantern.theme === 'christmas'
+        ? `Keep text about ${Math.round(app.settings.lantern.trimCover + 2)} mm away from a panel's edges: the Christmas frames cover them.`
+        : 'Keep text about 6 mm away from the side edges of a panel: they sit in the pillars\' slots.'),
     ) : isPanel() ? section('Place on the panel',
       note('Click the panel in the preview to move this text there, then fine-tune:'),
       slider(`${p}.panelX`, 'Left / right', Math.round(-(app.shape?.W ?? 150) / 2), Math.round((app.shape?.W ?? 150) / 2), 0.5, { fmt: mm }),
@@ -1353,6 +1403,16 @@ function lanternExportTab() {
     section('Frame parts',
       ...partRow('pillar', `Pillar (print ${geo.n})`), ...partRow('base', 'Base'), ...partRow('top', `Top: ${LANTERN_TOPS[geo.top.style]}`),
       note('The frame isn\'t a lithophane: normal slicer settings are fine. Dark, opaque filament looks like your photo.')),
+    geo.theme === 'christmas' ? section('Christmas trim',
+      ...trimPartList(s, geo).flatMap(([key, label]) => {
+        const p = trimPart(s, key, geo);
+        return p ? [
+          el('div', { class: 'row', style: 'margin-top:10px' }, el('b', { class: 'grow' }, label),
+            el('button', { class: 'btn small', disabled: busy || !app.shape, onclick: () => exportLanternPart(key) }, 'Export')),
+          fitEl(p.size), note(p.how),
+        ] : [];
+      }),
+      note('Print the trim flat in your second colour (gold, cream...). Thin "super glue" or a PLA glue pen holds it.')) : null,
     section('All parts in one file', ...threeMfBlock()),
     section('Progress',
       el('div', { class: 'progress', hidden: !busy }, el('div', { id: 'exportBar' })),
@@ -1554,7 +1614,9 @@ function exportLanternPart(part, side = 0) {
   const worker = new Worker(workerUrl, { type: 'module' });
   const done = () => { app.exporting = false; worker.terminate(); renderTab(); };
   const name = part === 'panel' ? `${sideNames()[side].toLowerCase().replace(/\s+/g, '-')}-panel-${s.detail}`
-    : part === 'pillar' ? `pillar-print-${lanternN()}` : part === 'top' ? `top-${lanternGeometry(s).top.style}` : 'base';
+    : part === 'pillar' ? `pillar-print-${lanternN()}` : part === 'top' ? `top-${lanternGeometry(s).top.style}`
+    : part.startsWith('x') ? `trim-${{ xframe: `side-frame-print-${lanternN()}`, xbase: `base-print-${lanternN()}`, xlattice: `roof-lattice-print-${lanternN()}`, xdecor: s.lantern.decor === 'holly' ? 'holly' : 'snowflakes', xtopper: s.lantern.topper === 'star' ? 'star' : 'ring' }[part]}`
+    : 'base';
   worker.onmessage = (e) => {
     const msg = e.data;
     if (msg.type === 'progress') {
@@ -1622,7 +1684,7 @@ function export3mf() {
 /** The 3MF button and what goes in the file. */
 function threeMfBlock() {
   const s = app.settings;
-  const parts = isLantern() ? `${lanternN()} panels, ${lanternN()} pillars, the base and the top`
+  const parts = isLantern() ? `${lanternN()} panels, ${lanternN()} pillars, the base and the top${s.lantern.theme === 'christmas' ? ' (and every trim piece, as its own part for the second colour)' : ''}`
     : isPanel() && s.base.panelKind === 'none' ? `the ${where()}` : `the ${where()} and its base`;
   return [
     el('button', { class: 'btn block', style: 'margin-top:8px', disabled: app.exporting || !app.shape, onclick: export3mf },

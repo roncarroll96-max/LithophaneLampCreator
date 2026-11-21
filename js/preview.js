@@ -61,6 +61,9 @@ export class Preview {
     this.scene.add(this.group);
     this.collarGlow = new THREE.MeshBasicMaterial({ color: AMBER.clone().multiplyScalar(0.55) });
     this.baseMat = new THREE.MeshStandardMaterial({ color: 0x1b171d, roughness: 0.35, metalness: 0.2 });
+    // Christmas lantern (1.7): the body and its trim in the colours chosen for the preview
+    this.bodyMat = new THREE.MeshStandardMaterial({ color: 0x2f6b3f, roughness: 0.55, metalness: 0.05 });
+    this.trimMat = new THREE.MeshStandardMaterial({ color: 0xd4a73c, roughness: 0.35, metalness: 0.45 });
     this.floorMat = new THREE.MeshStandardMaterial({ color: 0x120e13, roughness: 0.9 });
 
     const el = this.renderer.domElement;
@@ -213,7 +216,7 @@ export class Preview {
     if (this.glowMat.side !== side) { this.glowMat.side = side; this.plainMat.side = side; this.glowMat.needsUpdate = true; this.plainMat.needsUpdate = true; }
     // Free the old stand's geometry and its own materials (shared ones are kept), but keep the
     // real base: it is put back below, since it only changes when the base settings change.
-    const shared = new Set([this.plainMat, this.collarGlow, this.baseMat, this.floorMat]);
+    const shared = new Set([this.plainMat, this.collarGlow, this.baseMat, this.floorMat, this.bodyMat, this.trimMat]);
     for (const child of [...this.group.children]) {
       if (child === this._baseMesh) continue;
       child.geometry?.dispose();
@@ -319,7 +322,9 @@ export class Preview {
   clearBase() {
     this._dirty = true;
     if (!this._baseMesh) return;
-    this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose(); this._baseMesh = null;
+    this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose();
+    for (const c of this._baseMesh.children) c.geometry.dispose();
+    this._baseMesh = null;
     if (this._floor && this._zBot != null) {
       this._floor.position.z = this._zBot;
       if (this._pool) this._pool.position.z = this._zBot + 0.2;
@@ -334,15 +339,31 @@ export class Preview {
    */
   setBase(positions, indices, info) {
     this._dirty = true;
-    if (this._baseMesh) { this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose(); }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    g.setIndex(new THREE.BufferAttribute(indices, 1));
-    g.computeVertexNormals();
-    this._baseMesh = new THREE.Mesh(g, this.baseMat);
+    if (this._baseMesh) {
+      this.group.remove(this._baseMesh); this._baseMesh.geometry.dispose();
+      for (const c of this._baseMesh.children) c.geometry.dispose();
+    }
+    const geom = (p, i) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(p, 3));
+      g.setIndex(new THREE.BufferAttribute(i, 1));
+      g.computeVertexNormals();
+      return g;
+    };
+    const g = geom(positions, indices);
+    // A Christmas lantern's frame is shown in its body colour, with its trim (info.trim) on it
+    this._baseMesh = new THREE.Mesh(g, info.colored ? this.bodyMat : this.baseMat);
+    if (info.trim && info.trim.indices.length) this._baseMesh.add(new THREE.Mesh(geom(info.trim.positions, info.trim.indices), this.trimMat));
     this._baseInfo = info;
     this.group.add(this._baseMesh);
     this._placeBase();
+  }
+
+  /** The Christmas lantern's preview colours (body and trim). */
+  setLanternColors(body, trim) {
+    this._dirty = true;
+    if (body != null) this.bodyMat.color.setHex(body);
+    if (trim != null) this.trimMat.color.setHex(trim);
   }
 
   _placeBase() {

@@ -48,7 +48,8 @@ const BRIDGE = 2.5;    // pillar plastic left between the ends of its two slots
 const SLOT_END = 0.5;  // room past a panel's edge at the bottom of its slot
 const PEG_LEN = 6, PEG_MARGIN = 2;
 const FEET = 3;        // the base's corner blocks stand out this far past the pillars
-const FRAME_H = { classic: 10, pagoda: 20, lid: 10 }; // height of the top's frame round the panels
+const FRAME_H = { classic: 10, pagoda: 20, lid: 10, low: 8, tiered: 8 }; // height of the top's frame round the panels
+// (for the Christmas roofs: how high the inside wall goes before the inside slopes in at 45 degrees)
 const ROOF_T = 2.5;    // pagoda roof thickness
 const SQ2 = Math.SQRT2;
 const TAU = 2 * Math.PI;
@@ -142,13 +143,23 @@ export function lanternGeometry(settings) {
   const tray = settings.base?.puckHold === 'tray';
   const trayFloor = 2, trayRim = Math.min(8, Math.max(3, Math.round(puckH * 0.4)));
   const puckZ = tray ? trayFloor : 0;                  // where the puck's bottom sits
-  const top = LANTERN_TOPS[L.top] ? L.top : 'classic';
+  // Christmas theme (version 1.7): its own roofs, a topper and trim pieces (core/christmas.js)
+  const christmas = L.theme === 'christmas';
+  const xmas = christmas ? {
+    roof: L.xRoof === 'tiered' ? 'tiered' : 'low',
+    topper: L.topper === 'star' ? 'star' : 'ring',
+    decor: L.decor === 'holly' ? 'holly' : 'snow',
+    cover: clamp(L.trimCover, 6, 25),
+  } : null;
+  const top = christmas ? xmas.roof : LANTERN_TOPS[L.top] ? L.top : 'classic';
   const hF = FRAME_H[top];
   const ov = clamp(L.overhang, 0, 30);
 
   // The top's own sizes and its height; R: how far out it reaches (along the sides' normals)
   const t = { style: top, hF, ov, R: half + ov };
-  if (top === 'classic') {
+  if (christmas) {
+    Object.assign(t, christmasRoofSizes({ n, a, half, inner, ov }, top));
+  } else if (top === 'classic') {
     t.bh = Math.max(8, ov + 1);                        // beam height (its ends are cut back at 45 degrees)
     t.capOv = Math.min(4, Math.max(2, ov / 2));        // how far a cap sticks out past its post
     t.capH = t.capOv + 3;
@@ -173,7 +184,7 @@ export function lanternGeometry(settings) {
   return {
     n, a, ca, sa, frames: sideFrames(n),
     W, H, T, sw, slotFit, sEnd, P, Dm, Dout: Dm + T / 2, half, inner, cP, Q, insert, hB, zG, zT, pillarL,
-    peg, pegFit, puckD, puckH, puckR, puckFits, tray, trayFloor, trayRim, puckZ, top: t,
+    peg, pegFit, puckD, puckH, puckR, puckFits, tray, trayFloor, trayRim, puckZ, top: t, theme: christmas ? 'christmas' : 'plain', xmas,
     notchSide: Math.floor(n / 2),                      // the cable leaves through this side's wall (the back)
     baseSize: boxSize(polyBox(n, half + FEET)),
     footBox, footprint: [fw, fd], width: Math.max(fw, fd), totalHeight: zT + t.height,
@@ -383,6 +394,7 @@ function topFrame(geo, h) {
  * (a flat cap with vent holes; prints upside down).
  */
 export function topSdf(geo) {
+  if (geo.top.style === 'low' || geo.top.style === 'tiered') return christmasRoofSdf(geo);
   const { half, inner, cP, P } = geo, t = geo.top, pd = polyD(geo), cd = cornerD(geo);
   if (t.style === 'classic') {
     const fr = topFrame(geo, t.hF);
@@ -432,6 +444,96 @@ export function topSdf(geo) {
     return Math.max(Math.hypot(x - cx, y - cy) - rh, zBand(z, t.hRing - 1, t.height + 1));
   };
   return subtract(union(fr.solid, plate), holes, ...fr.cuts);
+}
+
+// ---------------------------------------------------------------- Christmas roofs (version 1.7)
+// Both roofs print as they sit, with no supports: the eaves rest on a 45 degree flare that grows
+// out of the frame, and the inside is hollowed at 45 degrees up to a small flat ceiling (a short
+// bridge). The outside is a low roof (about 30 degrees; steeper only when a big lantern needs it to
+// keep that ceiling short). A socket in the flat peak takes the topper's tab.
+const XR = { rPeak: 7, socketD: 6.5, socketW: 6.4, socketT: 3.4, wall: 2.5, capMax: 15 };
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/** A Christmas roof's sizes: style 'low' (photo 1) or 'tiered' (photo 2, upturned corners). */
+function christmasRoofSizes({ half, inner, ov: ov0 }, style) {
+  const ov = clamp(ov0, 3, 30), edge = half + ov, hcb = FRAME_H[style];
+  const s = { ov, edge, R: edge, hcb, rPeak: XR.rPeak, socketD: XR.socketD, socketW: XR.socketW, socketT: XR.socketT };
+  if (style === 'tiered') {
+    Object.assign(s, {
+      ef: 3.5, rb: Math.max(XR.rPeak + 12, half * 0.5), hb: 12, ov2: clamp(ov * 0.6, 4, 10), ef2: 3,
+    });
+    s.U1 = Math.min(6, ov * 0.5); s.W1 = ov + 10;     // upturned corners: how high, over how far in
+    s.U2 = Math.min(4, s.ov2 * 0.5); s.W2 = s.ov2 + 5;
+  } else s.ef = 4;
+  // The pitch: 30 degrees, steeper only if the flat ceiling inside would get too wide
+  for (let k = Math.tan(Math.PI / 6); ; k += 0.01) {
+    let zTop, cav;
+    if (style === 'tiered') {
+      const zL = (r) => ov + s.ef + (edge - r) * k;
+      const zB = zL(s.rb) + s.hb;
+      const zU = (r) => zB + s.ov2 + s.ef2 + (s.rb + s.ov2 - Math.max(r, s.rPeak)) * k;
+      zTop = zU(0);
+      cav = (r) => (r <= s.rb ? zU(r) : zL(r)); // the lowest solid top above the hollow
+      Object.assign(s, { zB, zLb: zL(s.rb) });
+    } else {
+      zTop = ov + s.ef + (edge - s.rPeak) * k;
+      cav = (r) => zTop - Math.max(0, r - s.rPeak) * k;
+    }
+    const apex = hcb + inner;
+    let zCap = apex;
+    for (let i = 0; i <= 200; i++) {
+      const r = (inner * i) / 200;
+      let A = cav(r) - XR.wall;
+      if (r <= 4.5) A = Math.min(A, zTop - XR.socketD - 2);
+      if (apex - r > A) zCap = Math.min(zCap, A);
+    }
+    Object.assign(s, { k, height: zTop, zCap, rc: apex - zCap });
+    if (apex - zCap <= XR.capMax || k >= 1) break;
+  }
+  return s;
+}
+
+/** A Christmas roof (top coordinates: z = 0 is its underside, resting on the pillars). */
+function christmasRoofSdf(geo) {
+  const t = geo.top, pd = polyD(geo), F = geo.frames, ta = Math.tan(geo.a / 2), norm = Math.sqrt(1 + t.k * t.k);
+  const { half, inner } = geo;
+  // how far out (r) and how near a corner (lat: 0 in a side's middle, 1 at a corner)
+  const where = (x, y) => {
+    // r is a smooth maximum of the sides' distances, so the hips and corners are rounded by about
+    // a millimetre (an exact crease lined up with the mesh grid can leave a hole in the mesh)
+    let m = -Infinity, kk = 0, sm = -Infinity;
+    for (let k = 0; k < F.length; k++) {
+      const d = x * F[k].nx + y * F[k].ny;
+      if (d > m) { m = d; kk = k; }
+      const h = Math.max(1.2 - Math.abs(sm - d), 0) / 1.2;
+      sm = Math.max(sm, d) + h * h * 0.3;
+    }
+    const s = x * F[kk].tx + y * F[kk].ty;
+    return { r: sm, lat: m > 1e-6 ? Math.min(1, Math.abs(s) / (m * ta)) : 0 };
+  };
+  let solid;
+  if (t.style === 'tiered') {
+    solid = (x, y, z) => {
+      // the upturn rises toward each corner and levels off there (a peak right on the corner would
+      // leave a thin crest)
+      const { r, lat } = where(x, y), q = clamp01((lat - 0.35) / 0.65), l4 = q * q * (3 - 2 * q);
+      const e1 = clamp01((r - (t.edge - t.W1)) / t.W1), e2 = clamp01((r - (t.rb + t.ov2 - t.W2)) / t.W2);
+      const zL = Math.min(t.ov + t.ef + (t.edge - r) * t.k + t.U1 * l4 * e1 * e1, t.zB);
+      const lower = Math.max(r - t.edge, (r - half - z) / SQ2, (z - zL) / norm, -z);
+      const band = Math.max(r - t.rb, z - t.zB, -z);
+      const zU = t.zB + t.ov2 + t.ef2 + (t.rb + t.ov2 - Math.max(r, t.rPeak)) * t.k + t.U2 * l4 * e2 * e2;
+      const upper = Math.max(r - (t.rb + t.ov2), (t.zB + (r - t.rb) - z) / SQ2, (z - zU) / norm);
+      return Math.min(lower, band, upper);
+    };
+  } else {
+    solid = (x, y, z) => {
+      const { r } = where(x, y), surf = t.height - Math.max(0, r - t.rPeak) * t.k;
+      return Math.max(r - t.edge, (r - half - z) / SQ2, (z - surf) / norm, -z);
+    };
+  }
+  const cavity = (x, y, z) => { const r = pd(x, y); return Math.max(r - inner, z - (t.hcb + inner - r), z - t.zCap, -1 - z); };
+  const socket = (x, y, z) => Math.max(Math.abs(x) - t.socketW / 2, Math.abs(y) - t.socketT / 2, t.height - t.socketD - z);
+  return subtract(solid, cavity, socket, ...topFrame(geo, 1).cuts);
 }
 
 /** The whole frame put together (for the preview), in lantern coordinates. */
@@ -492,7 +594,9 @@ export function lanternPart(settings, part, geo = lanternGeometry(settings)) {
   }
   return {
     sdf: f, bounds: { min: [b[0], b[2], 0], max: [b[1], b[3], H] },
-    size, how: 'Prints as it sits on the lantern. Its overhangs are cut at 45 degrees, so no supports are needed.',
+    size, how: geo.theme === 'christmas'
+      ? 'Prints as it sits on the lantern: the eaves rest on a 45 degree flare and the inside slopes at 45 degrees up to a short flat bridge, so no supports are needed.'
+      : 'Prints as it sits on the lantern. Its overhangs are cut at 45 degrees, so no supports are needed.',
   };
 }
 

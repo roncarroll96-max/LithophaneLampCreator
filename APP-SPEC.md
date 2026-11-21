@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20 · Version 1.4.2 (puck tray in the lantern base) 2026-11-20 · Version 1.5 (3MF export) 2026-11-20 · Version 1.6 (lanterns with 3 to 6 sides) 2026-11-20_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20 · Version 1.4.2 (puck tray in the lantern base) 2026-11-20 · Version 1.5 (3MF export) 2026-11-20 · Version 1.6 (lanterns with 3 to 6 sides) 2026-11-20 · Christmas lantern (feature 12d, version 1.7) added and approved 2026-11-21, done 2026-11-21_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -25,6 +25,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 1.4.2 | Lantern base: the puck can sit in a tray (closed floor, rim, gap for the cord) instead of a hole (done) |
 | 1.5 | 3MF export: every part in one file (the lamp and its base, or all the lantern's parts), moved up from the Later list (done) |
 | 1.6 | Lantern with 3, 4, 5 or 6 sides (done) |
+| 1.7 | Christmas lantern (feature 12d): Christmas roofs, a topper and trim pieces printed separately to glue on (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -105,6 +106,23 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
     - **Sizing**: everything follows the panel size and thickness. The slots and grooves are as wide as the panel (Thickest + 0.4 mm, so 3.4 mm by default) plus "Slot fit". A few sliders: **pillar thickness, base height, top height, top overhang, slot fit, peg fit.**
     - **Export**: separate buttons for each part: Front, Right, Back and Left panels, Pillar (print 4), Base, Top. Each part has its own size estimate and printer-fit check, and is laid out the way it should print, without supports.
     - Wall thickness, detail levels, preview modes, Thickness view, saving and project files work as for the other shapes. The print tips page and both PDF guides get a lantern section.
+
+12d. **Christmas lantern** (version 1.7, interview 2026-11-21): a Christmas look for the lantern, from your two photos (a green lantern with gold snowflakes and trees, and a red one with cream holly, lattice and a star). The lantern body (base, pillars, top) prints in your main colour; the decorations are **separate flat trim pieces** printed in a second colour and glued on afterwards.
+    - **Turning it on:** the lantern's Shape tab gets **Theme: Plain / Christmas**. Plain is the lantern as it is now. Christmas swaps the top choice for three mix-and-match choices:
+      - **Roof:** **Low roof** (photo 1): a low four-sided roof (about 30 degrees) with wide eaves and a small flat peak. **Two-tier roof** (photo 2): a lower roof, a short upright band, then a small upper roof, with the eave corners sweeping up.
+      - **Topper:** **Ring** (photo 1) or **Star** (photo 2), for looks only. It has a small tab that glues into a socket in the roof's peak.
+      - **Decoration:** **Snowflakes and trees** (photo 1) or **Holly and berries** (photo 2, with lattice).
+    - **Trim pieces** (each prints flat, decorated side up, 1.6 mm thick; open filigree so the body colour shows through, like the photos; every piece is sized to your lantern):
+      - **Side frame** (one file, print one per side): a border round each side, over the outer 12 mm of the picture, glued to the two pillars beside it (not to the panel, and not to the top, so the top still lifts off and the panels still slide out upward). Snowflakes and trees: scrolls along the top and bottom and a Christmas tree up each side. Holly and berries: a lattice band across the top, holly and berries up the sides, scrolls along the bottom.
+      - **Base trim** (one file, print one per side): a scrolled strip for each side of the base.
+      - **Roof decorations** (one file with all of them): for each roof face, one big and two small snowflakes, or holly sprigs (leaves and berries); the two-tier roof gets some for both tiers.
+      - **Lattice strips** (holly design with the two-tier roof): for the band between the two roof tiers.
+      - **Topper:** the ring or the star.
+    - **Shapes:** works for 3 to 6 sides; the roofs and every trim piece follow the shape.
+    - **Printing:** the Christmas roofs print without supports (their undersides slope at least 45 degrees, so the low roof is solid near the eaves; your slicer's infill keeps it light). Trim pieces print flat on the bed.
+    - **Preview:** the 3D view shows the trim in place, in colour: green body and gold trim to start; choosing Holly and berries switches the starting colours to red and cream. A body colour (green, red, white, black) and trim colour (gold, cream, white, silver) choice changes the preview only.
+    - **Export:** the Export tab gets a **Christmas trim** section with a button and printer-fit check for each trim piece. The one-file 3MF includes the trim pieces as their own named parts, so you can give them the second colour in your slicer.
+    - **Putting it together:** build the lantern as usual, then glue the side frames to the pillars, the base trim to the base, the roof decorations to the roof and the topper into its socket. The panels can still be swapped through the top.
 
 13. **Markings per design**: each marking set (lines, panels, laces, seams) can be **carved in** (thicker plastic, glows dark, smooth outside), **raised** (sticks out from the surface), or **off**. Line width and darkness are adjustable.
 14. **Size presets** plus a custom size field. The football scales with the preset:
@@ -304,6 +322,17 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Lantern: photos per side | One photo per side; collages per side later | You (2026-11-19, accepted default) |
 | Lantern: version | 1.4 | You (2026-11-19) |
 | Lantern: number of sides | 3 to 6, chosen on the Shape tab; 4 to start | You (2026-11-20) |
+| Christmas: what it is | A theme for the lantern (Plain / Christmas) | You (2026-11-21) |
+| Christmas: trim pieces | Side frames, roof decorations, topper, base trim, and lattice with the holly design; all printed separately and glued on | You (2026-11-21) |
+| Christmas: designs | Mix and match: roof (low or two-tier), topper (ring or star), decoration (snowflakes and trees, or holly and berries) | You (2026-11-21) |
+| Christmas: roofs | A new low roof like photo 1; a two-tier roof with upturned corners like photo 2 | You (2026-11-21) |
+| Christmas: side frame | Over the outer 12 mm of each picture, glued to the pillars (not the panel or the top) | You (2026-11-21; 12 mm accepted default) |
+| Christmas: topper | For looks only, glued into a socket in the peak; the top still lifts off | You (2026-11-21) |
+| Christmas: lattice | With the holly design: across the top of each side frame and round the two-tier roof's band | You (2026-11-21) |
+| Christmas: sizes and sides | Trim 1.6 mm thick, printed flat; works for 3 to 6 sides | You (2026-11-21, accepted defaults) |
+| Christmas: preview colours | Green and gold to start (red and cream with holly); body and trim colours changeable for the preview only | You (2026-11-21, accepted default) |
+| Christmas: version | 1.7 | You (2026-11-21, accepted default) |
+| Christmas: look of the trim | Open filigree (the body colour shows through), every piece one connected part; the low roof about 30 degrees, solid near the eaves; upturned corners made by raising the roof's edge toward each corner (the underside stays printable); trim files for the frames and base strips print one per side, small pieces all in one file; one-file 3MF includes the trim as separate named parts | Assumed (Claude's default) |
 | Lantern sides: names | Front, Right, Back, Left for 4 sides; Front, Side 2 ... Side 6 for the others | Claude's, accepted by you (2026-11-20) |
 | Lantern sides: pillars and pegs | Pillar outer faces continue the frame (square or rhombus); pegs take the pillar's shape so pillars can't turn. Pagoda frame 20 mm tall (was 16) with a small 45 degree brace under the eaves, eaves of under 3 mm left off, eave edges flattened 1.5 mm underneath; lid vent holes only where they fit whole | Assumed (Claude's, found while building: needed for clean, printable parts at every number of sides) |
 | Lantern: printer | Fit checked against 256 × 256 × 256 mm; pillars lie down when too tall to stand | You (2026-11-19, accepted default) |
@@ -335,6 +364,7 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 - **Heart and circle on the bed:** whether the small flat on the bottom is enough for them to print upright without tipping, or whether they need a brim or a wider flat. (You, at the first heart/circle print)
 - **Lantern peg and slot fit:** the default fit is a guess. Print the base and one pillar first and adjust "Peg fit" and "Slot fit" before printing everything. (You, at the first lantern print)
 - **Lantern light:** whether one puck lights all four sides evenly enough, and whether the even-glow strength is right for it. (You, at the first lantern print)
+- **Christmas trim glue and fit:** which glue works best on the trim (thin CA "super glue" or a PLA glue pen are the usual choices), and whether 1.6 mm trim is sturdy enough. (You, at the first Christmas print)
 - **File sizes:** measured (see feature 20). Still to confirm: does your slicer handle the Standard file comfortably? (You, at test print)
 
 ## How we'll know it works
@@ -348,7 +378,17 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 8. A 5×7 in flat panel from one of your photos prints standing up with no supports, drops into its light-box base, and glows with a clear, even picture. The same works for a curved panel and a 6 in heart.
 9. A lantern with four 4×6 in panels: every part prints without supports and fits your printer. The pillars push into the base, the panels slide down the slots, and the top presses on and lifts off again. With the puck switched on, all four pictures glow clearly and evenly. Changing to 5×7 panels and the pagoda roof resizes everything, and it still fits together.
 
+10. A Christmas lantern with the low roof, ring, and snowflakes and trees prints with no supports in your main colour; the trim pieces print flat in gold and fit their places, and after gluing it looks like your first photo. Switching to the two-tier roof, star, and holly and berries gives the look of your second photo, and it works for a 6-sided lantern too.
+
 ## Build progress
+
+### Version 1.7: Christmas lantern, done (2026-11-21)
+Built (feature 12d): **Theme: Plain / Christmas** on the lantern's Shape tab. Christmas has its own section: Roof (Low roof, Two-tier roof), Topper (Ring, Star), Decoration (Snowflakes and trees, Holly and berries), Frame over the picture (6 to 25 mm, 12 to start), Eaves, and the preview colours (body: green, red, white, black; trim: gold, cream, white, silver; Holly switches them to red and cream). The 3D view shows the body and trim in those colours, with every trim piece in place. The Export tab has a Christmas trim section (a button, size check and printing note for each piece), and the one-file 3MF includes every trim piece as its own named part.
+
+- **Roofs** (js/core/lantern.js): the eaves rest on a 45 degree flare that grows out of the frame; the inside is hollowed at 45 degrees up to a flat ceiling no more than 30 mm across (a short bridge). The low roof is 30 degrees, steeper only when a big lantern needs it to keep that ceiling short (a 6-sided 4×6 lantern: 34 to 40 degrees). The two-tier roof has a 12 mm upright band (where the lattice goes), a smaller upper roof, and corners that sweep up and level off. A socket in the peak takes the topper's tab. Found while building: the hips are rounded about a millimetre, and the upturn levels off at the corners, because a sharp crest left holes in the mesh.
+- **Trim** (js/core/christmas.js): every piece is open filigree, 1.6 mm thick (the topper 3 mm), drawn to the lantern's sizes. Side frame: rims round the outside and the opening, scrolls along the top and bottom, a tree up each side (holly: a lattice band on top and holly leaves and berries up a stem on each side). Base trim: a scrolled strip between the corner feet, above the cable notch. Roof lattice: strips for the two-tier band (holly design). Roof decorations: a big and two small snowflakes or holly sprigs (three leaves and berries) per face, plus one on each upper face of the two-tier roof; all in one file. Topper: a ring, or a star on a short stem, with a tab. Shapes are joined with a smooth union so no thin slivers are left where strokes meet; scrolls and leaves run well into the rims; star and leaf points are rounded; small snowflakes have shorter branches so neighbouring arms keep a gap.
+
+Checks passed: 96 automated tests (5 new: settings and roof choices; both roofs closed and printable at 3 to 6 sides and different eaves, with the socket open; every trim piece one closed part for 6 combinations of sides, designs, roofs and toppers; the trim fits its places: frames between the corners, above the base and below the top with pillar behind them, base strips between the feet with wall behind them, decorations lying on the roof faces, the topper's tab smaller than its socket; the preview and the 3MF part list). Every Christmas roof was also meshed at 3 to 6 sides and 5 eave sizes (40 cases): all closed. In the browser: both looks shown (as in your two photos), trim and 3MF exports (a 4-sided two-tier holly lantern: 26 MB at Draft, 11 s), phone layout. **Elegoo Slicer** read a holly two-tier lantern (24 pieces) and a 6-sided snowflake lantern (28 pieces) with every piece closed.
 
 ### Version 1.6: lanterns with 3 to 6 sides, done (2026-11-20)
 Built: **Number of sides** (3, 4, 5, 6) at the top of the lantern's Panels section. The lantern code now works out every part from the number of sides: each side has its own direction, the panels sit far enough out that one slot stops 2.5 mm short of the next, the pillar is the corner's rhombus (a square for 4), and the base, tops, grooves, peg holes, cable notch (always through the back wall) and the tray's cord gap are placed side by side round the outline. Changes found while building: the pegs take the pillar's shape; the pagoda frame is 20 mm tall (16 before) with a small brace under the eaves; eaves under 3 mm are left off and the eave edge is flattened 1.5 mm underneath; the lid only has vent holes that fit whole. (Each of these avoided a thin sliver or knife edge that left holes in the mesh at slanted angles.) The 4-sided lantern keeps its sizes (pillar 16 mm, panels 6.2 mm into their slots, same pegs). Shape list: "Lantern (3–6 panels)". Project file names say "-6-sided" etc. when not 4.

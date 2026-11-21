@@ -15,6 +15,9 @@ import { buildBase } from './base.js';
 import { meshSdf, gridStep } from './sdf.js';
 import { lanternGeometry, buildLanternStrip, createLanternField, lanternSidePanel, lanternPart, lanternSideNames, LANTERN_TOPS } from './lantern.js';
 import { ThreeMFWriter } from './threemf.js';
+import { trimPart, trimPartList, ROOF_LABELS } from './christmas.js';
+
+export const TRIM_STEP = 0.3; // mm grid for the trim pieces (fine filigree)
 
 export const BASE_STEP = 0.45;     // mm grid for the base mesh
 export const BASE_MAX_CELLS = 2e8; // a bigger base gets a slightly coarser grid (seconds, not minutes)
@@ -59,7 +62,10 @@ export function baseMesh(settings) {
   return { mesh, label: base.info.panel ? `Panel ${base.info.light}` : `Lamp base ${base.info.light}`, info: base.info };
 }
 
-/** One lantern part: 'panel' (side 0..3), 'pillar', 'base' or 'top'. Returns { mesh, label }. */
+/**
+ * One lantern part: 'panel' (side 0..n-1), 'pillar', 'base' or 'top', or a Christmas trim part
+ * ('xframe', 'xbase', 'xlattice', 'xdecor', 'xtopper'). Returns { mesh, label }.
+ */
 export function lanternMesh({ settings, photos, textMasks, stepInner, stepOuter }, part, side = 0, onProgress = () => {}, geo = lanternGeometry(settings)) {
   if (part === 'panel') {
     const strip = buildLanternStrip(settings, geo);
@@ -69,9 +75,11 @@ export function lanternMesh({ settings, photos, textMasks, stepInner, stepOuter 
     const mesh = buildPanelMesh({ panel, field: field.sideField(side, panel), stepInner: stepOuter, stepOuter: stepInner, onProgress });
     return { mesh, label: `Lantern ${lanternSideNames(geo.n)[side].toLowerCase()} panel ${Math.round(geo.W)}x${Math.round(geo.H)}mm` };
   }
-  const p = lanternPart(settings, part, geo);
+  const trim = part.startsWith('x');
+  const p = trim ? trimPart(settings, part, geo) : lanternPart(settings, part, geo);
+  if (!p) throw new Error('This lantern has no such part.');
   onProgress(0.1);
-  const mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, FRAME_STEP, BASE_MAX_CELLS));
+  const mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, trim ? TRIM_STEP : FRAME_STEP, BASE_MAX_CELLS));
   onProgress(1);
   return { mesh, label: `Lantern ${part}` };
 }
@@ -88,7 +96,12 @@ export function partList(data) {
       ...lanternSideNames(geo.n).map((side, k) => ({ name: `${side} panel`, copies: 1, weight: 4, make: (p) => lanternMesh(data, 'panel', k, p, geo).mesh })),
       { name: 'Pillar', copies: geo.n, weight: 1, make: (p) => lanternMesh(data, 'pillar', 0, p, geo).mesh },
       { name: 'Base', copies: 1, weight: 1, make: (p) => lanternMesh(data, 'base', 0, p, geo).mesh },
-      { name: `Top (${LANTERN_TOPS[geo.top.style]})`, copies: 1, weight: 1, make: (p) => lanternMesh(data, 'top', 0, p, geo).mesh },
+      { name: `Top (${LANTERN_TOPS[geo.top.style] || ROOF_LABELS[geo.top.style]})`, copies: 1, weight: 1, make: (p) => lanternMesh(data, 'top', 0, p, geo).mesh },
+      // Christmas trim, each its own part so it can get the second colour in the slicer
+      ...trimPartList(s, geo).map(([key, label]) => ({
+        name: `Trim: ${label.replace(/ [(].*[)]$/, '')}`, copies: key === 'xframe' || key === 'xbase' || key === 'xlattice' ? geo.n : 1, weight: 1,
+        make: (p) => lanternMesh(data, key, 0, p, geo).mesh,
+      })),
     ];
   }
   const label = SHAPES[s.shape]?.label || s.shape;

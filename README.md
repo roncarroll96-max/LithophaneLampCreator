@@ -38,7 +38,9 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    For a **lantern**: the number of sides (3, 4, 5 or 6), the panel size (4×6, 5×7, 8×10 in or square), pillar thickness, base height,
    slot and peg fit, and the top (like a Japanese lantern, a pagoda roof or a simple lid). Each photo fills one
    side; the Base tab takes your puck light's size, and whether it stands in a hole in the base's floor or sits
-   in a tray (closed floor, a rim round the puck and a gap for the cord). The Export tab has a button for each panel, the pillar
+   in a tray (closed floor, a rim round the puck and a gap for the cord). **Theme: Christmas** gives the lantern a low or
+   two-tier roof, a ring or star on top, and flat trim pieces (side frames, base strips, snowflakes or holly, lattice)
+   to print in a second colour and glue on. The Export tab has a button for each panel, the pillar
    (print one per corner), the base and the top, each already turned for printing without supports.
    On the Base tab, choose a light box (with an LED strip), a slot stand or none. The panel STL stands
    on its bottom edge, ready to print without supports (use a brim).

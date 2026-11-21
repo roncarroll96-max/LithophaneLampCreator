@@ -37,6 +37,13 @@ export function defaultLanternSettings() {
     overhang: 10,         // how far the top sticks out past the frame, mm
     slotFit: 0.4,         // extra room in the slots and grooves, mm
     pegFit: 0.25,         // extra room round the pegs, mm (each side)
+    theme: 'plain',       // 'plain' | 'christmas' (version 1.7)
+    xRoof: 'low',         // Christmas roof: 'low' (photo 1) | 'tiered' (photo 2)
+    topper: 'ring',       // Christmas topper: 'ring' | 'star'
+    decor: 'snow',        // Christmas decoration: 'snow' (snowflakes and trees) | 'holly' (holly, berries and lattice)
+    trimCover: 12,        // how far the side frames reach over each picture's edge, mm
+    bodyColor: 'green',   // preview only: the lantern body's colour
+    trimColor: 'gold',    // preview only: the trim's colour
   };
 }
 
