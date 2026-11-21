@@ -1,5 +1,5 @@
 # Lithophane Lamp Creator: Specification
-_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20 · Version 1.4.2 (puck tray in the lantern base) 2026-11-20 · Version 1.5 (3MF export) 2026-11-20 · Version 1.6 (lanterns with 3 to 6 sides) 2026-11-20 · Christmas lantern (feature 12d, version 1.7) added and approved 2026-11-21, done 2026-11-21_
+_Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (feature 12a) added and approved 2026-11-18 · Version 1.0.0 released 2026-11-18 (AI photo tools moved to Later) · Flat panel (feature 12b, version 1.1) added and approved 2026-11-19 · Version 1.2 (speed) 2026-11-19 · Version 1.3 (picture detail on the outside or front) 2026-11-19 · Lantern (feature 12c, version 1.4) added and approved 2026-11-19 · Version 1.4.1 (light colour in the Lit view) 2026-11-20 · Version 1.4.2 (puck tray in the lantern base) 2026-11-20 · Version 1.5 (3MF export) 2026-11-20 · Version 1.6 (lanterns with 3 to 6 sides) 2026-11-20 · Christmas lantern (feature 12d, version 1.7) added and approved 2026-11-21, done 2026-11-21 · Cylinder (feature 12e, version 1.8) added and approved 2026-11-21, done 2026-11-21_
 
 **Build order:** Milestone 1 = basketball + plain sphere with photo, carved/raised lines, opening and collar, lit preview, STL export → test print on the base → Milestone 2 = remaining shapes, multiple photos, cube, AI photo tools, text, base generator, phone polish.
 
@@ -26,6 +26,7 @@ _Interview date: 2026-11-18 · Status: Approved 2026-11-18 · Cube shape (featur
 | 1.5 | 3MF export: every part in one file (the lamp and its base, or all the lantern's parts), moved up from the Later list (done) |
 | 1.6 | Lantern with 3, 4, 5 or 6 sides (done) |
 | 1.7 | Christmas lantern (feature 12d): Christmas roofs, a topper and trim pieces printed separately to glue on (done) |
+| 1.8 | Cylinder (feature 12e): a wide photo wrapped round a tube that stands in a base with a light (done) |
 
 ## Purpose
 Making lithophane ball lamps by hand (basketball, football, soccer ball with a photo that glows when lit from below) is slow and fiddly. This tool does it in one place: pick a photo, let it auto-adjust the photo for a lithophane, tweak with sliders, choose a ball shape, preview how it will look lit, and export a 3D-printable STL (plus a matching base).
@@ -123,6 +124,15 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
     - **Preview:** the 3D view shows the trim in place, in colour: green body and gold trim to start; choosing Holly and berries switches the starting colours to red and cream. A body colour (green, red, white, black) and trim colour (gold, cream, white, silver) choice changes the preview only.
     - **Export:** the Export tab gets a **Christmas trim** section with a button and printer-fit check for each trim piece. The one-file 3MF includes the trim pieces as their own named parts, so you can give them the second colour in your slicer.
     - **Putting it together:** build the lantern as usual, then glue the side frames to the pillars, the base trim to the base, the roof decorations to the roof and the topper into its socket. The panels can still be swapped through the top.
+
+12e. **Cylinder** (version 1.8, interview 2026-11-21): a tube with a wide photo (a panorama, a group shot, a row of photos) wrapped round it, standing in a base that holds the light. A new choice on the Shape tab: **Cylinder (wide photo)**.
+    - **Size:** Small 80 × 120 mm, Medium 100 × 150 mm, Large 120 × 200 mm (diameter × height), or a custom diameter (60 to 200 mm) and height (60 to 250 mm). Medium to start.
+    - **Photo:** one wide photo wraps all the way round to start; its two ends fade softly into each other at the back. A **"How far round"** slider shrinks it to a front window, with plain glow round the rest (like the balls). The photo is zoomed and cropped to fit, and can be moved and zoomed as usual (drag it on the preview). Up to 4 photos can go side by side round it instead ("Arrange round the cylinder", like the flat panel's collage). The usual tone, cut-out and text tools work; text can be placed anywhere round it.
+    - **The tube:** open at the top, with a **3 mm plain rim** to stiffen the edge, and a **12 mm plain band at the bottom** that drops into the base's seat. Wall thickness (thinnest and thickest), picture detail on the inside or outside, detail levels, preview modes and the Thickness view work as for the other shapes.
+    - **Even glow:** the light sits low, so the top of a tall cylinder would come out dimmer; the plastic gets thinner higher up to even it out. On at 50%, with a strength slider.
+    - **Base:** the same choices as the balls: **LED puck** (inside the base), **LED strip on a riser** (a hollow post up the middle) or **bulb socket** (E12 / E26). Its seat fits the cylinder's bottom band, with the usual fit and cable-notch settings. Round, sized to the cylinder.
+    - **Printing:** the cylinder prints standing up on its bottom edge with no supports (the open top needs none). The base prints as the balls' bases do.
+    - **Export:** the cylinder STL and the base STL as now, and the one-file 3MF with both.
 
 13. **Markings per design**: each marking set (lines, panels, laces, seams) can be **carved in** (thicker plastic, glows dark, smooth outside), **raised** (sticks out from the surface), or **off**. Line width and darkness are adjustable.
 14. **Size presets** plus a custom size field. The football scales with the preset:
@@ -322,6 +332,13 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 | Lantern: photos per side | One photo per side; collages per side later | You (2026-11-19, accepted default) |
 | Lantern: version | 1.4 | You (2026-11-19) |
 | Lantern: number of sides | 3 to 6, chosen on the Shape tab; 4 to start | You (2026-11-20) |
+| Cylinder: what it is | A new shape: a wide photo round a tube, in a base with a light | You (2026-11-21) |
+| Cylinder: photo wrap | All the way round to start (the ends fade into each other at the back); a "How far round" slider for a front window | You (2026-11-21) |
+| Cylinder: top | Open, with a 3 mm plain rim | You (2026-11-21) |
+| Cylinder: base | Same light choices as the balls: puck, LED strip on a riser, bulb socket; the bottom band drops into the seat | You (2026-11-21) |
+| Cylinder: sizes | Presets Small 80 × 120, Medium 100 × 150, Large 120 × 200 mm, plus custom; the photo is cropped to fit | You (2026-11-21; preset sizes accepted defaults) |
+| Cylinder: photos, bands, glow, version | One wide photo, or up to 4 side by side; 12 mm plain band at the bottom, 3 mm rim at the top; even glow on at 50%; version 1.8 | You (2026-11-21, accepted defaults) |
+| Cylinder: how it's made | The wall is handled like a flat panel rolled into a tube (so the panel's photo, collage, text and even-glow tools work on it); the plain bands use the thickest wall; the seat is the base's usual collar seat sized to the tube | Assumed (Claude's default) |
 | Christmas: what it is | A theme for the lantern (Plain / Christmas) | You (2026-11-21) |
 | Christmas: trim pieces | Side frames, roof decorations, topper, base trim, and lattice with the holly design; all printed separately and glued on | You (2026-11-21) |
 | Christmas: designs | Mix and match: roof (low or two-tier), topper (ring or star), decoration (snowflakes and trees, or holly and berries) | You (2026-11-21) |
@@ -380,7 +397,14 @@ Making lithophane ball lamps by hand (basketball, football, soccer ball with a p
 
 10. A Christmas lantern with the low roof, ring, and snowflakes and trees prints with no supports in your main colour; the trim pieces print flat in gold and fit their places, and after gluing it looks like your first photo. Switching to the two-tier roof, star, and holly and berries gives the look of your second photo, and it works for a 6-sided lantern too.
 
+11. A Medium cylinder with one of your panoramas wraps all the way round with a soft join at the back, prints standing up with no supports, drops into its puck base, and glows evenly from bottom to top. Shrinking "How far round" leaves a clear front window with plain glow behind.
+
 ## Build progress
+
+### Version 1.8: cylinder, done (2026-11-21)
+Built (feature 12e): **Cylinder (wide photo)** on the Shape tab, with Small / Medium / Large / Custom sizes, a note of how wide a photo fills it without cropping, and **How far round** (20% to all the way). The wall is a flat panel rolled into a tube (js/core/cylinder.js): the panel's photo, text and even-glow tools work on it; a "filling" photo covers the part between the bands; all the way round, a copy of the photo one turn on lies over the last few centimetres, so the right end fades into the left end at the back; a front window has soft sides and crisp top and bottom. Plain bands (bottom 12 mm, top rim 3 mm) are as thick as the thickest wall, with the outside exactly on the radius. Photo tab: "Wrap round the cylinder" or a window; with 2 to 4 photos, **Arrange round the cylinder** puts them side by side, the first at the front. Text tab: "Round the cylinder" and "Up / down". Base tab: the balls' light choices, "Seat fit", and even glow (a puck low in the base, a strip up the riser, or a bulb). The base's seat is sized to the tube's bottom band; the strip's riser goes to about the middle (kept 10 mm below the rim); under a wide cylinder the strip base's hollow stays modest so the base stays low. The tube's mesh: outside and inside rings stitched together top and bottom into one closed solid, the picture side at the fine spacing. The preview shows it standing in its base, and you can look inside from above.
+
+Checks passed: 102 automated tests (6 new: sizes; bands, wrap with a smooth join, and a front window; even glow for each light; the tube closed and the right size with the picture inside or outside, and the file-size estimate; the base's seat fits for every light and size, with the riser to about the middle; the STL and 3MF parts). In the browser: a panorama wrapped round with a smooth join at the back, two photos arranged round it, a Standard export (57 MB, as estimated) and the 3MF (13.5 MB with the base), phone layout. **Elegoo Slicer** read a Medium cylinder with its puck base and a Large one with its strip base: every part closed, at the right sizes.
 
 ### Version 1.7: Christmas lantern, done (2026-11-21)
 Built (feature 12d): **Theme: Plain / Christmas** on the lantern's Shape tab. Christmas has its own section: Roof (Low roof, Two-tier roof), Topper (Ring, Star), Decoration (Snowflakes and trees, Holly and berries), Frame over the picture (6 to 25 mm, 12 to start), Eaves, and the preview colours (body: green, red, white, black; trim: gold, cream, white, silver; Holly switches them to red and cream). The 3D view shows the body and trim in those colours, with every trim piece in place. The Export tab has a Christmas trim section (a button, size check and printing note for each piece), and the one-file 3MF includes every trim piece as its own named part.

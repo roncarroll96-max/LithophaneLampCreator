@@ -19,6 +19,7 @@ export const SHAPES = {
   cube: { label: 'Cube (5 photos)', body: 'cube', markings: 'none', ready: true },
   panel: { label: 'Flat panel', body: 'panel', markings: 'none', ready: true },
   lantern: { label: 'Lantern (3–6 panels)', body: 'lantern', markings: 'none', ready: true },
+  cylinder: { label: 'Cylinder (wide photo)', body: 'cylinder', markings: 'none', ready: true },
 };
 
 /** The lantern's own settings (see core/lantern.js). */
@@ -90,6 +91,7 @@ export function defaultSettings() {
     evenGlow: { on: true, strength: 0.5 }, // cube and panel light box: thinner plastic farther from the light
     panel: defaultPanelSettings(), // flat panel (see core/panel.js)
     lantern: defaultLanternSettings(), // lantern (see core/lantern.js)
+    cylinder: { size: 'medium', diameter: 100, height: 150, wrap: 1, band: 12, rim: 3 }, // cylinder (see core/cylinder.js)
     base: {
       light: 'puck', puckD: 70, puckH: 20, puckHold: 'hole', socket: 'E12', riserD: 30, riserH: 0,
       clearance: 0.4, shape: 'auto', extra: 0, cableW: 10, cableH: 8,

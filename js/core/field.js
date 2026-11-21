@@ -110,7 +110,8 @@ export function blendLayers(layers, base, xyOf, res) {
       const r = Math.hypot(xmm / hx, ymm / hy);
       m = 1 - smooth(1 - L.feather / Math.min(hx, hy), 1, r);
     } else {
-      m = smooth(0, L.feather, hx - Math.abs(xmm)) * smooth(0, L.feather, hy - Math.abs(ymm));
+      // (featherY: a different soft edge at the top and bottom, as the cylinder's wrap uses)
+      m = smooth(0, L.feather, hx - Math.abs(xmm)) * smooth(0, L.featherY ?? L.feather, hy - Math.abs(ymm));
     }
     if (m <= 0) continue;
     // window coords in units of window width, centred

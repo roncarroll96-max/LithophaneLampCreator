@@ -25,7 +25,8 @@ export function lightBoxStrip(settings, panel) {
 /**
  * photos: { [photo id]: { w, h, data, alpha? } } (the adjusted pictures), textMasks as for the lamps.
  * opts (the lantern uses these): layers = photo layers already placed (each with cx, cy), and
- * light(u, v) = how much light reaches that spot compared with the middle (for even glow).
+ * light(u, v) = how much light reaches that spot compared with the middle (for even glow), and
+ * plain(u, v) = true where the wall is a plain band (the cylinder's), tRef thick.
  * Returns { eval(theta, s, out), evalUV(u, v, out, S?), layers, hasRaised: false, tMount } where
  * out receives x,y,z (front), ix,iy,iz (back), sx,sy,sz, t (mm), raise (0), mask, photoId, light,
  * u, v. evalUV works on panel coordinates directly; S (optional) is the front surface point and
@@ -115,6 +116,8 @@ export function createPanelField(settings, panel, photos, textMasks = null, opts
       const tf = tF - Math.max(0, panel.distEdge(u, v) - fw);
       if (tf > t) t = tf;
     }
+    // Plain bands (the cylinder's bottom band and top rim): the thickest wall, outside on the surface
+    if (opts.plain && opts.plain(u, v)) t = tRef;
 
     out.t = t; out.raise = 0; out.mask = pr.mask; out.photoId = pr.photoId; out.light = light;
     out.u = u; out.v = v;

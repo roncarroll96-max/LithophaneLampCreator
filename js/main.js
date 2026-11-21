@@ -4,6 +4,7 @@ import { Preview, LIGHT_COLORS } from './preview.js';
 import {
   trimPreviewMesh, trimPartList, trimPart, DECOR_LABELS, ROOF_LABELS, TOPPER_LABELS, BODY_COLORS, TRIM_COLORS, DECOR_COLORS,
 } from './core/christmas.js';
+import { buildCylinder, createCylinderField, CYL_SIZES, estimateCylinderTriangles } from './core/cylinder.js';
 import { decodeImage, extractLuma, shrinkBase, autoAdjust, processPhoto, drawGray } from './image.js';
 import { buildEllipsoidShape } from './core/shapes.js';
 import { createField } from './core/field.js';
@@ -125,7 +126,7 @@ let rafPending = false, idleTimer = null, baseTimer = null;
 function changed(group) {
   // A base setting doesn't change a ball or cube, only the base under it: rebuild just that.
   // (On a panel the light box's strip and slot also steer even glow, so the panel updates too.)
-  if (group === 'base' && !isPanel() && !isLantern()) {
+  if (group === 'base' && !isPanel() && !isLantern() && !isCylinder()) {
     clearTimeout(baseTimer);
     baseTimer = setTimeout(refreshBasePreview, 280);
     scheduleAutosave();
@@ -188,6 +189,16 @@ function update(quick) {
       if (sizeChanged && app.tab === 'ball') setTimeout(renderTab);
       app.dirty.shape = false; shapeChanged = true;
     }
+    if (app.dirty.shape && isCylinder()) {
+      const cyl = buildCylinder(s);
+      const reframe = !app.shape || app.shape.kind !== 'cylinder';
+      const sizeChanged = !reframe && (app.shape.D !== cyl.D || app.shape.H !== cyl.H);
+      app.shape = cyl; app.collar = null;
+      preview.updateStand(cyl, null, s);
+      if (reframe || sizeChanged) preview.frame();
+      if (sizeChanged && app.tab === 'ball') setTimeout(renderTab);
+      app.dirty.shape = false; shapeChanged = true;
+    }
     if (app.dirty.shape) {
       const maxOpen = maxOpening(s);
       if (s.opening.diameter > maxOpen && maxOpen >= 20) {
@@ -207,6 +218,8 @@ function update(quick) {
     ensureTextMasks();
     app.field = isLantern()
       ? createLanternField(s, app.shape, processedMap(), app.textMasks)
+      : isCylinder()
+      ? createCylinderField(s, app.shape, processedMap(), app.textMasks)
       : isPanel()
       ? createPanelField(s, app.shape, processedMap(), app.textMasks)
       : createField(s, app.shape, processedMap(), app.textMasks, ensureMoon());
@@ -236,16 +249,17 @@ const hasPhotos = () => app.settings.photos.some((p) => app.images[p.id]);
 const isCube = () => SHAPES[app.settings.shape]?.body === 'cube';
 const isPanel = () => SHAPES[app.settings.shape]?.body === 'panel';
 const isLantern = () => SHAPES[app.settings.shape]?.body === 'lantern';
+const isCylinder = () => SHAPES[app.settings.shape]?.body === 'cylinder';
 /** A flat shape (panel or lantern): photos and text are placed by panel coordinates. */
-const isFlatShape = (shape) => !!shape && (shape.kind === 'panel' || shape.kind === 'lantern');
+const isFlatShape = (shape) => !!shape && (shape.kind === 'panel' || shape.kind === 'lantern' || shape.kind === 'cylinder');
 /** "ball", "panel" or "lantern", for labels. */
-const where = () => (isLantern() ? 'lantern' : isPanel() ? 'panel' : 'ball');
+const where = () => (isLantern() ? 'lantern' : isCylinder() ? 'cylinder' : isPanel() ? 'panel' : 'ball');
 /** The lantern's number of sides (3 to 6), and their names. */
 const lanternN = () => (LANTERN_SIDE_COUNTS.includes(+app.settings.lantern?.sides) ? +app.settings.lantern.sides : 4);
 const sideNames = () => lanternSideNames(lanternN());
 const sideList = () => Array.from({ length: lanternN() }, (_, k) => k);
 /** How many photos the current shape takes: one per side on a lantern. */
-const maxPhotos = () => (isLantern() ? lanternN() : MAX_PHOTOS);
+const maxPhotos = () => (isLantern() ? lanternN() : isCylinder() ? 4 : MAX_PHOTOS);
 /** Lantern: gives every photo without a side the next free one (photos past the number of sides get none). */
 function ensureLanternSides() {
   const list = app.settings.photos, used = new Set(), n = lanternN();
@@ -268,11 +282,28 @@ function panelPhotoAspect() {
 }
 /** Where the n-th photo starts on a panel: the first fills it, later ones are smaller windows. */
 function panelPhotoSlot(n) {
+  if (n > 0 && app.shape && app.shape.kind === 'cylinder') {
+    // round the cylinder: right, back, left, then front again
+    const { C, H, band, rim } = app.shape, x = (((n % 4) * C) / 4 + C / 2) % C - C / 2;
+    return { panelW: +(C / 4 - 8).toFixed(1), panelX: +x.toFixed(1), panelY: +((band - rim) / 2).toFixed(1), aspect: +Math.min(1.5, (H - band - rim - 6) / (C / 4 - 8)).toFixed(3), feather: 4 };
+  }
   if (n === 0 || !app.shape || app.shape.kind !== 'panel') return { panelW: null, panelX: 0, panelY: 0 };
   const { W, H } = app.shape;
   const spots = [[-0.22, 0.22], [0.22, 0.22], [-0.22, -0.22], [0.22, -0.22], [0, 0]];
   const [fx, fy] = spots[(n - 1) % spots.length];
   return { panelW: +(W * 0.42).toFixed(1), panelX: +(fx * W).toFixed(1), panelY: +(fy * H).toFixed(1), aspect: null, feather: 4 };
+}
+/** Lays the cylinder's photos side by side round it, in list order (the first at the front). */
+function arrangeAround() {
+  const s = app.settings, list = s.photos.filter((c) => app.images[c.id]);
+  if (!app.shape || app.shape.kind !== 'cylinder' || !list.length) return;
+  const { C, H, band, rim } = app.shape, n = list.length, gap = 4;
+  const cw = C / n - gap, ch = H - band - rim - 4;
+  list.forEach((c, i) => Object.assign(c, {
+    panelW: +cw.toFixed(1), aspect: +(ch / cw).toFixed(3), feather: 2, windowShape: 'rect',
+    panelX: +((i * C) / n > C / 2 ? (i * C) / n - C : (i * C) / n).toFixed(1), panelY: +((band - rim) / 2).toFixed(1),
+  }));
+  changed('field'); renderTab();
 }
 /** Lays the panel's photos out in a grid inside the frame, in list order. */
 function arrangeCollage() {
@@ -347,7 +378,7 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
     if (!cfg) {
       const topUp = app.shape?.elev ? Math.floor(app.shape.elev(1)) - 2 : 70;
       const slot = isLantern() ? { side: sideList().find((k) => !s.photos.some((c) => c.side === k)) ?? null, panelW: null }
-        : isPanel() ? panelPhotoSlot(s.photos.length)
+        : isPanel() || isCylinder() ? panelPhotoSlot(s.photos.length)
         : isCube() && app.shape && app.shape.kind === 'cube'
         ? cubePhotoSlot(s.photos.length, s, app.shape) : photoSlot(s.photos.length, topUp);
       cfg = { ...defaultPhotoSettings(), ...slot, id: id || newPhotoId() };
@@ -358,7 +389,7 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
       const aspect = cfg.projection === 'planar' ? (cfg.aspect ?? 1) : null;
       Object.assign(cfg, autoAdjust(base), { zoom: 1, panX: 0, panY: 0, rotate: 0, aspect, auto: true });
       if (Math.max(base.originalW, base.originalH) < 900) {
-        toast('This photo is small (low resolution). It may look blurry on the ball.', 'err');
+        toast(`This photo is small (low resolution). It may look blurry on the ${where()}.`, 'err');
       }
     }
     app.images[cfg.id] = { blob: stored, name: name || 'photo', base, processed: null, dirty: true };
@@ -411,6 +442,7 @@ function projectBaseName() {
   if (isLantern() && app.shape && app.shape.kind === 'lantern') {
     return `${n}-lantern${app.shape.sides === 4 ? '' : `-${app.shape.sides}-sided`}-${Math.round(app.shape.sideW)}x${Math.round(app.shape.H)}mm`;
   }
+  if (isCylinder() && app.shape && app.shape.kind === 'cylinder') return `${n}-cylinder-${Math.round(app.shape.D)}x${Math.round(app.shape.H)}mm`;
   if (isPanel() && app.shape && app.shape.kind === 'panel') {
     return `${n}-panel-${app.shape.outline}-${Math.round(app.shape.W)}x${Math.round(app.shape.H)}mm`;
   }
@@ -432,7 +464,7 @@ function refreshBasePreview() {
   // (the preview colours only recolour; they don't rebuild the frame)
   const lanternKey = isLantern() ? { ...s.lantern, bodyColor: null, trimColor: null } : null;
   const key = JSON.stringify([s.base, s.shape, s.diameter, s.footballLength, s.footballWidth, s.footballTip, s.cube, s.opening, s.tMax,
-    isPanel() ? s.panel : null, lanternKey]);
+    isPanel() ? s.panel : null, lanternKey, isCylinder() ? s.cylinder : null]);
   if (isLantern()) applyLanternColors();
   if (key === app.baseKey) return;
   app.baseKey = key;
@@ -615,7 +647,7 @@ function photoTab() {
       class: 'btn small', title: 'Make a copy a little further round', disabled: list.length >= MAX_PHOTOS,
       onclick: () => {
         const src = app.images[c.id]; if (!src) return;
-        const copy = isPanel()
+        const copy = isPanel() || isCylinder()
           ? { ...structuredClone(c), id: newPhotoId(), ...(c.panelW > 0 ? { panelX: c.panelX + 15, panelY: c.panelY - 15 } : panelPhotoSlot(1)) }
           : { ...structuredClone(c), id: newPhotoId(), around: ((c.around + 210) % 360) - 180 };
         list.splice(i, 0, copy);
@@ -661,6 +693,8 @@ function photoTab() {
         : `Drag the photo on the ${where()} to move it.`) : null,
       isPanel() && list.length > 1
         ? el('button', { class: 'btn small', onclick: arrangeCollage, title: 'Lay the photos out in a grid inside the frame, in list order' }, 'Arrange as collage')
+        : isCylinder() && list.length > 1
+        ? el('button', { class: 'btn small', onclick: arrangeAround, title: 'Put the photos side by side round the cylinder, the first at the front' }, 'Arrange round the cylinder')
         : null,
       isMoonShape() && s.moon.mode !== 'photo'
         ? note('The Moon is set to "Moon only", so photos are not used. Choose "Photo + Moon" on the Shape tab to show them.', 'warn')
@@ -712,7 +746,7 @@ function photoTab() {
       slider(P('panY'), 'Move up / down', -0.5, 0.5, 0.005, { fmt: num2 }),
       slider(P('rotate'), 'Rotate', -180, 180, 0.5, { fmt: deg }),
     ),
-    isLantern() ? lanternSideSection(p) : isPanel() ? panelWindowSection(p, P) : section('Photo window on the ball',
+    isLantern() ? lanternSideSection(p) : isPanel() || isCylinder() ? panelWindowSection(p, P) : section('Photo window on the ball',
       slider(P('around'), 'Around the ball', -180, 180, 0.5, { fmt: deg }),
       slider(P('centerY'), 'Up / down', upMin, upMax, 0.5, { fmt: mm }),
       slider(P('coverage'), 'Size (how far around)', 10, 360, 0.5, {
@@ -756,8 +790,10 @@ function lanternSideSection(p) {
 
 /** Photo tab, flat panel: where the selected photo sits on the panel. */
 function panelWindowSection(p, P) {
-  const W = app.shape && app.shape.kind === 'panel' ? app.shape.W : 150;
-  const H = app.shape && app.shape.kind === 'panel' ? app.shape.H : 150;
+  const flat = app.shape && (app.shape.kind === 'panel' || app.shape.kind === 'cylinder');
+  const W = flat ? app.shape.W : 150;
+  const H = flat ? app.shape.H : 150;
+  const cyl = isCylinder();
   const fill = !(p.panelW > 0);
   const fillBox = el('input', { type: 'checkbox' });
   fillBox.checked = fill;
@@ -766,10 +802,11 @@ function panelWindowSection(p, P) {
     else Object.assign(p, { panelW: +(W * 0.6).toFixed(1), panelX: 0, panelY: 0, aspect: null });
     changed('field'); renderTab();
   });
-  return section('Photo on the panel',
-    el('label', { class: 'check' }, fillBox, 'Fill the whole panel'),
-    fill ? note('Use Zoom and Move in "Position in window" (or drag it on the panel) to choose what shows.') : [
-      slider(P('panelX'), 'Left / right', Math.round(-W / 2), Math.round(W / 2), 0.5, { fmt: mm }),
+  return section(cyl ? 'Photo on the cylinder' : 'Photo on the panel',
+    el('label', { class: 'check' }, fillBox, cyl ? 'Wrap round the cylinder' : 'Fill the whole panel'),
+    fill ? note(cyl ? 'It goes as far round as "How far round" on the Shape tab. Use Zoom and Move in "Position in window" (or drag it on the cylinder) to choose what shows.'
+      : 'Use Zoom and Move in "Position in window" (or drag it on the panel) to choose what shows.') : [
+      slider(P('panelX'), cyl ? 'Round the cylinder' : 'Left / right', Math.round(-W / 2), Math.round(W / 2), 0.5, { fmt: mm }),
       slider(P('panelY'), 'Up / down', Math.round(-H / 2), Math.round(H / 2), 0.5, { fmt: mm }),
       slider(P('panelW'), 'Width', 10, Math.round(W), 0.5, { fmt: mm }),
       aspectToggle(),
@@ -779,6 +816,32 @@ function panelWindowSection(p, P) {
       segmented(P('windowShape'), [{ value: 'rect', label: 'Rectangle' }, { value: 'oval', label: 'Oval' }]),
     ],
   );
+}
+
+/** Shape tab, cylinder: size and how far round the photo goes. */
+function cylinderSections() {
+  const s = app.settings, cy = s.cylinder, shape = app.shape && app.shape.kind === 'cylinder' ? app.shape : buildCylinder(s);
+  const num = (path, label, lo, hi) => {
+    const i = el('input', { type: 'number', min: lo, max: hi, step: 1, value: Math.round(getPath(s, path)), style: 'width:76px', 'aria-label': label });
+    i.addEventListener('change', () => {
+      const v = Math.min(hi, Math.max(lo, parseFloat(i.value) || getPath(s, path)));
+      i.value = v; setPath(s, path, v); changed('shape'); renderTab();
+    });
+    return el('div', { class: 'row', style: 'margin-top:8px' }, el('span', { class: 'grow' }, label), i);
+  };
+  const wrap = Math.round((cy.wrap ?? 1) * 100);
+  return [
+    section('Cylinder',
+      segmented('cylinder.size', [...Object.entries(CYL_SIZES).map(([k, v]) => ({ value: k, label: v.label, title: `${v.d} × ${v.h} mm` })), { value: 'custom', label: 'Custom' }], 'shape', (v) => {
+        if (v === 'custom') { cy.diameter = shape.D; cy.height = shape.H; }
+        renderTab();
+      }),
+      cy.size === 'custom' ? [num('cylinder.diameter', 'Diameter (mm)', 60, 200), num('cylinder.height', 'Height (mm)', 60, 250)] : null,
+      note(`${Math.round(shape.D)} mm across and ${Math.round(shape.H)} mm tall; the photo goes ${Math.round(shape.C)} mm round. A photo about ${(shape.C / (shape.H - shape.band - shape.rim)).toFixed(1)} times as wide as it is tall fills it without cropping.`),
+      slider('cylinder.wrap', 'How far round', 0.2, 1, 0.01, { fmt: (v) => (+v >= 0.995 ? 'All the way' : `${Math.round(v * 100)}%`), group: 'field' }),
+      note(wrap >= 100 ? 'All the way round: the photo\'s two ends fade into each other at the back.' : 'A window at the front; the rest glows plain.'),
+      note(`Open at the top with a ${shape.rim} mm plain rim; the ${shape.band} mm plain band at the bottom drops into the base. It prints standing up, with no supports.`)),
+  ];
 }
 
 /** Shape tab, flat panel: outline, size, curve, frame and feet. */
@@ -995,11 +1058,12 @@ function ballTab() {
     slider('tMin', 'Thinnest (brightest)', 0.4, 2, 0.05, { fmt: mm, map: (v) => Math.min(v, s.tMax - 0.5) }),
     // The cube's edge rounding can't be tighter than the thickest wall, so tMax reshapes it; on the
     // lantern it sets the panels' thickness, so the slots
-    slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() || isLantern() ? 'shape' : 'field' }),
+    slider('tMax', 'Thickest (darkest)', 1.5, 5, 0.05, { fmt: mm, map: (v) => Math.max(v, s.tMin + 0.5), group: isCube() || isLantern() || isCylinder() ? 'shape' : 'field' }),
     note('Typical white PLA: 0.8 mm to 3.0 mm.'),
     isLantern() ? note('The picture detail faces out, toward the room; the smooth side faces the light.') : reliefSideControl());
   if (isLantern()) return [section('Shape', shapeSel), ...lanternSections(), wall];
   if (isPanel()) return [section('Shape', shapeSel), ...panelSections(), wall];
+  if (isCylinder()) return [section('Shape', shapeSel), ...cylinderSections(), wall];
   return [
     section('Shape', shapeSel),
     isCube() ? section('Cube',
@@ -1047,7 +1111,7 @@ function markingsTab() {
   const s = app.settings, m = s.markings;
   const kind = SHAPES[s.shape]?.markings;
   if (!kind || kind === 'none') {
-    const what = isPanel() || isLantern() ? `Markings are for the ball shapes; a ${isLantern() ? 'lantern' : 'flat panel'} has none. Add words on the Text tab.`
+    const what = isPanel() || isLantern() || isCylinder() ? `Markings are for the ball shapes; a ${isLantern() ? 'lantern' : isCylinder() ? 'cylinder' : 'flat panel'} has none. Add words on the Text tab.`
       : isCube() ? 'The cube has no markings.' : 'The plain sphere has no markings.';
     return [section('Markings', note(what))];
   }
@@ -1149,10 +1213,10 @@ function textTab() {
         { value: 'carved', label: 'Carved (dark)', title: 'Thicker plastic: glows dark, outside stays smooth' },
         { value: 'bright', label: 'Bright', title: 'Thinner plastic: glows lighter than around it' },
         // Raised text isn't offered on a panel (it prints as carved)
-        isPanel() || isLantern() ? null : { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
+        isPanel() || isLantern() || isCylinder() ? null : { value: 'raised', label: 'Raised', title: 'Sticks out from the outside of the ball' },
       ].filter(Boolean), 'field', () => renderTab()),
-      (isPanel() || isLantern()) && it.style === 'raised' ? note('On a panel, raised text prints as carved.', 'warn') : null,
-      !isPanel() && !isLantern() && it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
+      (isPanel() || isLantern() || isCylinder()) && it.style === 'raised' ? note('On a panel, raised text prints as carved.', 'warn') : null,
+      !isPanel() && !isLantern() && !isCylinder() && it.style === 'raised' ? slider(`${p}.raise`, 'Raised height', 0.3, 3, 0.05, { fmt: mm }) : null,
       slider(`${p}.size`, 'Letter height', 4, 60, 0.5, { fmt: mm }),
       it.size < font.minSize ? note(`Letters under ${font.minSize} mm may not print cleanly in this font.`, 'warn') : null,
       slider(`${p}.arc`, 'Bend (smile to arch)', -180, 180, 1, { fmt: deg }),
@@ -1168,6 +1232,12 @@ function textTab() {
       note(app.settings.lantern.theme === 'christmas'
         ? `Keep text about ${Math.round(app.settings.lantern.trimCover + 2)} mm away from a panel's edges: the Christmas frames cover them.`
         : 'Keep text about 6 mm away from the side edges of a panel: they sit in the pillars\' slots.'),
+    ) : isCylinder() && app.shape?.kind === 'cylinder' ? section('Place on the cylinder',
+      note('Click the cylinder in the preview to move this text there, then fine-tune:'),
+      slider(`${p}.panelX`, 'Round the cylinder', Math.round(-app.shape.C / 2), Math.round(app.shape.C / 2), 0.5, { fmt: mm }),
+      slider(`${p}.panelY`, 'Up / down', Math.round(-app.shape.H / 2), Math.round(app.shape.H / 2), 0.5, { fmt: mm }),
+      slider(`${p}.rotate`, 'Rotate', -180, 180, 1, { fmt: deg }),
+      note(`Keep text off the plain bands: ${app.shape.band} mm at the bottom and ${app.shape.rim} mm at the top.`),
     ) : isPanel() ? section('Place on the panel',
       note('Click the panel in the preview to move this text there, then fine-tune:'),
       slider(`${p}.panelX`, 'Left / right', Math.round(-(app.shape?.W ?? 150) / 2), Math.round((app.shape?.W ?? 150) / 2), 0.5, { fmt: mm }),
@@ -1273,7 +1343,8 @@ function baseTab() {
   if (isLantern()) return lanternBaseTab();
   if (isPanel()) return panelBaseTab();
   const s = app.settings, b = s.base, info = app.baseInfo;
-  const col = collarDims(s);
+  const cyl = isCylinder() && app.shape?.kind === 'cylinder';
+  const col = cyl ? app.shape.collar : collarDims(s);
   const kind = b.light;
   const lightSection = section('Light',
     segmented('base.light', [
@@ -1293,7 +1364,7 @@ function baseTab() {
     ] : null,
     kind === 'bulb' ? [
       segmented('base.socket', Object.entries(SOCKETS).map(([k, v]) => ({ value: k, label: v.label })), undefined, () => renderTab()),
-      note(`The socket screws onto a 1/8" threaded lamp nipple through the top. The bulb must fit through the ${(col.ri * 2).toFixed(0)} mm opening.`),
+      note(`The socket screws onto a 1/8" threaded lamp nipple through the top. The bulb must fit through the ${(col.ri * 2).toFixed(0)} mm ${cyl ? 'inside of the cylinder' : 'opening'}.`),
       info && info.socketFits === false ? note('This socket is wider than the opening. Use a smaller socket or a bigger opening (Shape tab).', 'warn') : null,
     ] : null,
   );
@@ -1306,8 +1377,13 @@ function baseTab() {
   const st = app.lastBaseExport;
   return [
     lightSection,
+    cyl ? section('Even glow',
+      checkbox('evenGlow.on', 'Even glow (thinner plastic farther from the light)', 'field', () => renderTab()),
+      s.evenGlow.on ? slider('evenGlow.strength', 'Even glow strength', 0, 1, 0.01, { fmt: pct }) : null,
+      note(b.light === 'puck' ? 'The puck sits low, so the top of the cylinder gets the least light. Even glow makes the plastic thinner higher up to balance it.'
+        : 'Even glow makes the plastic thinner where less light reaches it.')) : null,
     section('Fit and size',
-      slider('base.clearance', 'Collar fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm }),
+      slider('base.clearance', cyl ? 'Seat fit (extra room)' : 'Collar fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm }),
       note('Too tight? Add room. Too loose? Take some away.'),
       el('div', { class: 'ctl' }, el('label', {}, 'Base shape')), shapeOpts,
       slider('base.extra', 'Extra width', 0, 40, 1, { fmt: mm }),
@@ -1445,12 +1521,15 @@ function exportTab() {
     estSize = [width, depth, panel.H];
     estDiag = [(estSize[0] + depth) * Math.SQRT1_2, (estSize[0] + depth) * Math.SQRT1_2];
   }
+  const cylShape = isCylinder() && app.shape && app.shape.kind === 'cylinder' ? app.shape : null;
+  if (cylShape) { estSize = [cylShape.D, cylShape.D, cylShape.H]; estDiag = [cylShape.D, cylShape.D]; }
   const fit = app.lastExport?.size ? fitCheck(app.lastExport.size, app.lastExport.diagonal) : fitCheck(estSize, estDiag);
 
   const raised = app.field ? app.field.hasRaised : s.markings.style === 'raised' && SHAPES[s.shape]?.markings !== 'none';
   // The picture side gets the fine spacing (the outside for outside detail, a panel's front)
   const outside = app.field ? !!app.field.reliefOutside : s.reliefSide === 'outside';
-  const estBytes = (d) => stlBytes(estimateTriangles(app.shape, outside ? OUTER_STEP : d.step, raised || outside ? d.step : OUTER_STEP));
+  const estBytes = (d) => stlBytes(cylShape ? estimateCylinderTriangles(cylShape, outside ? d.step : OUTER_STEP, outside ? OUTER_STEP : d.step)
+    : estimateTriangles(app.shape, outside ? OUTER_STEP : d.step, raised || outside ? d.step : OUTER_STEP));
   const opts = Object.entries(DETAIL_PRESETS).map(([k, d]) => {
     const sizeText = app.shape ? `≈ ${(estBytes(d) / 1e6).toFixed(0)} MB` : '';
     const radio = el('input', { type: 'radio', name: 'detail', value: k });
@@ -1473,12 +1552,14 @@ function exportTab() {
       el('div', { class: 'fit ' + fit.cls }, fit.text)),
     section('Detail', ...opts, bigFileNote(app.shape && DETAIL_PRESETS[s.detail] ? estBytes(DETAIL_PRESETS[s.detail]) : 0)),
     section('Export', btn, ...threeMfBlock(), progress, stats,
-      panel
+      cylShape
+        ? note('Prints standing up on its bottom edge, open top up, as exported. No supports needed.')
+        : panel
         ? note('Prints standing up on its bottom edge, as exported. No supports needed; a brim helps tall or thin panels stay put.')
         : isCube()
         ? note('The cube STL is already turned upside down: top face on the bed. No supports needed.')
         : note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
-      !hasPhotos() ? note(panel ? 'No photo yet: this exports a plain panel.' : 'No photo yet: this exports a plain ball with markings.', 'warn') : null,
+      !hasPhotos() ? note(panel ? 'No photo yet: this exports a plain panel.' : cylShape ? 'No photo yet: this exports a plain cylinder.' : 'No photo yet: this exports a plain ball with markings.', 'warn') : null,
       panel && s.base.panelKind === 'none' ? null : note('As STLs, the base is a separate file: Base tab, Export base STL.'),
       tipsLink()),
   ];

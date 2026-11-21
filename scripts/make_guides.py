@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.7: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.8: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -421,6 +421,8 @@ def app_guide(path):
          'Flat (0 to 120 degrees)'],
         ['Flat panel: frame, feet', 'Raised frame (on the picture side); feet on the bottom edge to stand without a base.',
          'The frame is the thickest part.', 'Frame on, 6 mm; feet off'],
+        ['Cylinder', 'Small 80 x 120, Medium 100 x 150, Large 120 x 200 mm or custom; how far round the photo goes; a 12 mm '
+         'plain band at the bottom (in the base) and a 3 mm rim at the top.', 'The plain bands are as thick as Thickest.', 'Medium, all the way'],
         ['Lantern: panels', 'Rectangle (4x6, 5x7, 8x10 in, portrait or landscape, or custom) or square (4, 6, 8 in or '
          'custom); 3 to 6 sides, all the same, flat, picture detail facing out.', 'None (size only).', '4x6 in portrait'],
         ['Lantern: frame', 'Pillar thickness, base height, slot fit and peg fit (extra room).', 'None: the frame is not a '
@@ -514,8 +516,8 @@ def app_guide(path):
         '<b>Print settings matter as much as these sliders.</b> See the companion Printer Settings guide.',
     ])
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.7 - Settings Guide'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.7 - Settings Guide'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.8 - Settings Guide'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.8 - Settings Guide'))
 
 
 # ---------------------------------------------------------------- document 2
@@ -525,7 +527,7 @@ def printer_guide(path):
                             title='Lithophane Lamp - Printer Settings')
     s = []
     s.append(P('Printer Settings for Lithophane Lamps', H1))
-    s.append(P('For Lithophane Lamp Creator 1.7: slicer settings for the lamp and the base, and what each one changes. '
+    s.append(P('For Lithophane Lamp Creator 1.8: slicer settings for the lamp and the base, and what each one changes. '
                'Names match Bambu Studio and OrcaSlicer; other slicers use similar names.', SUB))
 
     s.append(P('Why the slicer matters', H2))
@@ -580,6 +582,7 @@ def printer_guide(path):
         ['Flat panel', 'Standing up on its bottom edge, as exported, with the front facing the seam-free side. Brim on, '
          'no supports.'],
         ['Panel light box, slot stand', 'Standing up, as it sits on the table. No supports.'],
+        ['Cylinder', 'Standing up on its bottom edge, open top up, as exported. No supports.'],
         ['Lantern panels', 'Standing up on the bottom edge, as exported, picture side out. Brim on, no supports.'],
         ['Lantern pillar (one per corner)', 'Standing on its foot (the end with the hole), as exported; a pillar too tall for '
          'your printer comes out lying on its side. No supports.'],
@@ -639,8 +642,8 @@ def printer_guide(path):
     s.append(P('Tip: to test settings quickly, export a Small lamp with the picture shrunk to fit. It prints much faster '
                'and shows the same problems.', SMALL))
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.7 - Printer Settings'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.7 - Printer Settings'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.8 - Printer Settings'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.8 - Printer Settings'))
 
 
 if __name__ == '__main__':

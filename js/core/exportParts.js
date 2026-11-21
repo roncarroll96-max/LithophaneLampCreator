@@ -16,6 +16,7 @@ import { meshSdf, gridStep } from './sdf.js';
 import { lanternGeometry, buildLanternStrip, createLanternField, lanternSidePanel, lanternPart, lanternSideNames, LANTERN_TOPS } from './lantern.js';
 import { ThreeMFWriter } from './threemf.js';
 import { trimPart, trimPartList, ROOF_LABELS } from './christmas.js';
+import { buildCylinder, createCylinderField, buildCylinderMesh } from './cylinder.js';
 
 export const TRIM_STEP = 0.3; // mm grid for the trim pieces (fine filigree)
 
@@ -25,10 +26,20 @@ export const FRAME_STEP = 0.4;     // mm grid for the lantern's frame parts (peg
 
 const isPanel = (settings) => SHAPES[settings.shape]?.body === 'panel';
 const isLantern = (settings) => SHAPES[settings.shape]?.body === 'lantern';
-const lampShape = (settings) => (isPanel(settings) ? buildPanel(settings) : buildEllipsoidShape(bodyAxes(settings), collarDims(settings).ro));
+const isCylinder = (settings) => SHAPES[settings.shape]?.body === 'cylinder';
+const lampShape = (settings) => (isPanel(settings) ? buildPanel(settings) : isCylinder(settings) ? buildCylinder(settings)
+  : buildEllipsoidShape(bodyAxes(settings), collarDims(settings).ro));
 
-/** The lamp itself: a ball, cube or flat panel. Returns { mesh, label }. */
+/** The lamp itself: a ball, cube, flat panel or cylinder. Returns { mesh, label }. */
 export function lampMesh({ settings, photos, textMasks, moon, stepInner, stepOuter }, onProgress = () => {}) {
+  if (isCylinder(settings)) {
+    // Standing on its bottom edge; the picture side gets the fine spacing
+    const shape = buildCylinder(settings);
+    const field = createCylinderField(settings, shape, photos || null, textMasks || null);
+    const out = field.reliefOutside;
+    const mesh = buildCylinderMesh({ shape, field, stepOut: out ? stepInner : stepOuter, stepIn: out ? stepOuter : stepInner, onProgress });
+    return { mesh, label: `Lithophane cylinder ${Math.round(shape.D)}x${Math.round(shape.H)}mm` };
+  }
   if (isPanel(settings)) {
     // The panel stands on its bottom edge, as exported
     const panel = buildPanel(settings);
@@ -105,7 +116,7 @@ export function partList(data) {
     ];
   }
   const label = SHAPES[s.shape]?.label || s.shape;
-  const list = [{ name: isPanel(s) ? 'Panel' : label, copies: 1, weight: 6, make: (p) => lampMesh(data, p).mesh }];
+  const list = [{ name: isPanel(s) ? 'Panel' : isCylinder(s) ? 'Cylinder' : label, copies: 1, weight: 6, make: (p) => lampMesh(data, p).mesh }];
   if (!(isPanel(s) && (s.base?.panelKind || 'lightbox') === 'none')) {
     list.push({ name: 'Base', copies: 1, weight: 1, make: () => { const b = baseMesh(s); return b && b.mesh; } });
   }

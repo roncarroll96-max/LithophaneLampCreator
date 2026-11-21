@@ -33,7 +33,8 @@ export function defaultBaseSettings() {
 }
 
 /** How wide the lamp is (for a base in proportion to it). */
-function lampWidth(settings) {
+function lampWidth(settings, shape) {
+  if (shape && shape.kind === 'cylinder') return shape.D;
   if (SHAPES[settings.shape]?.body === 'cube') return settings.cube?.size ?? 100;
   if (settings.shape === 'football') return settings.footballWidth;
   return settings.diameter;
@@ -47,11 +48,13 @@ function lampWidth(settings) {
 export function buildBase(settings, shape) {
   if (shape && shape.kind === 'panel') return buildPanelBase(settings, shape);
   const b = { ...defaultBaseSettings(), ...(settings.base || {}) };
-  const col = collarDims(settings);
+  // A cylinder's bottom band is its collar: it drops into the seat
+  const cyl = !!shape && shape.kind === 'cylinder';
+  const col = cyl ? shape.collar : collarDims(settings);
   const rs = col.ro + b.clearance / 2;            // seat hole radius
   const seatD = col.height;                        // the collar rests on the seat floor
   const square = b.shape === 'square' || (b.shape === 'auto' && SHAPES[settings.shape]?.body === 'cube');
-  const prop = 0.28 * lampWidth(settings);
+  const prop = 0.28 * lampWidth(settings, shape);
   const notch = (R, h) => box(-b.cableW / 2, b.cableW / 2, 0, R + 10, -1, h);
   const outer = (R, H) => (square ? roundedSquare(R, Math.min(8, R * 0.2), 0, H) : cylinder(R, 0, H));
   let sdf, H, R, flip, riserTop = null, extraInfo = {};
@@ -70,21 +73,26 @@ export function buildBase(settings, shape) {
   } else if (b.light === 'strip') {
     const roT = Math.min(b.riserD / 2, col.ri - 1.5), riT = roT - 2;
     R = Math.max(rs + 8, prop) + b.extra;
-    const rc = R - 3, hc0 = 8;
+    // (under a wide cylinder the hollow for the controller stays modest; the rest is solid)
+    const rc = cyl ? Math.min(R - 3, riT + 24) : R - 3, hc0 = 8;
     // the 45° ceiling narrows to the riser's hollow, and must finish below the seat floor
     H = hc0 + (rc - riT) + 2.5 + seatD;
     const zSeat = H - seatD;
     // Up to the middle of the lamp: collar height plus the depth of the opening below the centre
     let zEdge = 0;
-    if (shape) {
+    if (shape && !cyl) {
       const o = {};
       zEdge = Infinity;
       for (let i = 0; i < 64; i++) { const th = (i / 64) * 2 * Math.PI; shape.surf(th, shape.phiEdge(th), o); zEdge = Math.min(zEdge, o.z); }
     }
-    const toMiddle = col.height + (shape ? -zEdge : 60);
+    const toMiddle = cyl ? shape.H / 2 : col.height + (shape ? -zEdge : 60);
     riserTop = H + (b.riserH > 0 ? b.riserH : Math.max(10, toMiddle - seatD - 5));
     // A tall riser must stay inside the lamp: at least 5 mm below its inside wall over the riser
-    if (shape) {
+    // (a cylinder is open at the top: just keep the riser 10 mm below its rim)
+    if (cyl) {
+      const maxTop = H - seatD + shape.H - 10;
+      if (riserTop > maxTop) { riserTop = Math.max(H + 10, maxTop); extraInfo.riserLimited = true; }
+    } else if (shape) {
       const centre = zSeat + col.height - zEdge;        // the lamp's centre, in base coordinates
       const ci = shape.c - (settings.tMax ?? 3) - 0.4;  // inside top above the centre
       const over = shape.kind === 'cube' ? ci : Math.sqrt(Math.max(0, ci * ci - roT * roT));

@@ -212,7 +212,8 @@ export class Preview {
   updateStand(shape, collar, settings) {
     this._dirty = true;
     // Panels (and the lantern's panels) can be seen from both sides; lamps only from outside
-    const side = shape.kind === 'panel' || shape.kind === 'lantern' ? THREE.DoubleSide : THREE.FrontSide;
+    // (and the open cylinder from inside, looking in at the top)
+    const side = shape.kind === 'panel' || shape.kind === 'lantern' || shape.kind === 'cylinder' ? THREE.DoubleSide : THREE.FrontSide;
     if (this.glowMat.side !== side) { this.glowMat.side = side; this.plainMat.side = side; this.glowMat.needsUpdate = true; this.plainMat.needsUpdate = true; }
     // Free the old stand's geometry and its own materials (shared ones are kept), but keep the
     // real base: it is put back below, since it only changes when the base settings change.
@@ -226,6 +227,7 @@ export class Preview {
     if (this._baseMesh) this.group.add(this._baseMesh);
     if (shape.kind === 'panel') { this._panelStand(shape); return; }
     if (shape.kind === 'lantern') { this._lanternStand(shape); return; }
+    if (shape.kind === 'cylinder') { this._cylinderStand(shape); return; }
     this.collar = null;
     const o = {};
     let zEdge = Infinity;
@@ -296,6 +298,24 @@ export class Preview {
     Object.assign(this, { _zBot: zBot, _standBase: base, _ring: null, _floor: floor, _pool: pool, _lampTop: panel.c, _lampW: panel.chordHalf });
     this._frameBox = { w: panel.chordHalf * 2, h: panel.H };
     this.controls.target.set(0, 0, 0);
+    if (this._baseMesh) this._placeBase();
+  }
+
+  /** The cylinder: it stands in its base (which arrives through setBase), on a floor. */
+  _cylinderStand(cyl) {
+    this.collar = null;
+    const zBot = cyl.bottom, floorZ = zBot - 20;
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(900, 64), this.floorMat);
+    floor.position.z = floorZ;
+    this.group.add(floor);
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(cyl.R * 3, 64), new THREE.MeshBasicMaterial({
+      color: AMBER, transparent: true, opacity: 0.07, depthWrite: false,
+    }));
+    pool.position.z = floorZ + 0.2;
+    this.group.add(pool);
+    Object.assign(this, { _zBot: zBot, _standBase: null, _ring: null, _floor: floor, _pool: pool, _lampTop: cyl.top, _lampW: cyl.R });
+    this._frameBox = { w: cyl.D, h: cyl.H + 20 };
+    this.controls.target.set(0, 0, (floorZ + cyl.top) / 2);
     if (this._baseMesh) this._placeBase();
   }
 

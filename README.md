@@ -1,8 +1,8 @@
 # Lithophane Lamp Creator
 
 Turn photos into 3D-printable lithophane lamps (STL): balls (basketball, soccer, football,
-baseball/softball, volleyball, plain), a Moon, a cube with a photo on each side, flat panels, or a
-lantern of four panels in a frame, plus a matching base for an LED puck, an LED strip or a bulb. Everything runs in your browser;
+baseball/softball, volleyball, plain), a Moon, a cube with a photo on each side, flat panels, a
+cylinder with a wide photo wrapped round it, or a lantern of 3 to 6 panels in a frame, plus a matching base for an LED puck, an LED strip or a bulb. Everything runs in your browser;
 photos never leave your computer. Works on desktop, tablet and phone.
 
 See [APP-SPEC.md](APP-SPEC.md) for the full specification.
@@ -25,7 +25,7 @@ Double-click **start.bat**. It starts a tiny local web server and opens
 2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes.
    The **Thickness** button above the preview shows the walls as a grey map; point at the ball to read the thickness in mm.
    In the **Lit** view, the colour dots under the buttons change the colour of the light (white, warm white, yellow or amber). It only changes the preview.
-3. **Shape** tab: shape (basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon or cube),
+3. **Shape** tab: shape (basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon, cube, cylinder),
    size (Small 100 / Medium 150 / Large 200 mm; footballs 160 × 100 / 240 × 150 / 280 × 175 mm),
    wall thickness, opening and collar. "Picture detail on the" puts the picture's bumps inside (smooth ball, the
    default) or outside (facing you, often crisper when lit); on a panel, back or front.
@@ -33,6 +33,8 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    For the Moon: Moon only or Photo + Moon, crater depth, and turning the Moon.
    For the cube (5 photos): size, edge rounding, photo border, "Fit photos to faces", even glow.
    The cube STL comes out upside down, top face on the bed, ready to print without supports.
+   For a **cylinder**: Small, Medium, Large or a custom diameter and height, and how far round the photo goes (all the
+   way round, its ends fading into each other at the back, or a front window). It stands in a base like the balls'.
    For a **flat panel**: rectangle (match the photo, 4×6, 5×7, 8×10 in or custom), square, circle or heart;
    a curve slider; a raised frame; optional feet. Several photos can make a collage ("Arrange as collage").
    For a **lantern**: the number of sides (3, 4, 5 or 6), the panel size (4×6, 5×7, 8×10 in or square), pillar thickness, base height,
