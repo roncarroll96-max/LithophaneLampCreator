@@ -18,12 +18,13 @@ export const SHAPES = {
   moon: { label: 'Moon', body: 'sphere', markings: 'moon', ready: true },
   cube: { label: 'Cube (5 photos)', body: 'cube', markings: 'none', ready: true },
   panel: { label: 'Flat panel', body: 'panel', markings: 'none', ready: true },
-  lantern: { label: 'Lantern (4 panels)', body: 'lantern', markings: 'none', ready: true },
+  lantern: { label: 'Lantern (3–6 panels)', body: 'lantern', markings: 'none', ready: true },
 };
 
 /** The lantern's own settings (see core/lantern.js). */
 export function defaultLanternSettings() {
   return {
+    sides: 4,             // number of panels (sides): 3, 4, 5 or 6
     outline: 'rect',      // 'rect' | 'square'
     size: '4x6',          // rect: '4x6' | '5x7' | '8x10' | 'custom'; square: '4' | '6' | '8' | 'custom'
     orient: 'portrait',   // rect print sizes: 'portrait' | 'landscape'

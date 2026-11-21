@@ -1,14 +1,16 @@
-// Lantern (feature 12c, version 1.4): four panels in a frame of pillars, a base and a top.
+// Lantern (feature 12c, version 1.4; 3 to 6 sides in 1.6): panels in a frame of pillars, a base and a top.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultSettings } from '../js/core/settings.js';
 import {
   lanternGeometry, lanternPart, pillarSdf, baseSdf, topSdf, buildLanternStrip, createLanternField,
-  lanternSidePanel, lanternFrameMesh, lanternLight, sideCenterU, sideOf,
+  lanternSidePanel, lanternFrameMesh, lanternLight, sideCenterU, sideOf, lanternSideNames, polyBox,
 } from '../js/core/lantern.js';
 import { meshSdf } from '../js/core/sdf.js';
 import { checkWatertight } from '../js/core/mesh.js';
 import { buildPanelMesh } from '../js/core/panelMesh.js';
+
+const SIDES = [3, 4, 5, 6];
 
 function lantern(edit = {}, tMax = 3) {
   const s = defaultSettings();
@@ -16,16 +18,16 @@ function lantern(edit = {}, tMax = 3) {
   Object.assign(s.lantern, edit);
   return s;
 }
-const ROT = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-/** A point given in front-side terms (x along the panel, d out from the middle), on side k. */
-function onSide(k, x, d, z) { const [c, s] = ROT[k]; return [x * c - (-d) * s, x * s + (-d) * c, z]; }
+/** A point given in side terms (x along the panel, d out from the middle), on side k. */
+function onSide(g, k, x, d, z) { const F = g.frames[k]; return [x * F.tx + d * F.nx, x * F.ty + d * F.ny, z]; }
 /** The pillar placed at corner k (lantern coordinates). */
-function placedPillar(geo, k) {
-  const f = pillarSdf(geo), [c, s] = ROT[k];
-  const X = geo.c * (c + s), Y = geo.c * (s - c);
-  return (x, y, z) => { const px = x - X, py = y - Y; return f(px * c + py * s, -px * s + py * c, z - geo.hB); };
+function placedPillar(g, k) {
+  const f = pillarSdf(g), th = k * g.a, c = Math.cos(th), s = Math.sin(th);
+  return (x, y, z) => { const px = x * c + y * s, py = -x * s + y * c; return f(px - g.Q[0], py - g.Q[1], z - g.hB); };
 }
-const topPlaced = (geo) => { const f = topSdf(geo); return (x, y, z) => f(x, y, z - geo.zT); };
+const topPlaced = (g) => { const f = topSdf(g); return (x, y, z) => f(x, y, z - g.zT); };
+/** The point at corner 0 that is d0 out along side 0's normal and d1 along side 1's. */
+const atD = (g, d0, d1) => [(d1 - d0 * g.ca) / g.sa, -d0];
 
 function photo(w = 120, h = 160, v = 0.2) {
   const data = new Float32Array(w * h).fill(v);
@@ -34,64 +36,91 @@ function photo(w = 120, h = 160, v = 0.2) {
 
 test('lantern sizes: the slots hold the panels about 6 mm deep, and the pillar stays in one piece', () => {
   const g = lanternGeometry(lantern());
+  assert.equal(g.n, 4);
   assert.ok(Math.abs(g.W - 101.6) < 1e-9 && Math.abs(g.H - 152.4) < 1e-9, '4x6 in portrait to start');
   assert.ok(Math.abs(g.insert - 6.2) < 0.01, `insert ${g.insert}`);
-  for (const P of [14, 16, 20, 24]) for (const tMax of [2, 3, 5]) for (const slotFit of [0.1, 0.4, 1.2]) {
-    const q = lanternGeometry(lantern({ pillar: P, slotFit }, tMax));
-    assert.ok(q.o >= 0, 'slot inside the pillar');
-    assert.ok(q.insert >= 4 - 1e-9, `P ${P} tMax ${tMax}: insert ${q.insert}`);
-    // the two slots stop short of each other (the pillar's corner holds it together)
-    assert.ok(q.xe < q.o - q.sw / 2 - 2, 'bridge between the slots');
-    // the peg stays clear of both slots
-    assert.ok(q.peg.x0 > q.xe + 0.5 && -q.peg.y1 > q.xe + 0.5, `peg clear of slots (P ${P})`);
+  assert.ok(Math.abs(g.half - g.inner - 16) < 1e-9 && Math.abs(g.peg.h - 2.8) < 1e-9, 'the 4-sided lantern keeps its sizes');
+  for (const n of SIDES) for (const P of [14, 16, 20, 24]) for (const tMax of [2, 3, 5]) for (const slotFit of [0.1, 0.4, 1.2]) {
+    const q = lanternGeometry(lantern({ sides: n, pillar: P, slotFit }, tMax));
+    const tag = `n ${n} P ${P} tMax ${tMax} fit ${slotFit}`;
+    assert.ok(q.insert >= 4 - 1e-9, `${tag}: insert ${q.insert}`);
+    assert.ok(q.Dm - q.sw / 2 > q.inner + 1, `${tag}: pillar wall behind the panel`);
+    // the slot for side 0 stops BRIDGE mm short of side 1's slot (the corner holds the pillar together)
+    const end = Math.max(...[-1, 1].map((e) => q.sEnd * q.sa + (q.Dm + (e * q.sw) / 2) * q.ca));
+    assert.ok(end <= q.Dm - q.sw / 2 - 2.5 + 1e-9, `${tag}: bridge between the slots`);
+    // the peg stays clear of both slots' ends and inside the pillar
+    const { dp, h } = q.peg;
+    for (const d0 of [dp - h, dp + h]) for (const d1 of [dp - h, dp + h]) {
+      const [x] = atD(q, d0, d1);
+      assert.ok(x >= q.sEnd + 0.99, `${tag}: peg clear of the slot ends`);
+      assert.ok(Math.max(d0, d1) <= q.half - 1.99, `${tag}: peg inside the pillar`);
+    }
   }
 });
 
+test('the side names, strip positions and outline boxes', () => {
+  assert.deepEqual(lanternSideNames(4), ['Front', 'Right', 'Back', 'Left']);
+  assert.deepEqual(lanternSideNames(3), ['Front', 'Side 2', 'Side 3']);
+  for (const n of SIDES) for (let k = 0; k < n; k++) assert.equal(sideOf(100, sideCenterU(100, k, n), n), k);
+  assert.deepEqual(polyBox(4, 10), [-10, 10, -10, 10]);
+  const b3 = polyBox(3, 10);
+  assert.ok(Math.abs(b3[2] + 10) < 1e-6 && Math.abs(b3[3] - 20) < 1e-6, 'a triangle: flat front, point at the back');
+  const b6 = polyBox(6, 10);
+  assert.ok(Math.abs(b6[3] - 10) < 1e-6 && Math.abs(b6[1] - 20 / Math.sqrt(3)) < 1e-6, 'a hexagon: flat front and back');
+});
+
 test('the panels fit: room all round in the slots and grooves, held in front by the pillars', () => {
-  for (const top of ['classic', 'pagoda', 'lid']) for (const edit of [{}, { size: '5x7', orient: 'landscape' }, { outline: 'square', size: '4', pillar: 20 }]) {
-    const s = lantern({ ...edit, top, topH: top === 'pagoda' ? 60 : 32 });
+  const cases = [];
+  for (const n of SIDES) cases.push([n, 'classic', {}]);
+  cases.push([4, 'pagoda', { size: '5x7', orient: 'landscape' }], [4, 'lid', { outline: 'square', size: '4', pillar: 20 }],
+    [3, 'pagoda', {}], [6, 'lid', {}], [5, 'classic', { outline: 'square', size: '4', pillar: 20 }]);
+  for (const [n, top, edit] of cases) {
+    const s = lantern({ sides: n, ...edit, top, topH: top === 'pagoda' ? 60 : 32 });
     const g = lanternGeometry(s);
-    const parts = [baseSdf(g), topPlaced(g), ...[0, 1, 2, 3].map((k) => placedPillar(g, k))];
+    const parts = [baseSdf(g), topPlaced(g), ...Array.from({ length: n }, (_, k) => placedPillar(g, k))];
     const frame = (p) => Math.min(...parts.map((f) => f(...p)));
-    for (let k = 0; k < 4; k++) {
+    const tag = `${n} sides ${top} ${JSON.stringify(edit)}`;
+    for (let k = 0; k < n; k++) {
       // Every bit of the panel (W x T x H slab) is clear of the frame
-      for (let i = 0; i <= 40; i++) for (let j = 0; j <= 40; j++) for (const d of [g.Dm - g.T / 2 + 0.02, g.Dm, g.Dm + g.T / 2 - 0.02]) {
-        const x = -g.W / 2 + (g.W * i) / 40, z = g.zG + 0.02 + ((g.H - 0.04) * j) / 40;
-        const p = onSide(k, x, d, z);
-        assert.ok(frame(p) > 0, `${top} ${JSON.stringify(edit)} side ${k}: panel point ${p.map((v) => v.toFixed(1))} inside the frame`);
+      for (let i = 0; i <= 30; i++) for (let j = 0; j <= 30; j++) for (const d of [g.Dm - g.T / 2 + 0.02, g.Dm, g.Dm + g.T / 2 - 0.02]) {
+        const x = -g.W / 2 + (g.W * i) / 30, z = g.zG + 0.02 + ((g.H - 0.04) * j) / 30;
+        const p = onSide(g, k, x, d, z);
+        assert.ok(frame(p) > 0, `${tag} side ${k}: panel point ${p.map((v) => v.toFixed(1))} inside the frame`);
       }
       // Held in front: just outside the panel's face near its edges there is pillar
       for (const x of [-g.W / 2 + 1.5, g.W / 2 - 1.5]) {
-        const p = onSide(k, x, g.Dm + g.T / 2 + 1, g.zG + g.H / 2);
-        assert.ok(frame(p) < 0, 'a pillar lip in front of the panel edge');
+        assert.ok(frame(onSide(g, k, x, g.Dm + g.T / 2 + 1, g.zG + g.H / 2)) < 0, `${tag}: a pillar lip in front of the panel edge`);
       }
       // Held at the bottom and top: the base groove floor and the top's groove roof
-      assert.ok(frame(onSide(k, 0, g.Dm, g.zG - 0.5)) < 0, 'groove floor under the panel');
-      assert.ok(frame(onSide(k, 0, g.Dm, g.zG + g.H + 1.5)) < 0, 'top groove above the panel');
+      assert.ok(frame(onSide(g, k, 0, g.Dm, g.zG - 0.5)) < 0, `${tag}: groove floor under the panel`);
+      assert.ok(frame(onSide(g, k, 0, g.Dm, g.zG + g.H + 1.5)) < 0, `${tag}: top groove above the panel`);
     }
   }
 });
 
 test('the pegs fit their holes: snug, with the fit room all round', () => {
-  const s = lantern();
-  const g = lanternGeometry(s), f = g.pegFit, pg = g.peg;
-  const pillar = placedPillar(g, 0), base = baseSdf(g), top = topPlaced(g);
-  const X = g.c, Y = -g.c; // the front-right corner (pillar coordinates = lantern minus this)
-  const inPeg = (z0, z1, grow) => {
-    const pts = [];
-    for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) for (const z of [z0, (z0 + z1) / 2, z1]) {
-      pts.push([X + pg.x0 - grow + ((pg.x1 - pg.x0 + 2 * grow) * i) / 8, Y + pg.y0 - grow + ((pg.y1 - pg.y0 + 2 * grow) * j) / 8, z]);
+  for (const n of SIDES) {
+    const s = lantern({ sides: n });
+    const g = lanternGeometry(s), f = g.pegFit, { dp, h, len } = g.peg;
+    const pillar = placedPillar(g, 0), base = baseSdf(g), top = topPlaced(g);
+    const grid = (grow, z0, z1) => {
+      const pts = [];
+      for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) for (const z of [z0, (z0 + z1) / 2, z1]) {
+        pts.push([...atD(g, dp - h - grow + ((2 * (h + grow)) * i) / 8, dp - h - grow + ((2 * (h + grow)) * j) / 8), z]);
+      }
+      return pts;
+    };
+    // The base's peg goes up into the pillar's foot without touching it; the pillar's peg into the top
+    for (const p of grid(-0.6, g.hB + 0.6, g.hB + len - 0.6)) { assert.ok(base(...p) < 0); assert.ok(pillar(...p) > 0, `${n}: base peg clear of the pillar`); }
+    for (const p of grid(-0.6, g.zT + 0.6, g.zT + len - 0.6)) { assert.ok(pillar(...p) < 0); assert.ok(top(...p) > 0, `${n}: pillar peg clear of the top`); }
+    // ...and the hole is only `fit` bigger: just past it there is plastic
+    const out = h + f + 0.15;
+    for (let i = 0; i <= 8; i++) {
+      const a = dp - out + (2 * out * i) / 8;
+      for (const [d0, d1] of [[dp - out, a], [dp + out, a], [a, dp - out], [a, dp + out]]) {
+        assert.ok(pillar(...atD(g, d0, d1), g.hB + 3) < 0, `${n}: snug hole`);
+      }
     }
-    return pts;
-  };
-  // The base's peg goes up into the pillar's foot without touching it; the pillar's peg into the top
-  for (const p of inPeg(g.hB + 0.6, g.hB + pg.len - 0.6, -0.6)) { assert.ok(base(...p) < 0); assert.ok(pillar(...p) > 0, 'base peg clear of the pillar'); }
-  for (const p of inPeg(g.zT + 0.6, g.zT + pg.len - 0.6, -0.6)) { assert.ok(pillar(...p) < 0); assert.ok(top(...p) > 0, 'pillar peg clear of the top'); }
-  // ...and the hole is only `fit` bigger: just past it there is plastic
-  for (const p of inPeg(g.hB + 2, g.hB + 4, f + 0.15)) {
-    const onEdge = Math.abs(p[0] - X - (pg.x0 - f - 0.15)) < 1e-9 || Math.abs(p[0] - X - (pg.x1 + f + 0.15)) < 1e-9
-      || Math.abs(p[1] - Y - (pg.y0 - f - 0.15)) < 1e-9 || Math.abs(p[1] - Y - (pg.y1 + f + 0.15)) < 1e-9;
-    if (onEdge) assert.ok(pillar(...p) < 0, 'snug hole');
   }
 });
 
@@ -115,63 +144,86 @@ function overhangArea(m, zAbove) {
 }
 
 test('every frame part is a closed solid that prints without supports (only short bridges)', () => {
-  for (const [top, topH] of [['classic', 32], ['pagoda', 60], ['lid', 14]]) {
-    const s = lantern({ top, topH });
+  for (const n of SIDES) for (const [top, topH] of [['classic', 32], ['pagoda', 60], ['lid', 14]]) {
+    const s = lantern({ sides: n, top, topH });
     const g = lanternGeometry(s);
     for (const part of top === 'classic' ? ['pillar', 'base', 'top'] : ['top']) {
       const p = lanternPart(s, part);
       const m = meshSdf(p.sdf, p.bounds, 0.5);
       const wt = checkWatertight(m.indices, m.positions.length / 3);
-      assert.ok(wt.ok, `${top} ${part}: bad edges ${wt.badEdges}`);
-      assert.ok(Math.abs(m.bbox.min[2]) < 0.3, `${top} ${part} sits on the bed`);
+      const tag = `${n} sides ${top} ${part}`;
+      assert.ok(wt.ok, `${tag}: bad edges ${wt.badEdges}`);
+      assert.ok(Math.abs(m.bbox.min[2]) < 0.3, `${tag} sits on the bed`);
+      const size = m.bbox.max.map((v, i) => v - m.bbox.min[i]);
+      assert.ok(size.every((v, i) => v <= p.size[i] + 1.5), `${tag}: size ${size.map((v) => v.toFixed(1))} within ${p.size.map((v) => v.toFixed(1))}`);
       // Allowed: the ceilings of the peg holes, grooves, cable notch and vents (short bridges)
       const limit = part === 'pillar' ? g.peg.len + 1.5 : part === 'base' ? g.cableH + 1 : top === 'pagoda' ? g.top.hF - 1.5 : g.peg.len + 1.5;
       const a = overhangArea(m, limit);
-      assert.ok(a < 200, `${top} ${part}: ${a.toFixed(0)} mm² of overhang above z ${limit}`);
+      assert.ok(a < 200, `${tag}: ${a.toFixed(0)} mm² of overhang above z ${limit}`);
     }
   }
   // A pillar too tall for the printer lies down, still without supports
-  const tall = lantern({ size: '8x10' }); tall.bed.z = 200;
-  const p = lanternPart(tall, 'pillar');
-  assert.ok(p.size[2] < 30 && p.size[1] > 200, 'lies down');
-  const m = meshSdf(p.sdf, p.bounds, 0.5);
-  assert.ok(checkWatertight(m.indices, m.positions.length / 3).ok);
-  assert.ok(overhangArea(m, 8) < 50, 'only the slot and peg-hole bridges');
+  for (const n of [4, 6]) {
+    const tall = lantern({ sides: n, size: '8x10' }); tall.bed.z = 200;
+    const p = lanternPart(tall, 'pillar');
+    assert.ok(p.size[2] < 30 && p.size[1] > 200, 'lies down');
+    const m = meshSdf(p.sdf, p.bounds, 0.5);
+    assert.ok(checkWatertight(m.indices, m.positions.length / 3).ok);
+    assert.ok(Math.abs(m.bbox.min[2]) < 0.3, 'lies on the bed');
+    assert.ok(overhangArea(m, 8) < 50, `${n} sides: only the slot and peg-hole bridges`);
+  }
 });
 
 test('the preview frame is the parts put together', () => {
-  const s = lantern();
-  const g = lanternGeometry(s);
-  const fm = lanternFrameMesh(s, meshSdf, 2);
-  let zMin = Infinity, zMax = -Infinity, xMax = -Infinity;
-  for (let i = 0; i < fm.positions.length; i += 3) {
-    zMin = Math.min(zMin, fm.positions[i + 2]); zMax = Math.max(zMax, fm.positions[i + 2]); xMax = Math.max(xMax, fm.positions[i]);
+  for (const n of SIDES) {
+    const s = lantern({ sides: n });
+    const g = lanternGeometry(s);
+    const fm = lanternFrameMesh(s, meshSdf, 2);
+    let zMin = Infinity, zMax = -Infinity, yMin = Infinity;
+    for (let i = 0; i < fm.positions.length; i += 3) {
+      zMin = Math.min(zMin, fm.positions[i + 2]); zMax = Math.max(zMax, fm.positions[i + 2]); yMin = Math.min(yMin, fm.positions[i + 1]);
+    }
+    assert.ok(Math.abs(zMin) < 1.5, 'on the table');
+    assert.ok(Math.abs(zMax - g.totalHeight) < 1.5, `top at ${zMax} vs ${g.totalHeight}`);
+    if (n === 4) assert.ok(Math.abs(-yMin - (g.half + g.top.ov)) < 2, 'beams reach out in front by the overhang');
+    // nothing sticks out past the lantern's footprint (beam ends included)
+    assert.ok(yMin >= g.footBox[2] - 1.5, `${n}: front ${yMin.toFixed(1)} within the footprint ${g.footBox[2].toFixed(1)}`);
+    assert.equal(fm.info.seatFloor, g.zG);
+    // Every corner has its pillar: a point in each pillar's middle is in the assembled frame's mesh box
+    const pillar = placedPillar(g, 0);
+    for (let k = 0; k < n; k++) {
+      const th = k * g.a, [qx, qy] = g.Q, x = qx * Math.cos(th) - qy * Math.sin(th), y = qx * Math.sin(th) + qy * Math.cos(th);
+      assert.ok(placedPillar(g, k)(x, y, g.hB + g.pillarL / 2) < 0, `${n}: pillar ${k} in place`);
+      if (k > 0) assert.ok(pillar(x, y, g.hB + g.pillarL / 2) > 0);
+    }
   }
-  assert.ok(Math.abs(zMin) < 1.5, 'on the table');
-  assert.ok(Math.abs(zMax - g.totalHeight) < 1.5, `top at ${zMax} vs ${g.totalHeight}`);
-  assert.ok(Math.abs(xMax - (g.half + g.top.ov)) < 2, 'beams reach out by the overhang');
-  assert.equal(fm.info.seatFloor, g.zG);
 });
 
-test('the strip folds round the four sides, each photo fills its own side, and panels export closed', () => {
-  const s = lantern();
-  s.photos = [{ id: 'a', side: 0 }, { id: 'b', side: 2 }];
-  const strip = buildLanternStrip(s);
-  const g = strip.geo;
-  const field = createLanternField(s, strip, { a: photo(120, 160, 0), b: photo(120, 160, 1) });
-  const o = {};
-  for (let k = 0; k < 4; k++) {
-    const u = sideCenterU(g.W, k);
-    assert.equal(sideOf(g.W, u), k);
-    field.evalUV(u, 0, o);
-    // The panel's outer face is Dout from the middle, on side k, facing out
-    const [ex, ey] = onSide(k, 0, g.Dout, 0);
-    assert.ok(Math.hypot(o.sx - ex, o.sy - ey) < 1e-6, `side ${k} position`);
-    assert.ok(Math.hypot(o.ix, o.iy) < Math.hypot(o.sx, o.sy), 'back faces in');
-    if (k === 0) assert.equal(o.photoId, 'a');
-    if (k === 2) assert.equal(o.photoId, 'b');
-    if (k === 1 || k === 3) assert.equal(o.photoId, null);
+test('the strip folds round the sides, each photo fills its own side, and panels export closed', () => {
+  for (const n of SIDES) {
+    const s = lantern({ sides: n });
+    s.photos = [{ id: 'a', side: 0 }, { id: 'b', side: 2 }, { id: 'c', side: n }];
+    const strip = buildLanternStrip(s);
+    const g = strip.geo;
+    assert.equal(strip.sides, n);
+    assert.ok(Math.abs(strip.W - n * g.W) < 1e-9, 'one panel width per side');
+    const field = createLanternField(s, strip, { a: photo(120, 160, 0), b: photo(120, 160, 1), c: photo(120, 160, 1) });
+    const o = {};
+    for (let k = 0; k < n; k++) {
+      const u = sideCenterU(g.W, k, n);
+      assert.equal(sideOf(g.W, u, n), k);
+      field.evalUV(u, 0, o);
+      // The panel's outer face is Dout from the middle, on side k, facing out
+      const [ex, ey] = onSide(g, k, 0, g.Dout, 0);
+      assert.ok(Math.hypot(o.sx - ex, o.sy - ey) < 1e-6, `${n} sides: side ${k} position`);
+      assert.ok(Math.hypot(o.ix, o.iy) < Math.hypot(o.sx, o.sy), 'back faces in');
+      assert.equal(o.photoId, k === 0 ? 'a' : k === 2 ? 'b' : null, `${n} sides: side ${k} photo (a photo set to a missing side is not shown)`);
+    }
   }
+  const s = lantern();
+  const strip = buildLanternStrip(s), g = strip.geo;
+  s.photos = [{ id: 'a', side: 0 }];
+  const field = createLanternField(s, strip, { a: photo(120, 160, 0) });
   // Even glow: the panel is thinner higher up (farther from the puck) for the same photo shade
   s.evenGlow = { on: true, strength: 0.6 };
   s.photos = [];
@@ -194,24 +246,30 @@ test('every top style has a sensible height', () => {
   const g2 = lanternGeometry(lantern({ top: 'pagoda', topH: 500, overhang: 30 }));
   assert.ok(g2.top.height <= g2.top.zA + 1e-9, 'pagoda no taller than its peak');
   assert.ok(g2.top.ov <= g2.top.hF - 3, 'eaves capped so they stay above the bed');
+  assert.equal(lanternGeometry(lantern({ top: 'pagoda', overhang: 2 })).top.ov, 0, 'very short eaves are left off');
   const g3 = lanternGeometry(lantern({ top: 'lid', topH: 5 }));
   assert.ok(g3.top.hRing >= g3.top.hF);
 });
 
 test('the base can hold the puck in a tray: closed floor, a rim round the puck, a gap for the cord', () => {
+  for (const n of SIDES) {
+    const s = lantern({ sides: n }); s.base.puckHold = 'tray'; s.base.puckD = 30;
+    const g = lanternGeometry(s), base = baseSdf(g);
+    assert.ok(g.tray && g.puckZ === 2);
+    const r = Math.min(g.puckR, g.inner - 2.5), zr = 2 + g.trayRim / 2;
+    // the back: the cable notch's side (side n/2, rounded down)
+    const F = g.frames[g.notchSide], at = (d, x = 0) => [x * F.tx + d * F.nx, x * F.ty + d * F.ny];
+    assert.ok(base(0, 0, 1) < 0, `${n}: closed floor under the puck`);
+    assert.ok(base(0, 0, 3) > 0, 'room for the puck above the floor');
+    assert.ok(base(...at(-(r + 1)), zr) < 0, `${n}: rim round the puck (front)`);
+    assert.ok(base(...at(r + 1), zr) > 0, `${n}: gap in the rim at the back for the cord`);
+    assert.ok(base(...at(r + 1), 1) < 0, 'the gap leaves the floor whole');
+    assert.ok(base(...at(g.half - 1), 2) > 0, `${n}: the cable notch goes out through the back wall`);
+    // The hole version is still open under the puck
+    assert.ok(baseSdf(lanternGeometry(lantern({ sides: n })))(0, 0, 1) > 0);
+  }
   const s = lantern(); s.base.puckHold = 'tray';
-  const g = lanternGeometry(s), base = baseSdf(g);
-  assert.ok(g.tray && g.puckZ === 2);
-  const r = Math.min(g.puckR, g.inner - 2.5);
-  assert.ok(base(0, 0, 1) < 0, 'closed floor under the puck');
-  assert.ok(base(0, 0, 3) > 0, 'room for the puck above the floor');
-  assert.ok(base(r + 1, 0, 2 + g.trayRim / 2) < 0, 'rim round the puck (side)');
-  assert.ok(base(0, -(r + 1), 2 + g.trayRim / 2) < 0, 'rim round the puck (front)');
-  assert.ok(base(0, r + 1, 2 + g.trayRim / 2) > 0, 'gap in the rim at the back for the cord');
-  assert.ok(base(0, r + 1, 1) < 0, 'the gap leaves the floor whole');
-  // The hole version is still open under the puck
-  const h = baseSdf(lanternGeometry(lantern()));
-  assert.ok(h(0, 0, 1) > 0);
+  const g = lanternGeometry(s);
   // Closed and printable
   const p = lanternPart(s, 'base');
   const m = meshSdf(p.sdf, p.bounds, 0.5);

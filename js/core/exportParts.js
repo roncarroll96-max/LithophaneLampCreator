@@ -13,7 +13,7 @@ import { createPanelField } from './panelField.js';
 import { buildPanelMesh } from './panelMesh.js';
 import { buildBase } from './base.js';
 import { meshSdf, gridStep } from './sdf.js';
-import { lanternGeometry, buildLanternStrip, createLanternField, lanternSidePanel, lanternPart, LANTERN_SIDES, LANTERN_TOPS } from './lantern.js';
+import { lanternGeometry, buildLanternStrip, createLanternField, lanternSidePanel, lanternPart, lanternSideNames, LANTERN_TOPS } from './lantern.js';
 import { ThreeMFWriter } from './threemf.js';
 
 export const BASE_STEP = 0.45;     // mm grid for the base mesh
@@ -67,7 +67,7 @@ export function lanternMesh({ settings, photos, textMasks, stepInner, stepOuter 
     const panel = lanternSidePanel(settings, geo);
     // The picture faces out (the front), so the front gets the fine spacing
     const mesh = buildPanelMesh({ panel, field: field.sideField(side, panel), stepInner: stepOuter, stepOuter: stepInner, onProgress });
-    return { mesh, label: `Lantern ${LANTERN_SIDES[side].toLowerCase()} panel ${Math.round(geo.W)}x${Math.round(geo.H)}mm` };
+    return { mesh, label: `Lantern ${lanternSideNames(geo.n)[side].toLowerCase()} panel ${Math.round(geo.W)}x${Math.round(geo.H)}mm` };
   }
   const p = lanternPart(settings, part, geo);
   onProgress(0.1);
@@ -85,8 +85,8 @@ export function partList(data) {
   if (isLantern(s)) {
     const geo = lanternGeometry(s);
     return [
-      ...LANTERN_SIDES.map((side, k) => ({ name: `${side} panel`, copies: 1, weight: 4, make: (p) => lanternMesh(data, 'panel', k, p, geo).mesh })),
-      { name: 'Pillar', copies: 4, weight: 1, make: (p) => lanternMesh(data, 'pillar', 0, p, geo).mesh },
+      ...lanternSideNames(geo.n).map((side, k) => ({ name: `${side} panel`, copies: 1, weight: 4, make: (p) => lanternMesh(data, 'panel', k, p, geo).mesh })),
+      { name: 'Pillar', copies: geo.n, weight: 1, make: (p) => lanternMesh(data, 'pillar', 0, p, geo).mesh },
       { name: 'Base', copies: 1, weight: 1, make: (p) => lanternMesh(data, 'base', 0, p, geo).mesh },
       { name: `Top (${LANTERN_TOPS[geo.top.style]})`, copies: 1, weight: 1, make: (p) => lanternMesh(data, 'top', 0, p, geo).mesh },
     ];

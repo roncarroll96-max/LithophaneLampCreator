@@ -22,7 +22,7 @@ import { createPanelField } from './core/panelField.js';
 import { meshSdf, gridStep } from './core/sdf.js';
 import {
   lanternGeometry, buildLanternStrip, createLanternField, lanternFrameMesh, lanternPart, lanternSidePanel,
-  LANTERN_SIDES, LANTERN_TOPS, sideCenterU, sideOf,
+  lanternSideNames, LANTERN_SIDE_COUNTS, LANTERN_TOPS, sideCenterU, sideOf,
 } from './core/lantern.js';
 
 const OUTER_STEP = 1.0; // mm; the smooth outside needs far fewer points than the photo side
@@ -178,7 +178,7 @@ function update(quick) {
     if (app.dirty.shape && isLantern()) {
       const strip = buildLanternStrip(s);
       const reframe = !app.shape || app.shape.kind !== 'lantern';
-      const sizeChanged = !reframe && (app.shape.sideW !== strip.sideW || app.shape.H !== strip.H);
+      const sizeChanged = !reframe && (app.shape.sideW !== strip.sideW || app.shape.H !== strip.H || app.shape.sides !== strip.sides);
       app.shape = strip; app.collar = null;
       preview.updateStand(strip, null, s);
       if (reframe || sizeChanged) preview.frame();
@@ -237,15 +237,19 @@ const isLantern = () => SHAPES[app.settings.shape]?.body === 'lantern';
 const isFlatShape = (shape) => !!shape && (shape.kind === 'panel' || shape.kind === 'lantern');
 /** "ball", "panel" or "lantern", for labels. */
 const where = () => (isLantern() ? 'lantern' : isPanel() ? 'panel' : 'ball');
+/** The lantern's number of sides (3 to 6), and their names. */
+const lanternN = () => (LANTERN_SIDE_COUNTS.includes(+app.settings.lantern?.sides) ? +app.settings.lantern.sides : 4);
+const sideNames = () => lanternSideNames(lanternN());
+const sideList = () => Array.from({ length: lanternN() }, (_, k) => k);
 /** How many photos the current shape takes: one per side on a lantern. */
-const maxPhotos = () => (isLantern() ? 4 : MAX_PHOTOS);
-/** Lantern: gives every photo without a side the next free one (photos past four get none). */
+const maxPhotos = () => (isLantern() ? lanternN() : MAX_PHOTOS);
+/** Lantern: gives every photo without a side the next free one (photos past the number of sides get none). */
 function ensureLanternSides() {
-  const list = app.settings.photos, used = new Set();
-  for (const c of list) if (c.side >= 0 && c.side <= 3 && !used.has(c.side)) used.add(c.side); else c.side = null;
+  const list = app.settings.photos, used = new Set(), n = lanternN();
+  for (const c of list) if (c.side >= 0 && c.side < n && !used.has(c.side)) used.add(c.side); else c.side = null;
   for (const c of [...list].reverse()) {
     if (c.side != null) continue;
-    const free = [0, 1, 2, 3].find((k) => !used.has(k));
+    const free = sideList().find((k) => !used.has(k));
     if (free == null) break;
     c.side = free; used.add(free);
   }
@@ -325,7 +329,7 @@ async function normalizedBlob(image, w, h, keepAlpha) {
 async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
   const s = app.settings, gen = app.projectGen;
   if (!id && s.photos.length + app.pendingPhotos >= maxPhotos()) {
-    toast(isLantern() ? 'A lantern holds 4 photos, one on each side. Remove one first.' : `A lamp can hold up to ${MAX_PHOTOS} photos. Remove one first.`, 'err');
+    toast(isLantern() ? `This lantern holds ${lanternN()} photos, one on each side. Remove one first.` : `A lamp can hold up to ${MAX_PHOTOS} photos. Remove one first.`, 'err');
     return;
   }
   if (!id) app.pendingPhotos++;
@@ -339,7 +343,7 @@ async function loadPhoto(blob, name, { fresh = true, id = null } = {}) {
     let cfg = id ? s.photos.find((p) => p.id === id) : null;
     if (!cfg) {
       const topUp = app.shape?.elev ? Math.floor(app.shape.elev(1)) - 2 : 70;
-      const slot = isLantern() ? { side: [0, 1, 2, 3].find((k) => !s.photos.some((c) => c.side === k)) ?? null, panelW: null }
+      const slot = isLantern() ? { side: sideList().find((k) => !s.photos.some((c) => c.side === k)) ?? null, panelW: null }
         : isPanel() ? panelPhotoSlot(s.photos.length)
         : isCube() && app.shape && app.shape.kind === 'cube'
         ? cubePhotoSlot(s.photos.length, s, app.shape) : photoSlot(s.photos.length, topUp);
@@ -402,7 +406,7 @@ function projectBaseName() {
   const first = app.settings.photos.find((p) => app.images[p.id]);
   const n = ((first && app.images[first.id].name) || 'lamp').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').slice(0, 40);
   if (isLantern() && app.shape && app.shape.kind === 'lantern') {
-    return `${n}-lantern-${Math.round(app.shape.sideW)}x${Math.round(app.shape.H)}mm`;
+    return `${n}-lantern${app.shape.sides === 4 ? '' : `-${app.shape.sides}-sided`}-${Math.round(app.shape.sideW)}x${Math.round(app.shape.H)}mm`;
   }
   if (isPanel() && app.shape && app.shape.kind === 'panel') {
     return `${n}-panel-${app.shape.outline}-${Math.round(app.shape.W)}x${Math.round(app.shape.H)}mm`;
@@ -589,7 +593,7 @@ function photoTab() {
   const rows = list.map((c, i) => el('div', { class: 'text-row photo-row' + (c.id === app.selectedPhoto ? ' active' : '') },
     el('button', { class: 'text-pick', title: 'Edit this photo', onclick: () => { app.selectedPhoto = c.id; renderTab(); } },
       el('canvas', { 'data-photo-thumb': c.id, class: 'row-thumb' }),
-      el('span', {}, (isLantern() ? `${c.side != null ? LANTERN_SIDES[c.side] : 'Not shown'}: ` : '') + ((app.images[c.id] && app.images[c.id].name) || 'photo'))),
+      el('span', {}, (isLantern() ? `${c.side != null ? sideNames()[c.side] : 'Not shown'}: ` : '') + ((app.images[c.id] && app.images[c.id].name) || 'photo'))),
     el('button', { class: 'btn small', title: 'Bring forward (in front of the photo below)', disabled: i === 0, onclick: () => move(i, -1) }, '↑'),
     el('button', { class: 'btn small', title: 'Send backward', disabled: i === list.length - 1, onclick: () => move(i, 1) }, '↓'),
     el('button', { class: 'btn small', title: c.hidden ? `Show on the ${where()}` : `Hide from the ${where()}`, onclick: () => { c.hidden = !c.hidden; changed('field'); renderTab(); } }, c.hidden ? 'Show' : 'Hide'),
@@ -637,7 +641,7 @@ function photoTab() {
         el('span', { class: 'note', style: 'margin:0' }, `${list.length} of ${maxPhotos()}`)),
       isLantern() && list.length ? note('Each photo fills one side of the lantern. Pick its side below; drag it on the lantern to choose what shows.')
         : null,
-      isLantern() && list.some((c) => c.side == null) ? note('A lantern shows 4 photos, one per side. Remove the extra ones (marked "Not shown").', 'warn') : null,
+      isLantern() && list.some((c) => c.side == null) ? note(`This lantern shows ${lanternN()} photos, one per side. Remove the extra ones (marked "Not shown"), or give the lantern more sides.`, 'warn') : null,
       list.length && !isLantern() ? note(list.length > 1
         ? `Drag the selected photo on the ${where()} to move it (pick it in this list first). Where photos overlap, the one higher in the list is in front.`
         : `Drag the photo on the ${where()} to move it.`) : null,
@@ -724,7 +728,7 @@ function photoTab() {
 function lanternSideSection(p) {
   const list = app.settings.photos;
   const bar = el('div', { class: 'segbar', role: 'group' });
-  LANTERN_SIDES.forEach((label, k) => {
+  sideNames().forEach((label, k) => {
     const other = list.find((c) => c !== p && c.side === k);
     bar.append(el('button', {
       class: 'seg' + (p.side === k ? ' active' : ''),
@@ -834,7 +838,11 @@ function lanternSections() {
   const topMax = t.style === 'pagoda' ? Math.floor(t.zA) : 80;
   const topMin = t.style === 'classic' ? Math.ceil(t.hF + t.bh + t.capH + 4) : t.style === 'pagoda' ? t.hF + 14 : t.hF + 3;
   return [
-    section('Panels (all four the same)',
+    section(`Panels (all ${geo.n} the same)`,
+      el('div', { class: 'row', style: 'margin-top:2px' }, el('span', { class: 'grow' }, 'Number of sides')),
+      segmented('lantern.sides', LANTERN_SIDE_COUNTS.map((k) => ({
+        value: k, label: String(k), title: { 3: 'A triangle', 4: 'A square', 5: 'A pentagon', 6: 'A hexagon' }[k],
+      })), 'shape', () => renderTab()),
       segmented('lantern.outline', [{ value: 'rect', label: 'Rectangle' }, { value: 'square', label: 'Square' }], 'shape', (v) => {
         L.size = v === 'square' ? '6' : '4x6'; changed('shape'); renderTab();
       }),
@@ -842,7 +850,9 @@ function lanternSections() {
       rect && L.size !== 'custom' ? segmented('lantern.orient', [{ value: 'portrait', label: 'Portrait (tall)' }, { value: 'landscape', label: 'Landscape (wide)' }], 'shape', () => renderTab()) : null,
       rect && L.size === 'custom' ? [num('lantern.width', 'Panel width (mm)', 50, 250), num('lantern.height', 'Panel height (mm)', 50, 250)] : null,
       !rect && L.size === 'custom' ? num('lantern.side', 'Panel size (mm)', 60, 250) : null,
-      note(`Each panel: ${sizeLabel(geo.W, geo.H)}, flat, no frame. The lantern: ${Math.round(geo.width)} × ${Math.round(geo.width)} mm, ${Math.round(geo.totalHeight)} mm tall.`)),
+      note(`Each panel: ${sizeLabel(geo.W, geo.H)}, flat, no frame. The lantern: ${Math.round(geo.footprint[0])} × ${Math.round(geo.footprint[1])} mm, ${Math.round(geo.totalHeight)} mm tall.`),
+      geo.n !== 4 ? note(`Side 1 is the front; the others follow round to the right. The pillars are shaped to the ${geo.n === 3 ? '60' : geo.n === 5 ? '108' : '120'} degree corners.`) : null,
+      geo.puckFits ? null : note(`Your puck (${geo.puckD} mm) is too wide for this lantern: the inside is ${Math.round(2 * geo.inner)} mm across. Use bigger panels, more sides or a smaller puck.`, 'warn')),
     section('Frame',
       slider('lantern.pillar', 'Pillar thickness', 14, 24, 0.5, { fmt: (v) => mm(Math.max(+v, geo.P)), group: 'shape' }),
       geo.P > L.pillar + 0.01 ? note(`The pillars are ${geo.P.toFixed(1)} mm thick at least, so these ${geo.T.toFixed(1)} mm panels sit 4 mm deep in their slots.`) : null,
@@ -858,8 +868,9 @@ function lanternSections() {
       })), 'shape', (v) => { L.topH = TOP_HEIGHTS[v]; changed('shape'); renderTab(); }),
       slider('lantern.topH', 'Top height', topMin, topMax, 1, { fmt: (v) => mm(Math.min(topMax, Math.max(topMin, v))), group: 'shape' }),
       slider('lantern.overhang', 'Overhang', 0, 30, 0.5, { fmt: mm, group: 'shape' }),
-      t.style === 'pagoda' && L.overhang > t.ov ? note(`The pagoda's eaves reach out ${t.ov.toFixed(0)} mm at most (so they print without supports).`, 'warn') : null,
-      t.style === 'pagoda' ? note('The roof rises at 45 degrees; a lower top leaves a square opening at the peak that lets heat and light out.') : null,
+      t.style === 'pagoda' && L.overhang > 0 && t.ov === 0 ? note('Eaves shorter than 3 mm are left off (too small to print well).', 'warn') : null,
+      t.style === 'pagoda' && t.ov > 0 && L.overhang > t.ov ? note(`The pagoda's eaves reach out ${t.ov.toFixed(0)} mm at most (so they print without supports).`, 'warn') : null,
+      t.style === 'pagoda' ? note('The roof rises at 45 degrees; a lower top leaves an opening at the peak that lets heat and light out.') : null,
       t.style === 'classic' ? note('The beams and caps stick out by the overhang; their undersides slope at 45 degrees so they print without supports.') : null,
       t.style === 'lid' ? note('A flat cap with vent holes. It prints upside down.') : null),
   ];
@@ -1039,7 +1050,7 @@ function textTab() {
 
   const add = () => {
     const n = defaultTextItem(items.length);
-    if (isLantern() && app.shape?.kind === 'lantern') n.panelX = sideCenterU(app.shape.sideW, 0); // on the front
+    if (isLantern() && app.shape?.kind === 'lantern') n.panelX = sideCenterU(app.shape.sideW, 0, app.shape.sides); // on the front
     items.push(n); app.selectedText = n.id; changed('field'); renderTab();
   };
   const list = items.map((t, i) => el('div', { class: 'text-row' + (t.id === app.selectedText ? ' active' : '') },
@@ -1101,8 +1112,8 @@ function textTab() {
     ),
     isLantern() && app.shape?.kind === 'lantern' ? section('Place on the lantern',
       note('Click the lantern in the preview to move this text there, then fine-tune:'),
-      slider(`${p}.panelX`, 'Around the lantern', Math.round(-2 * app.shape.sideW), Math.round(2 * app.shape.sideW), 0.5, {
-        fmt: (v) => { const W = app.shape.sideW, k = sideOf(W, +v); return `${LANTERN_SIDES[k]}, ${(+v - sideCenterU(W, k)).toFixed(0)} mm`; },
+      slider(`${p}.panelX`, 'Around the lantern', Math.round((-app.shape.sides * app.shape.sideW) / 2), Math.round((app.shape.sides * app.shape.sideW) / 2), 0.5, {
+        fmt: (v) => { const W = app.shape.sideW, n = app.shape.sides, k = sideOf(W, +v, n); return `${lanternSideNames(n)[k]}, ${(+v - sideCenterU(W, k, n)).toFixed(0)} mm`; },
       }),
       slider(`${p}.panelY`, 'Up / down', Math.round(-app.shape.H / 2), Math.round(app.shape.H / 2), 0.5, { fmt: mm }),
       slider(`${p}.rotate`, 'Rotate', -180, 180, 1, { fmt: deg }),
@@ -1204,7 +1215,7 @@ function lanternBaseTab() {
       note('The puck sits low in the middle, so the bottoms of the panels get the most light. Even glow makes the plastic thinner higher up to balance it.'),
     ),
     section('Frame parts',
-      note(`Base ${Math.round(2 * (geo.half + 3))} mm square and ${geo.hB.toFixed(0)} mm tall, pillars ${geo.P.toFixed(1)} mm thick. Sizes and fit are on the Shape tab; export every part on the Export tab.`)),
+      note(`Base ${Math.round(geo.baseSize[0])} × ${Math.round(geo.baseSize[1])} mm and ${geo.hB.toFixed(0)} mm tall, pillars ${geo.P.toFixed(1)} mm thick. Sizes and fit are on the Shape tab; export every part on the Export tab.`)),
   ];
 }
 
@@ -1317,7 +1328,7 @@ function lanternExportTab() {
   });
   const busy = app.exporting;
   const fitEl = (size) => { const f = fitCheck(size); return el('div', { class: 'fit ' + f.cls }, f.text); };
-  const panelRows = LANTERN_SIDES.map((label, k) => {
+  const panelRows = lanternSideNames(geo.n).map((label, k) => {
     const cfg = s.photos.find((c) => c.side === k && app.images[c.id]);
     return el('div', { class: 'row', style: 'margin-top:6px' },
       el('span', { class: 'grow' }, `${label}: ${cfg ? app.images[cfg.id].name : 'no photo (plain panel)'}`),
@@ -1340,7 +1351,7 @@ function lanternExportTab() {
       fitEl([geo.W, geo.T, geo.H]),
       note('Each panel prints standing up on its bottom edge, picture side out. No supports needed; a brim helps tall panels stay put.')),
     section('Frame parts',
-      ...partRow('pillar', 'Pillar (print 4)'), ...partRow('base', 'Base'), ...partRow('top', `Top: ${LANTERN_TOPS[geo.top.style]}`),
+      ...partRow('pillar', `Pillar (print ${geo.n})`), ...partRow('base', 'Base'), ...partRow('top', `Top: ${LANTERN_TOPS[geo.top.style]}`),
       note('The frame isn\'t a lithophane: normal slicer settings are fine. Dark, opaque filament looks like your photo.')),
     section('All parts in one file', ...threeMfBlock()),
     section('Progress',
@@ -1542,8 +1553,8 @@ function exportLanternPart(part, side = 0) {
   const workerUrl = new URL('./exportWorker.js', import.meta.url);
   const worker = new Worker(workerUrl, { type: 'module' });
   const done = () => { app.exporting = false; worker.terminate(); renderTab(); };
-  const name = part === 'panel' ? `${LANTERN_SIDES[side].toLowerCase()}-panel-${s.detail}`
-    : part === 'pillar' ? 'pillar-print-4' : part === 'top' ? `top-${lanternGeometry(s).top.style}` : 'base';
+  const name = part === 'panel' ? `${sideNames()[side].toLowerCase().replace(/\s+/g, '-')}-panel-${s.detail}`
+    : part === 'pillar' ? `pillar-print-${lanternN()}` : part === 'top' ? `top-${lanternGeometry(s).top.style}` : 'base';
   worker.onmessage = (e) => {
     const msg = e.data;
     if (msg.type === 'progress') {
@@ -1611,7 +1622,7 @@ function export3mf() {
 /** The 3MF button and what goes in the file. */
 function threeMfBlock() {
   const s = app.settings;
-  const parts = isLantern() ? '4 panels, 4 pillars, the base and the top'
+  const parts = isLantern() ? `${lanternN()} panels, ${lanternN()} pillars, the base and the top`
     : isPanel() && s.base.panelKind === 'none' ? `the ${where()}` : `the ${where()} and its base`;
   return [
     el('button', { class: 'btn block', style: 'margin-top:8px', disabled: app.exporting || !app.shape, onclick: export3mf },

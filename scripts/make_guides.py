@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.5: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.6: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -422,7 +422,7 @@ def app_guide(path):
         ['Flat panel: frame, feet', 'Raised frame (on the picture side); feet on the bottom edge to stand without a base.',
          'The frame is the thickest part.', 'Frame on, 6 mm; feet off'],
         ['Lantern: panels', 'Rectangle (4x6, 5x7, 8x10 in, portrait or landscape, or custom) or square (4, 6, 8 in or '
-         'custom); all four the same, flat, picture detail facing out.', 'None (size only).', '4x6 in portrait'],
+         'custom); 3 to 6 sides, all the same, flat, picture detail facing out.', 'None (size only).', '4x6 in portrait'],
         ['Lantern: frame', 'Pillar thickness, base height, slot fit and peg fit (extra room).', 'None: the frame is not a '
          'lithophane.', '16 mm, 24 mm, 0.4 mm, 0.25 mm'],
         ['Lantern: top', 'Like the photo (crossed beams, capped posts, open lattice), Pagoda roof or Simple lid; top '
@@ -492,10 +492,10 @@ def app_guide(path):
          'warning (sooner on phones and tablets, which have less memory).'],
         ['Export ball / panel STL', 'The lamp. The cube comes out upside down (top face on the bed); a panel stands '
          'on its bottom edge. Both are ready to print.'],
-        ['Lantern', 'A button for each panel (Front, Right, Back, Left), the pillar (print 4), the base and the top, '
+        ['Lantern', 'A button for each panel (Front, Right, Back, Left; Front, Side 2... for other numbers of sides), the pillar (print one per corner), the base and the top, '
          'each with its own printer-fit check, already turned for printing without supports.'],
-        ['Export all parts as one 3MF', 'Every part in one file: the lamp and its base, or the lantern\'s 4 panels, 4 pillars, '
-         'base and top. Each part is named and already turned for printing; press Arrange in your slicer to place them '
+        ['Export all parts as one 3MF', 'Every part in one file: the lamp and its base, or every lantern panel and pillar, '
+         'the base and the top. Each part is named and already turned for printing; press Arrange in your slicer to place them '
          '(on more plates if needed). Uses the detail chosen above; about a fifth the size of the STLs.'],
     ], [2.2 * inch, 4.8 * inch]))
 
@@ -511,8 +511,8 @@ def app_guide(path):
         '<b>Print settings matter as much as these sliders.</b> See the companion Printer Settings guide.',
     ])
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.5 - Settings Guide'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.5 - Settings Guide'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.6 - Settings Guide'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.6 - Settings Guide'))
 
 
 # ---------------------------------------------------------------- document 2
@@ -522,7 +522,7 @@ def printer_guide(path):
                             title='Lithophane Lamp - Printer Settings')
     s = []
     s.append(P('Printer Settings for Lithophane Lamps', H1))
-    s.append(P('For Lithophane Lamp Creator 1.5: slicer settings for the lamp and the base, and what each one changes. '
+    s.append(P('For Lithophane Lamp Creator 1.6: slicer settings for the lamp and the base, and what each one changes. '
                'Names match Bambu Studio and OrcaSlicer; other slicers use similar names.', SUB))
 
     s.append(P('Why the slicer matters', H2))
@@ -578,7 +578,7 @@ def printer_guide(path):
          'no supports.'],
         ['Panel light box, slot stand', 'Standing up, as it sits on the table. No supports.'],
         ['Lantern panels', 'Standing up on the bottom edge, as exported, picture side out. Brim on, no supports.'],
-        ['Lantern pillar (print 4)', 'Standing on its foot (the end with the hole), as exported; a pillar too tall for '
+        ['Lantern pillar (one per corner)', 'Standing on its foot (the end with the hole), as exported; a pillar too tall for '
          'your printer comes out lying on its side. No supports.'],
         ['Lantern base, top', 'As exported: the base and the photo-style and pagoda tops as they sit (overhangs cut at '
          '45 degrees), the simple lid upside down. No supports.'],
@@ -634,8 +634,8 @@ def printer_guide(path):
     s.append(P('Tip: to test settings quickly, export a Small lamp with the picture shrunk to fit. It prints much faster '
                'and shows the same problems.', SMALL))
 
-    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.5 - Printer Settings'),
-              onLaterPages=footer('Lithophane Lamp Creator 1.5 - Printer Settings'))
+    doc.build(s, onFirstPage=footer('Lithophane Lamp Creator 1.6 - Printer Settings'),
+              onLaterPages=footer('Lithophane Lamp Creator 1.6 - Printer Settings'))
 
 
 if __name__ == '__main__':

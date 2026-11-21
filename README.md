@@ -35,11 +35,11 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    The cube STL comes out upside down, top face on the bed, ready to print without supports.
    For a **flat panel**: rectangle (match the photo, 4×6, 5×7, 8×10 in or custom), square, circle or heart;
    a curve slider; a raised frame; optional feet. Several photos can make a collage ("Arrange as collage").
-   For a **lantern** (4 panels): the panel size (4×6, 5×7, 8×10 in or square), pillar thickness, base height,
+   For a **lantern**: the number of sides (3, 4, 5 or 6), the panel size (4×6, 5×7, 8×10 in or square), pillar thickness, base height,
    slot and peg fit, and the top (like a Japanese lantern, a pagoda roof or a simple lid). Each photo fills one
    side; the Base tab takes your puck light's size, and whether it stands in a hole in the base's floor or sits
    in a tray (closed floor, a rim round the puck and a gap for the cord). The Export tab has a button for each panel, the pillar
-   (print 4), the base and the top, each already turned for printing without supports.
+   (print one per corner), the base and the top, each already turned for printing without supports.
    On the Base tab, choose a light box (with an LED strip), a slot stand or none. The panel STL stands
    on its bottom edge, ready to print without supports (use a brim).
 4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
