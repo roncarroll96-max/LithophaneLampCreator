@@ -5,6 +5,8 @@ import {
   trimPreviewMesh, trimPartList, trimPart, DECOR_LABELS, ROOF_LABELS, TOPPER_LABELS, BODY_COLORS, TRIM_COLORS, DECOR_COLORS,
 } from './core/christmas.js';
 import { buildCylinder, createCylinderField, CYL_SIZES, estimateCylinderTriangles } from './core/cylinder.js';
+import { buildLid, LID_STYLES } from './core/lid.js';
+import { PANEL_PATTERNS } from './core/patterns.js';
 import { decodeImage, extractLuma, shrinkBase, autoAdjust, processPhoto, drawGray } from './image.js';
 import { buildEllipsoidShape } from './core/shapes.js';
 import { createField } from './core/field.js';
@@ -135,7 +137,7 @@ function changed(group) {
   if (group === 'tone') { const im = app.images[app.selectedPhoto]; if (im) im.dirty = true; }
   if (group === 'shape') app.dirty.shape = true;
   app.dirty.field = true;
-  app.lastExport = null;
+  app.lastExport = null; app.lastLidExport = null;
   if (!rafPending) { rafPending = true; requestAnimationFrame(() => { rafPending = false; update(true); }); }
   clearTimeout(idleTimer);
   idleTimer = setTimeout(() => update(false), 280);
@@ -486,13 +488,30 @@ function refreshBasePreview() {
       return;
     }
     app.baseInfo = base.info;
-    const mesh = meshSdf(base.sdf, base.bounds, gridStep(base.bounds, 1.2, 3e6));
+    let mesh = meshSdf(base.sdf, base.bounds, gridStep(base.bounds, 1.2, 3e6));
+    // A cylinder's lid is shown on its top, with the base (it is not a lithophane either)
+    const lid = isCylinder() && app.shape.kind === 'cylinder' ? buildLid(s, app.shape) : null;
+    if (lid) mesh = joinMeshes(mesh, meshSdf(lid.sitSdf, lid.sitBounds, 0.8), base.info.seatFloor + app.shape.H);
     preview.setBase(mesh.positions, mesh.indices, base.info);
     app.lastBaseExport = null;
     if (app.tab === 'base') renderTab();
   } catch (err) {
     console.error(err);
   }
+}
+
+/** Two meshes as one, the second raised by dz. */
+function joinMeshes(a, b, dz) {
+  const positions = new Float32Array(a.positions.length + b.positions.length);
+  positions.set(a.positions);
+  for (let i = 0; i < b.positions.length; i += 3) {
+    const o = a.positions.length + i;
+    positions[o] = b.positions[i]; positions[o + 1] = b.positions[i + 1]; positions[o + 2] = b.positions[i + 2] + dz;
+  }
+  const indices = new Uint32Array(a.indices.length + b.indices.length), nv = a.positions.length / 3;
+  indices.set(a.indices);
+  for (let i = 0; i < b.indices.length; i++) indices[a.indices.length + i] = b.indices[i] + nv;
+  return { positions, indices };
 }
 
 // ---------- Moon maps (loaded the first time the Moon shape is chosen) ----------
@@ -678,7 +697,17 @@ function photoTab() {
     slider('photo.surround', `Plain ${where()} brightness`, 0, 1, 0.01, {
       fmt: (v) => `${pct(v)} (${(s.tMin + (1 - v) * (s.tMax - s.tMin)).toFixed(2)} mm)`,
     }),
-    note(`The ${where()} outside your photos.`));
+    note(`The ${where()} outside your photos.`),
+    isPanel() || isLantern() || isCylinder() ? [
+      el('div', { class: 'ctl' }, el('label', {}, 'Pattern where there\'s no photo')),
+      segmented('pattern.kind', Object.entries(PANEL_PATTERNS).map(([k, label]) => ({ value: k, label })), 'field', () => renderTab()),
+      (s.pattern?.kind || 'none') !== 'none' ? [
+        slider('pattern.size', 'Pattern size', 6, 40, 1, { fmt: mm }),
+        note(isLantern() ? 'Fills every side that has no photo, centred on the side.'
+          : isCylinder() ? 'Fills the wall where there\'s no photo; it joins up neatly at the back.'
+          : 'Fills the panel where there\'s no photo. Plain brightness above sets how bright it glows.'),
+      ] : null,
+    ] : null);
 
   const out = [
     section(`Photos on the ${where()}`,
@@ -841,7 +870,17 @@ function cylinderSections() {
       note(`${Math.round(shape.D)} mm across and ${Math.round(shape.H)} mm tall; the photo goes ${Math.round(shape.C)} mm round. A photo about ${(shape.C / (shape.H - shape.band - shape.rim)).toFixed(1)} times as wide as it is tall fills it without cropping.`),
       slider('cylinder.wrap', 'How far round', 0.2, 1, 0.01, { fmt: (v) => (+v >= 0.995 ? 'All the way' : `${Math.round(v * 100)}%`), group: 'field' }),
       note(wrap >= 100 ? 'All the way round: the photo\'s two ends fade into each other at the back.' : 'A window at the front; the rest glows plain.'),
-      note(`Open at the top with a ${shape.rim} mm plain rim; the ${shape.band} mm plain band at the bottom drops into the base. It prints standing up, with no supports.`)),
+      note(`A ${shape.rim} mm plain rim at the top; the ${shape.band} mm plain band at the bottom drops into the base. It prints standing up, with no supports.`)),
+    section('Lid',
+      segmented('cylinder.lid', Object.entries(LID_STYLES).map(([k, label]) => ({
+        value: k, label,
+        title: { none: 'Open at the top', solid: 'A flat cap', diamond: 'Criss-cross strips', honeycomb: 'Six-sided holes', snowflake: 'A snowflake in an open circle', holes: 'Rings of round holes' }[k],
+      })), 'base', () => renderTab()),
+      (cy.lid || 'none') !== 'none' ? [
+        slider('cylinder.lidFit', 'Lid fit (extra room)', 0, 0.6, 0.05, { fmt: mm2, group: 'base' }),
+        note('The lid\'s short lip drops inside the top rim. Too tight? Add room. Too loose? Take some away.'),
+        note('Export it on the Export tab. It prints upside down (the cap on the bed), with no supports.'),
+      ] : note('Open at the top.')),
   ];
 }
 
@@ -1598,6 +1637,12 @@ function exportTab() {
         : note('Print opening-down on the bed. Turn on supports in your slicer for the curve just above the collar.'),
       !hasPhotos() ? note(panel ? 'No photo yet: this exports a plain panel.' : cylShape ? 'No photo yet: this exports a plain cylinder.' : 'No photo yet: this exports a plain ball with markings.', 'warn') : null,
       panel && s.base.panelKind === 'none' ? null : note('As STLs, the base is a separate file: Base tab, Export base STL.'),
+      cylShape && (s.cylinder.lid || 'none') !== 'none' ? [
+        el('button', { class: 'btn block', style: 'margin-top:8px', id: 'btnExportLid', disabled: app.exporting, onclick: () => exportBaseStl('lid') },
+          app.exporting ? 'Building…' : `Export lid STL (${LID_STYLES[s.cylinder.lid]})`),
+        note('The lid prints upside down (the cap on the bed), as exported. No supports needed.'),
+        app.lastLidExport ? exportStats(app.lastLidExport) : null,
+      ] : null,
       tipsLink()),
   ];
 }
@@ -1648,13 +1693,14 @@ function exportBaseStl(part = 'base') {
       const bar = document.getElementById('exportBar');
       if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
     } else if (msg.type === 'done') {
-      const fileName = part === 'cover' ? `${projectBaseName()}-base-bottom-cover.stl` : `${projectBaseName()}-base-${isPanel() ? s.base.panelKind : s.base.light}.stl`;
+      const fileName = part === 'lid' ? `${projectBaseName()}-lid-${s.cylinder.lid}.stl`
+        : part === 'cover' ? `${projectBaseName()}-base-bottom-cover.stl` : `${projectBaseName()}-base-${isPanel() ? s.base.panelKind : s.base.light}.stl`;
       download(new Blob(msg.stl, { type: 'model/stl' }), fileName);
-      app.lastBaseExport = { ...msg.stats, fileName };
+      if (part === 'lid') app.lastLidExport = { ...msg.stats, fileName }; else app.lastBaseExport = { ...msg.stats, fileName };
       toast(`Saved ${fileName}`);
       done();
     } else if (msg.type === 'error') {
-      toast(`Base export failed: ${msg.message}`, 'err');
+      toast(`${part === 'lid' ? 'Lid' : 'Base'} export failed: ${msg.message}`, 'err');
       done();
     }
   };
@@ -1662,7 +1708,7 @@ function exportBaseStl(part = 'base') {
     toast(await workerErrorText(workerUrl, e, 'Base export failed'), 'err');
     done();
   };
-  worker.postMessage({ kind: 'base', part, settings: structuredClone(s) });
+  worker.postMessage({ kind: part === 'lid' ? 'lid' : 'base', part, settings: structuredClone(s) });
 }
 
 function exportStl() {
@@ -1803,7 +1849,8 @@ function export3mf() {
 function threeMfBlock() {
   const s = app.settings;
   const parts = isLantern() ? `${lanternN()} panels, ${lanternN()} pillars, the base and the top${s.lantern.theme === 'christmas' ? ' (and every trim piece, as its own part for the second colour)' : ''}`
-    : isPanel() && s.base.panelKind === 'none' ? `the ${where()}` : `the ${where()} and its base`;
+    : isPanel() && s.base.panelKind === 'none' ? `the ${where()}`
+    : isCylinder() && (s.cylinder.lid || 'none') !== 'none' ? `the ${where()}, its base and its lid` : `the ${where()} and its base`;
   return [
     el('button', { class: 'btn block', style: 'margin-top:8px', disabled: app.exporting || !app.shape, onclick: export3mf },
       app.exporting ? 'Building…' : 'Export all parts as one 3MF'),
@@ -1952,7 +1999,7 @@ function hasWork() {
   const s = app.settings, d = defaultSettings();
   if (hasPhotos() || (s.texts || []).length) return true;
   // Anything changed apart from the things New keeps
-  return ['shape', 'markings', 'moon', 'footballTip', 'footballStripes', 'evenGlow', 'photo']
+  return ['shape', 'markings', 'moon', 'footballTip', 'footballStripes', 'evenGlow', 'photo', 'pattern']
     .some((k) => JSON.stringify(s[k]) !== JSON.stringify(d[k]));
 }
 $('btnNew').addEventListener('click', () => {

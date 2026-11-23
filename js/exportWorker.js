@@ -1,6 +1,7 @@
 // Builds the STL (or 3MF) in the background so the page stays responsive.
 // Message in:  { settings, photos: { [id]: { w, h, data, alpha? } }, textMasks | null, moon | null, stepInner, stepOuter }
 //   or { kind: 'base', part: 'base' | 'cover', settings }
+//   or { kind: 'lid', settings } (the cylinder's lid)
 //   or { kind: 'lantern', part: 'panel' | 'pillar' | 'base' | 'top', side (0..3, for a panel), settings, photos, textMasks, stepInner, stepOuter }
 //   or { kind: '3mf', title, settings, photos, textMasks, moon, stepInner, stepOuter } (every part in one 3MF file)
 // Messages out: { type: 'progress', value } and { type: 'done', stl: [ArrayBuffer parts], stats } or { type: 'error', message }
@@ -8,7 +9,7 @@
 
 import { diagonalFootprint } from './core/mesh.js';
 import { writeBinarySTLParts } from './core/stl.js';
-import { lampMesh, baseMesh, lanternMesh, build3MF } from './core/exportParts.js';
+import { lampMesh, baseMesh, lidMesh, lanternMesh, build3MF } from './core/exportParts.js';
 
 const progress = (v) => self.postMessage({ type: 'progress', value: v });
 
@@ -38,6 +39,12 @@ self.onmessage = async (e) => {
       sendDone(parts, stats);
     } else if (d.kind === 'lantern') {
       sendStl(lanternMesh(d, d.part, d.side, (v) => progress(v * 0.9)));
+    } else if (d.kind === 'lid') {
+      progress(0.1);
+      const l = lidMesh(d.settings);
+      if (!l) throw new Error('This cylinder has no lid.');
+      progress(0.9);
+      sendStl(l);
     } else if (d.kind === 'base') {
       progress(0.1);
       const b = baseMesh(d.settings, d.part || 'base');

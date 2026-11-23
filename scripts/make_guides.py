@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.9: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.10: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -302,6 +302,8 @@ def app_guide(path):
          'Blend in'],
         ['Plain ball outside the photos', '"Plain ball brightness" (Photo tab). 100% = Thinnest, 0% = Thickest',
          '55% = 1.79 mm'],
+        ['Pattern where there\'s no photo', 'Panels, lantern sides, cylinder (Photo tab). Lattice lines go to nearly Thickest; '
+         'stars and snowflakes to Thinnest on a darker ground; wood grain in between', 'None'],
         ['Moon surface', 'NASA\'s brightness map plus "Crater depth", between Thinnest and Thickest', '0.80 to 3.00 mm'],
         ['Carved lines', 'Pushed toward Thickest + 0.4 mm by "Darkness"; hidden inside photos by "Hide lines under photos"',
          '3.40 mm'],
@@ -336,6 +338,9 @@ def app_guide(path):
         ['Hide, Copy, Remove', 'Hide keeps the photo but leaves it off the lamp. Copy makes a second one a little further '
          'round. Remove takes it off.'],
         ['Dragging', 'Drag the <b>selected</b> photo on the 3D lamp to move it. Dragging anywhere else turns the view.'],
+        ['Pattern where there\'s no photo', 'Flat panel, lantern and cylinder: None, Diamond lattice, Honeycomb, Wood grain '
+         'or Stars and snowflakes, and Pattern size. It fills what the photos leave plain (on a lantern, every side '
+         'without a photo, centred on the side; round a cylinder it joins up at the back).'],
     ], [1.5 * inch, 5.5 * inch]))
     s.append(P('Selected photo and its grey map', H3))
     s.append(P('The black-and-white picture is the selected photo\'s <b>grey map</b>: exactly what gets turned into '
@@ -423,6 +428,8 @@ def app_guide(path):
          'The frame is the thickest part.', 'Frame on, 6 mm; feet off'],
         ['Cylinder', 'Small 80 x 120, Medium 100 x 150, Large 120 x 200 mm or custom; how far round the photo goes; a 12 mm '
          'plain band at the bottom (in the base) and a 3 mm rim at the top.', 'The plain bands are as thick as Thickest.', 'Medium, all the way'],
+        ['Cylinder: lid', 'No lid, Solid, Diamond lattice, Honeycomb, Snowflake or Round holes; Lid fit (extra room round its '
+         'lip, which drops inside the rim). Export it on the Export tab.', 'None: the lid is not a lithophane.', 'No lid, 0.2 mm'],
         ['Lantern: panels', 'Rectangle (4x6, 5x7, 8x10 in, portrait or landscape, or custom) or square (4, 6, 8 in or '
          'custom); 3 to 6 sides, all the same, flat, picture detail facing out.', 'None (size only).', '4x6 in portrait'],
         ['Lantern: frame', 'Pillar thickness, base height, slot fit and peg fit (extra room).', 'None: the frame is not a '
@@ -592,6 +599,7 @@ def printer_guide(path):
          'no supports.'],
         ['Panel light box, slot stand', 'Standing up, as it sits on the table. No supports.'],
         ['Cylinder', 'Standing up on its bottom edge, open top up, as exported. No supports.'],
+        ['Cylinder lid', 'Upside down (the cap on the bed), as exported. No supports.'],
         ['Lantern panels', 'Standing up on the bottom edge, as exported, picture side out. Brim on, no supports.'],
         ['Lantern pillar (one per corner)', 'Standing on its foot (the end with the hole), as exported; a pillar too tall for '
          'your printer comes out lying on its side. No supports.'],

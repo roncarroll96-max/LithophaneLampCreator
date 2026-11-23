@@ -12,6 +12,7 @@ import { createPanelTextLayer } from './textLayer.js';
 import { defaultPhotoSettings } from './settings.js';
 import { defaultPanelSettings, panelEdgeThickness } from './panel.js';
 import { MU } from './previewData.js';
+import { createPanelPattern } from './patterns.js';
 
 const STRIP_TILT = (30 * Math.PI) / 180; // the light box's LED strip leans 30° toward the panel
 
@@ -27,6 +28,9 @@ export function lightBoxStrip(settings, panel) {
  * opts (the lantern uses these): layers = photo layers already placed (each with cx, cy), and
  * light(u, v) = how much light reaches that spot compared with the middle (for even glow), and
  * plain(u, v) = true where the wall is a plain band (the cylinder's), tRef thick.
+ * The background pattern (settings.pattern, version 1.10) fills what the photos leave plain:
+ * opts.patternUV(u, v, out) maps to pattern coordinates (a lantern centres it on each side) and
+ * opts.periodU makes it repeat round a cylinder.
  * Returns { eval(theta, s, out), evalUV(u, v, out, S?), layers, hasRaised: false, tMount } where
  * out receives x,y,z (front), ix,iy,iz (back), sx,sy,sz, t (mm), raise (0), mask, photoId, light,
  * u, v. evalUV works on panel coordinates directly; S (optional) is the front surface point and
@@ -36,6 +40,8 @@ export function createPanelField(settings, panel, photos, textMasks = null, opts
   const { tMin, tMax } = settings;
   const pp = { ...defaultPanelSettings(), ...(settings.panel || {}) };
   const surround = settings.photo?.surround ?? 0.55;
+  const pattern = createPanelPattern(settings, { periodU: opts.periodU });
+  const puv = [0, 0];
   const reliefFront = settings.reliefSide === 'outside';
   const tRef = panelEdgeThickness(settings); // the thickest the panel gets (frame or carved text)
 
@@ -88,7 +94,12 @@ export function createPanelField(settings, panel, photos, textMasks = null, opts
     const S = Sgiven || panel.surfAt(u, v, Sbuf);
 
     curU = u; curV = v;
-    blendLayers(layers, surround, xyOf, pr);
+    let ground = surround;
+    if (pattern) {
+      if (opts.patternUV) opts.patternUV(u, v, puv); else { puv[0] = u; puv[1] = v; }
+      ground = pattern(puv[0], puv[1], surround);
+    }
+    blendLayers(layers, ground, xyOf, pr);
     let t = tMin + (1 - pr.bright) * (tMax - tMin);
 
     // Text: optional bright outline first, then the letters (raised text is carved on a panel,

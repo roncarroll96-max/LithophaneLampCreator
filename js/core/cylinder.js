@@ -29,6 +29,8 @@ export function defaultCylinderSettings() {
     wrap: 1,              // how far round the photo goes (0.2 .. 1; 1 = all the way)
     band: 12,             // plain band at the bottom (sits in the base's seat), mm
     rim: 3,               // plain rim at the top, mm
+    lid: 'none',          // version 1.10: 'none' | 'solid' | 'diamond' | 'honeycomb' | 'snowflake' | 'holes'
+    lidFit: 0.2,          // extra room round the lid's lip, mm (each side)
   };
 }
 
@@ -142,6 +144,7 @@ export function createCylinderField(settings, shape, photos, textMasks = null) {
     layers: cylinderLayers(settings, shape, photos),
     light: cylinderLight(settings, shape),
     plain: (u, v) => inBand(shape, v),
+    periodU: shape.C, // the pattern joins up at the back
   });
   return { ...f, kind: 'cylinder' };
 }

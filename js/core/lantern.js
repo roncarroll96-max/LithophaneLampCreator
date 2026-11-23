@@ -272,6 +272,7 @@ export function createLanternField(settings, strip, photos, textMasks = null) {
   const f = createPanelField(ls, strip, photos, textMasks, {
     layers: lanternLayers(settings, geo, photos),
     light: (u, v) => lanternLight(geo, u - sideCenterU(W, sideOf(W, u, n), n), v),
+    patternUV: (u, v, o) => { o[0] = u - sideCenterU(W, sideOf(W, u, n), n); o[1] = v; }, // centred on each side
   });
   function sideField(k, sidePanel) {
     const P = {}, S = {}, uk = sideCenterU(W, k, n);

@@ -17,12 +17,14 @@ import { lanternGeometry, buildLanternStrip, createLanternField, lanternSidePane
 import { ThreeMFWriter } from './threemf.js';
 import { trimPart, trimPartList, ROOF_LABELS } from './christmas.js';
 import { buildCylinder, createCylinderField, buildCylinderMesh } from './cylinder.js';
+import { buildLid, LID_STYLES } from './lid.js';
 
 export const TRIM_STEP = 0.3; // mm grid for the trim pieces (fine filigree)
 
 export const BASE_STEP = 0.45;     // mm grid for the base mesh
 export const BASE_MAX_CELLS = 2e8; // a bigger base gets a slightly coarser grid (seconds, not minutes)
 export const FRAME_STEP = 0.4;     // mm grid for the lantern's frame parts (pegs and slots need a fine fit)
+export const LID_STEP = 0.4;       // mm grid for the cylinder's lid (its lip needs a fine fit)
 
 const isPanel = (settings) => SHAPES[settings.shape]?.body === 'panel';
 const isLantern = (settings) => SHAPES[settings.shape]?.body === 'lantern';
@@ -80,6 +82,15 @@ export function baseMesh(settings, part = 'base') {
   return { mesh, label, info: base.info };
 }
 
+/** The cylinder's lid, upside down for printing, or null when it has none. Returns { mesh, label, info }. */
+export function lidMesh(settings) {
+  if (!isCylinder(settings)) return null;
+  const lid = buildLid(settings, buildCylinder(settings));
+  if (!lid) return null;
+  const mesh = meshSdf(lid.sdf, lid.bounds, gridStep(lid.bounds, LID_STEP, BASE_MAX_CELLS));
+  return { mesh, label: `Cylinder lid ${lid.info.style}`, info: lid.info };
+}
+
 /**
  * One lantern part: 'panel' (side 0..n-1), 'pillar', 'base' or 'top', or a Christmas trim part
  * ('xframe', 'xbase', 'xlattice', 'xdecor', 'xtopper'). Returns { mesh, label }.
@@ -124,6 +135,9 @@ export function partList(data) {
   }
   const label = SHAPES[s.shape]?.label || s.shape;
   const list = [{ name: isPanel(s) ? 'Panel' : isCylinder(s) ? 'Cylinder' : label, copies: 1, weight: 6, make: (p) => lampMesh(data, p).mesh }];
+  if (isCylinder(s) && LID_STYLES[s.cylinder?.lid] && s.cylinder.lid !== 'none') {
+    list.push({ name: `Lid (${LID_STYLES[s.cylinder.lid]})`, copies: 1, weight: 1, make: () => lidMesh(s).mesh });
+  }
   if (!(isPanel(s) && (s.base?.panelKind || 'lightbox') === 'none')) {
     list.push({ name: 'Base', copies: 1, weight: 1, make: () => { const b = baseMesh(s); return b && b.mesh; } });
     if (buildBase(s, lampShape(s))?.parts.cover) { // a puck tray under a narrow opening

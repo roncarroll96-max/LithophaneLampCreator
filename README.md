@@ -22,7 +22,9 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    then drag it on the ball to move it.
    A cut-out photo (transparent background, e.g. from your phone's "lift subject") works too:
    choose whether the empty area blends into the ball, glows bright or stays dark.
-2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes.
+2. **Photo** tab: fine-tune tone, position the photo, set how far around the ball it goes. On a flat panel, lantern or
+   cylinder, **Pattern where there's no photo** fills the plain parts with a diamond lattice, honeycomb, wood grain or
+   stars and snowflakes.
    The **Thickness** button above the preview shows the walls as a grey map; point at the ball to read the thickness in mm.
    In the **Lit** view, the colour dots under the buttons change the colour of the light (white, warm white, yellow or amber). It only changes the preview.
 3. **Shape** tab: shape (basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon, cube, cylinder),
@@ -35,6 +37,7 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    The cube STL comes out upside down, top face on the bed, ready to print without supports.
    For a **cylinder**: Small, Medium, Large or a custom diameter and height, and how far round the photo goes (all the
    way round, its ends fading into each other at the back, or a front window). It stands in a base like the balls'.
+   A **lid** is optional: solid, diamond lattice, honeycomb, snowflake or round holes (Export tab, Export lid STL).
    For a **flat panel**: rectangle (match the photo, 4×6, 5×7, 8×10 in or custom), square, circle or heart;
    a curve slider; a raised frame; optional feet. Several photos can make a collage ("Arrange as collage").
    For a **lantern**: the number of sides (3, 4, 5 or 6), the panel size (4×6, 5×7, 8×10 in or square), pillar thickness, base height,
