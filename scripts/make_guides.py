@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.8: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.9: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -402,10 +402,10 @@ def app_guide(path):
          'least 0.8 mm with a 0.4 mm nozzle (two printed lines).', '0.4 to 2.0 mm<br/>Default 0.8'],
         ['Thickest (darkest)', 'Thickness used for pure black.', 'Higher = darker shadows. Past about 3 mm in white PLA '
          'little light gets through.', '1.5 to 5.0 mm<br/>Default 3.0'],
-        ['Picture detail on the', 'Inside or Outside (balls, cube); Back or Front (panel). Outside / Front puts the '
+        ['Picture detail on the', 'Outside or Inside (balls, cube); Front or Back (panel). Outside / Front puts the '
          'bumpy side toward you, which usually looks crisper when lit; the ball is then textured to the touch. The '
          'collar, and a cube\'s top face (it prints on the bed), keep their detail inside.',
-         'None: same thickness either way.', 'Inside (Back)'],
+         'None: same thickness either way.', 'Outside (Front)'],
         ['Opening, collar height, collar wall', 'The hole the light shines through and the collar that drops into the '
          'base.', 'Collar wall also sets the plain band above the opening.', '50 mm, 5 mm, 2 mm'],
         ['Football: tip shape', 'From a smooth oval to pointed.', 'None (shape only).', 'Default 60%'],
@@ -426,9 +426,9 @@ def app_guide(path):
         ['Lantern: panels', 'Rectangle (4x6, 5x7, 8x10 in, portrait or landscape, or custom) or square (4, 6, 8 in or '
          'custom); 3 to 6 sides, all the same, flat, picture detail facing out.', 'None (size only).', '4x6 in portrait'],
         ['Lantern: frame', 'Pillar thickness, base height, slot fit and peg fit (extra room).', 'None: the frame is not a '
-         'lithophane.', '16 mm, 24 mm, 0.4 mm, 0.25 mm'],
-        ['Lantern: top', 'Like the photo (crossed beams, capped posts, open lattice), Pagoda roof or Simple lid; top '
-         'height and overhang.', 'None.', 'Like the photo, 32 mm, 10 mm'],
+         'lithophane.', '16 mm, 24 mm, 0.4 mm, 0.15 mm'],
+        ['Lantern: top', 'Standard roof (crossed beams, capped posts, open lattice), Pagoda roof or Simple lid; top '
+         'height and overhang.', 'None.', 'Standard roof, 32 mm, 10 mm'],
         ['Lantern: Christmas theme', 'Low or two-tier roof, ring or star topper, snowflakes and trees or holly and berries; '
          'how far the side frames cover each picture; eaves; preview colours.', 'None, but the frames hide the outer edge '
          'of each picture.', 'Plain; frames 12 mm'],
@@ -471,21 +471,28 @@ def app_guide(path):
     s.append(P('Base tab', H2))
     s.append(table([
         ['Setting', 'What it does'],
-        ['Light', '<b>LED puck</b>: the puck goes in from below (enter its diameter and height). <b>LED strip on a '
+        ['Light', '<b>LED puck</b>: enter its diameter and height (59.5 x 8 mm to start). <b>LED strip on a '
          'riser</b>: a hollow post rises into the lamp to wrap the strip round. <b>Bulb socket</b> (E12 / E26): holds '
          'a socket on a 1/8" threaded lamp nipple.'],
         ['Collar fit', 'Extra room for the collar in the seat (default 0.4 mm). Too tight: add room. Too loose: take '
          'some away.'],
         ['Base shape, extra width', 'Matches the lamp (round under balls, square under the cube), or round or square; '
          'extra width all round.'],
-        ['Cable notch', 'Width and height of the notch at the back.'],
+        ['Puck: Tray or Open bottom', '<b>Tray</b> (default): the puck lifts with the lamp. A wall round it (5 mm), '
+         'a hole in the floor at the back 1 mm bigger than the cable\'s plug (plug width and height, 15.5 x 15 mm), and a '
+         'channel underneath to a small hole in the side (cable thickness 3 mm, cable hole height 4 mm). Under a '
+         'cylinder the base is one piece and the puck drops in from above. Under a ball or the cube the tray is a '
+         '<b>bottom cover</b> that presses into the base (Cover fit, 0.15 mm): export it with its own button. '
+         '<b>Open bottom</b>: the puck goes in from below and stays on the table.'],
+        ['Cable notch', 'Open bottom, strip and bulb: width and height of the notch at the back.'],
         ['Export base STL', 'A separate file, already turned the right way up for printing.'],
         ['Flat panel: base', '<b>Light box</b>: the panel stands in a slot; an LED strip on a leaning floor behind it '
          'shines up its back (set the strip width; even glow on/off). <b>Slot stand</b>: just the slot. <b>None</b>: '
          'feet, a window or a frame.'],
         ['Flat panel: slot fit', 'Extra room in the slot (default 0.4 mm). The app shows the slot width.'],
-        ['Lantern: light', 'Your puck\'s diameter and height (it stands on the table in a hole in the base\'s floor, or sits '
-         'in a tray: a closed floor with a rim round it and a gap for the cord; lift the lantern off to switch it on), the cable notch width, and even glow on/off and strength.'],
+        ['Lantern: light', 'Your puck\'s diameter and height. Tray (default): the same tray as above in the base\'s '
+         'floor, so the puck lifts with the lantern. Hole in the floor: the puck stands on the table (cable notch width and '
+         'height). Even glow on/off and strength.'],
     ], [1.6 * inch, 5.4 * inch]))
 
     s.append(P('Export tab', H2))
@@ -577,7 +584,9 @@ def printer_guide(path):
          'diagonally: rotate it 45 degrees in the slicer (the app tells you).'],
         ['Cube', 'Already upside down in the file: top face flat on the bed. The 45-degree funnel underneath needs no '
          'supports.'],
-        ['Base: LED puck, bulb socket', 'Already upside down in the file (top on the bed). No supports.'],
+        ['Base: LED puck, bulb socket', 'Already upside down in the file (top on the bed). No supports. A one-piece '
+         'puck tray under a cylinder prints as it sits.'],
+        ['Base bottom cover', 'As it sits, wall up, as exported. The cable channel underneath is a short bridge: no supports.'],
         ['Base: LED strip riser', 'Standing up, as it sits on the table. No supports.'],
         ['Flat panel', 'Standing up on its bottom edge, as exported, with the front facing the seam-free side. Brim on, '
          'no supports.'],

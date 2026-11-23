@@ -52,6 +52,7 @@ test('every outline is the right size and its rings never cross (so the mesh sta
 test('the front stays smooth; bright photo areas are thin, dark ones thick; the frame is thickest', () => {
   const s = panelSettings({ outline: 'square', size: '4' });
   s.base.panelKind = 'none'; // no light box, so no even glow
+  s.reliefSide = 'inside';   // picture detail on the back
   const panel = buildPanel(s);
   // A photo: left half black, right half white
   const w = 64, h = 64, data = new Float32Array(w * h);

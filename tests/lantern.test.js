@@ -12,9 +12,10 @@ import { buildPanelMesh } from '../js/core/panelMesh.js';
 
 const SIDES = [3, 4, 5, 6];
 
-function lantern(edit = {}, tMax = 3) {
+function lantern(edit = {}, tMax = 3, hold) {
   const s = defaultSettings();
   s.shape = 'lantern'; s.tMax = tMax;
+  if (hold) s.base.puckHold = hold;
   Object.assign(s.lantern, edit);
   return s;
 }
@@ -251,30 +252,43 @@ test('every top style has a sensible height', () => {
   assert.ok(g3.top.hRing >= g3.top.hF);
 });
 
-test('the base can hold the puck in a tray: closed floor, a rim round the puck, a gap for the cord', () => {
+test('the base can hold the puck in a tray: closed floor, a wall round the puck, a plug hole and a hidden cable channel', () => {
   for (const n of SIDES) {
     const s = lantern({ sides: n }); s.base.puckHold = 'tray'; s.base.puckD = 30;
-    const g = lanternGeometry(s), base = baseSdf(g);
-    assert.ok(g.tray && g.puckZ === 2);
-    const r = Math.min(g.puckR, g.inner - 2.5), zr = 2 + g.trayRim / 2;
+    const g = lanternGeometry(s), base = baseSdf(g), td = g.td;
+    assert.ok(g.tray && Math.abs(g.puckZ - (s.base.cableHoleH + 1.6)) < 1e-9, 'the floor is the cable hole plus 1.6 mm thick');
+    assert.equal(g.trayRim, 5, 'a 5 mm wall round the puck');
+    const r = td.pr, zr = g.puckZ + g.trayRim / 2;
     // the back: the cable notch's side (side n/2, rounded down)
     const F = g.frames[g.notchSide], at = (d, x = 0) => [x * F.tx + d * F.nx, x * F.ty + d * F.ny];
-    assert.ok(base(0, 0, 1) < 0, `${n}: closed floor under the puck`);
-    assert.ok(base(0, 0, 3) > 0, 'room for the puck above the floor');
-    assert.ok(base(...at(-(r + 1)), zr) < 0, `${n}: rim round the puck (front)`);
-    assert.ok(base(...at(r + 1), zr) > 0, `${n}: gap in the rim at the back for the cord`);
-    assert.ok(base(...at(r + 1), 1) < 0, 'the gap leaves the floor whole');
-    assert.ok(base(...at(g.half - 1), 2) > 0, `${n}: the cable notch goes out through the back wall`);
+    assert.ok(base(0, 0, g.puckZ - 0.5) < 0 && base(0, 0, 0.5) < 0, `${n}: closed floor under the puck`);
+    assert.ok(base(0, 0, g.puckZ + 1) > 0, 'room for the puck above the floor');
+    assert.ok(base(...at(-(r + 1)), zr) < 0, `${n}: wall round the puck (front)`);
+    assert.ok(base(...at(-(r - 1)), zr) > 0, `${n}: the puck fits inside the wall`);
+    // the plug hole: through the floor and the wall at the back, as big as the plug plus 1 mm
+    const ym = (td.y0 + td.y1) / 2;
+    for (const z of [0.5, g.puckZ - 0.5, zr]) assert.ok(base(...at(ym), z) > 0, `${n}: plug hole open at z ${z}`);
+    assert.ok(base(...at(ym, td.hw - 0.3), g.puckZ - 0.5) > 0 && base(...at(ym, td.hw + 0.3), g.puckZ - 0.5) < 0, `${n}: plug hole ${2 * td.hw} mm wide`);
+    assert.ok(td.hl >= s.base.plugH + 1 - 1e-9 || td.y1 > g.inner, 'plug hole long enough');
+    // the cable channel: under the floor, out through the back wall; only a small hole shows
+    const cw = s.base.cableD + 1, ch = s.base.cableHoleH;
+    assert.ok(base(...at(g.half - 1), ch - 0.5) > 0, `${n}: the cable hole goes out through the back wall`);
+    assert.ok(base(...at(g.half - 1), ch + 0.5) < 0, `${n}: the back wall is solid above the cable hole`);
+    assert.ok(base(...at(g.half - 1, cw / 2 + 0.5), 1) < 0, `${n}: the cable hole is only ${cw} mm wide`);
+    assert.ok(base(...at(Math.min(td.y1 + 1, g.inner + 2)), ch + 0.5) < 0, `${n}: floor (or wall) over the channel`);
     // The hole version is still open under the puck
-    assert.ok(baseSdf(lanternGeometry(lantern({ sides: n })))(0, 0, 1) > 0);
+    assert.ok(baseSdf(lanternGeometry(lantern({ sides: n }, 3, 'hole')))(0, 0, 1) > 0);
   }
-  const s = lantern(); s.base.puckHold = 'tray';
-  const g = lanternGeometry(s);
-  // Closed and printable
-  const p = lanternPart(s, 'base');
-  const m = meshSdf(p.sdf, p.bounds, 0.5);
-  assert.ok(checkWatertight(m.indices, m.positions.length / 3).ok);
-  assert.ok(overhangArea(m, g.cableH + 1) < 200);
-  // The puck sits 2 mm higher, so the light is a little higher too
-  assert.ok(lanternLight(g, 0, -g.H / 2) !== lanternLight(lanternGeometry(lantern()), 0, -g.H / 2));
+  for (const n of SIDES) {
+    const s = lantern({ sides: n }); s.base.puckHold = 'tray';
+    const g = lanternGeometry(s);
+    // Closed and printable (the channel's ceiling is a short bridge)
+    const p = lanternPart(s, 'base');
+    const m = meshSdf(p.sdf, p.bounds, 0.5);
+    assert.ok(checkWatertight(m.indices, m.positions.length / 3).ok, `${n} sides: closed`);
+    assert.ok(overhangArea(m, g.cableH + 1) < 200);
+  }
+  // The puck sits higher in the tray, so the light is a little higher too
+  const g = lanternGeometry(lantern());
+  assert.ok(lanternLight(g, 0, -g.H / 2) !== lanternLight(lanternGeometry(lantern({}, 3, 'hole')), 0, -g.H / 2));
 });

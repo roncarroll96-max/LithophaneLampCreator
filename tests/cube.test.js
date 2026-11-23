@@ -7,7 +7,7 @@ import { defaultSettings, defaultPhotoSettings, cubePhotoSlot, bodyAxes, collarD
 
 function cube(edit = () => {}) {
   const s = defaultSettings();
-  s.shape = 'cube';
+  s.shape = 'cube'; s.reliefSide = 'inside'; // (outside detail presses into the faces)
   edit(s);
   const col = collarDims(s);
   return { s, col, shape: buildEllipsoidShape(bodyAxes(s), col.ro) };

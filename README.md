@@ -27,8 +27,8 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    In the **Lit** view, the colour dots under the buttons change the colour of the light (white, warm white, yellow or amber). It only changes the preview.
 3. **Shape** tab: shape (basketball, soccer, football, baseball/softball, volleyball, plain sphere, Moon, cube, cylinder),
    size (Small 100 / Medium 150 / Large 200 mm; footballs 160 × 100 / 240 × 150 / 280 × 175 mm),
-   wall thickness, opening and collar. "Picture detail on the" puts the picture's bumps inside (smooth ball, the
-   default) or outside (facing you, often crisper when lit); on a panel, back or front.
+   wall thickness, opening and collar. "Picture detail on the" puts the picture's bumps outside (facing you, often
+   crisper when lit; the default since 1.9) or inside (smooth ball); on a panel, front or back.
    For the football: tip shape, from oval to pointed.
    For the Moon: Moon only or Photo + Moon, crater depth, and turning the Moon.
    For the cube (5 photos): size, edge rounding, photo border, "Fit photos to faces", even glow.
@@ -38,9 +38,9 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    For a **flat panel**: rectangle (match the photo, 4×6, 5×7, 8×10 in or custom), square, circle or heart;
    a curve slider; a raised frame; optional feet. Several photos can make a collage ("Arrange as collage").
    For a **lantern**: the number of sides (3, 4, 5 or 6), the panel size (4×6, 5×7, 8×10 in or square), pillar thickness, base height,
-   slot and peg fit, and the top (like a Japanese lantern, a pagoda roof or a simple lid). Each photo fills one
-   side; the Base tab takes your puck light's size, and whether it stands in a hole in the base's floor or sits
-   in a tray (closed floor, a rim round the puck and a gap for the cord). **Theme: Christmas** gives the lantern a low or
+   slot and peg fit, and the top (standard roof, pagoda roof or simple lid). Each photo fills one
+   side; the Base tab takes your puck light's size, and whether it sits in a tray (it lifts with the lantern) or
+   stands in a hole in the base's floor. **Theme: Christmas** gives the lantern a low or
    two-tier roof, a ring or star on top, and flat trim pieces (side frames, base strips, snowflakes or holly, lattice)
    to print in a second colour and glue on. The Export tab has a button for each panel, the pillar
    (print one per corner), the base and the top, each already turned for printing without supports.
@@ -51,7 +51,10 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    click the ball to place the text, then fine-tune size, bend and position.
 6. **Base** tab: choose the light (LED puck, LED strip on a riser, or bulb socket), enter its size,
    adjust the collar fit, check that it fits your bed, and **Export base STL** (a separate file,
-   already turned for printing).
+   already turned for printing). A puck can sit in a **tray** (the default: it lifts with the lamp) or stand on the
+   table in the open bottom. The tray has a wall round the puck, a hole in its floor for the cable's plug and a
+   channel underneath, so only a small cable hole shows at the back. Under a ball or the cube the tray is a
+   separate **bottom cover** that presses into the base: export it too (**Export bottom cover STL**).
 7. **Export** tab: check the bed fit, pick a detail level (each shows its file size; very big files get a warning),
    **Export ball STL** (or **Export panel STL**), or **Export all parts as one 3MF**: the lamp and its base (or every lantern
    part) in one much smaller file, each part named and turned for printing. In your slicer, press Arrange to place them.

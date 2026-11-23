@@ -2,6 +2,9 @@
 // Three kinds: an LED puck inside the base, an LED strip wrapped round a hollow riser post that
 // rises into the lamp, or a lamp socket (E12 / E26) on a threaded nipple.
 // Every base has a seat on top that the collar drops into, and a notch for the cable.
+// A puck can stand on the table in the open bottom, or (version 1.9) sit in a tray that lifts
+// with the lamp: one piece when the opening is wide enough to drop it in from above (a cylinder),
+// else a bottom cover that presses into the base.
 //
 // Coordinates: millimetres, Z up, the base standing on the table at z = 0, centred on x/y = 0.
 // The notch faces the back (+Y). No DOM here.
@@ -20,17 +23,53 @@ export const SOCKETS = {
 export function defaultBaseSettings() {
   return {
     light: 'puck',     // 'puck' | 'strip' | 'bulb'
-    puckD: 70, puckH: 20, // LED puck size, mm
-    puckHold: 'hole',  // lantern only: 'hole' (the puck stands on the table) | 'tray' (closed floor with a rim)
+    puckD: 59.5, puckH: 8, // LED puck size, mm (70 x 20 before version 1.9)
+    puckHold: 'tray',  // 'hole' (open bottom: the puck stays on the table) | 'tray' (the puck lifts with the lamp)
     socket: 'E12',     // bulb socket type
     riserD: 30,        // strip riser outside diameter, mm
     riserH: 0,         // strip riser height above the base top, mm; 0 = up to the middle of the lamp
     clearance: 0.4,    // extra room around the collar in the seat, mm (on the diameter)
     shape: 'auto',     // 'auto' (round under balls, square under the cube) | 'round' | 'square'
     extra: 0,          // extra width all round, mm
-    cableW: 10, cableH: 8, // cable notch, mm
+    cableW: 10, cableH: 8, // cable notch (open bottom), mm
+    // Puck tray (version 1.9): a wall round the puck, a hole in the floor the cable's plug goes
+    // through, and a channel under the floor to a small hole in the side
+    rimH: 5,           // height of the wall round the puck, mm
+    cableD: 3,         // cable thickness, mm
+    cableHoleH: 4,     // height of the cable's hole in the side, mm
+    plugW: 15.5, plugH: 15, // the biggest part on the cable (the plug), mm
+    coverFit: 0.15,    // balls and cube: extra room round the bottom cover's wall, mm (each side)
   };
 }
+
+const clampN = (v, lo, hi, d) => Math.min(hi, Math.max(lo, Number.isFinite(+v) ? +v : d));
+
+/**
+ * Sizes of the puck tray for a puck whose room has radius pr (the wall stands just outside it).
+ * The tray is a floor F thick with a channel under it (open to the table) from the plug hole out
+ * to the side, so only a small hole shows. The plug hole is at the back (+y), from y0 to y1: it
+ * cuts through the wall, so the cable can drop from the puck's side straight down into it.
+ */
+export function trayDims(b, pr) {
+  const cableD = clampN(b.cableD, 1.5, 10, 3);
+  const ch = clampN(b.cableHoleH, cableD + 0.5, 20, cableD + 1);
+  const rimH = clampN(b.rimH, 2, 15, 5), rimT = 2;
+  const hw = (clampN(b.plugW, 4, 40, 15.5) + 1) / 2, hl = clampN(b.plugH, 4, 40, 15) + 1;
+  const y1 = pr + rimT + cableD + 0.5;
+  return { cableD, cw: cableD + 1, ch, F: ch + 1.6, rimH, rimT, hw, hl, y0: y1 - hl, y1, pr };
+}
+
+/** The tray as one piece: floor (outer shape `plate`, F thick), wall round the puck, plug hole and channel. */
+function traySdf(td, plate, reach) {
+  const { F, pr, rimT, rimH, cw, ch, hw, y0, y1 } = td;
+  const rim = subtract(cylinder(pr + rimT, F - 0.5, F + rimH), cylinder(pr, F - 1, F + rimH + 1));
+  return subtract(union(plate, rim),
+    box(-hw, hw, y0, y1, -1, F + rimH + 1),            // the plug goes down through here
+    box(-cw / 2, cw / 2, (y0 + y1) / 2, reach, -1, ch)); // the cable runs under the floor to the side
+}
+
+/** Moves a solid up by dz. */
+const raise = (f, dz) => (x, y, z) => f(x, y, z - dz);
 
 /** How wide the lamp is (for a base in proportion to it). */
 function lampWidth(settings, shape) {
@@ -43,7 +82,9 @@ function lampWidth(settings, shape) {
 /**
  * Builds the base for the current settings.
  * shape: the built lamp shape (used for the riser height: the middle of the lamp).
- * Returns { sdf, bounds, info } where info has the sizes and whether it prints upside down.
+ * Returns { sdf, bounds, parts, info }: sdf and bounds are the whole base put together (for the
+ * preview); parts.base (and parts.cover for a puck tray under a narrow opening) are the pieces as
+ * they print, each { sdf, bounds, flip }. info has the sizes and whether the base prints upside down.
  */
 export function buildBase(settings, shape) {
   if (shape && shape.kind === 'panel') return buildPanelBase(settings, shape);
@@ -57,7 +98,7 @@ export function buildBase(settings, shape) {
   const prop = 0.28 * lampWidth(settings, shape);
   const notch = (R, h) => box(-b.cableW / 2, b.cableW / 2, 0, R + 10, -1, h);
   const outer = (R, H) => (square ? roundedSquare(R, Math.min(8, R * 0.2), 0, H) : cylinder(R, 0, H));
-  let sdf, H, R, flip, riserTop = null, extraInfo = {};
+  let sdf, H, R, flip, riserTop = null, extraInfo = {}, parts = null;
 
   if (b.light === 'bulb') {
     const hb = 28, plate = 3;
@@ -111,22 +152,71 @@ export function buildBase(settings, shape) {
     flip = false;
     extraInfo = { ...extraInfo, riserD: roT * 2, riserHeight: riserTop - H };
   } else { // LED puck
-    const rc = b.puckD / 2 + 0.6, hc = b.puckH + 1, floor = 2;
-    const rh = Math.max(8, Math.min(col.ri - 1.5, rc - 3));
-    H = hc + floor + seatD;
-    R = Math.max(rc + 3, rs + 8, prop) + b.extra;
-    sdf = subtract(outer(R, H),
-      cylinder(rc, -1, hc),                            // the puck goes in from below
-      cylinder(rh, hc - 1, H + 1),                     // light shines up through here
-      cylinder(rs, H - seatD, H + 1),                  // collar seat
-      notch(R, Math.min(b.cableH, hc)));
-    flip = true;
+    const pr = b.puckD / 2 + 0.6;
+    const tray = b.puckHold === 'tray';
+    const td = tray ? trayDims(b, pr) : null;
+    // Drop-in tray: the opening is wide enough for the puck and the plug to go in from above, so
+    // the base is one piece with a closed floor. Otherwise a separate bottom cover holds the puck.
+    const rIn = col.ri - 1.5;
+    // (the plug hole comes in a little if need be, as long as it still cuts through the wall)
+    const yIn = Math.sqrt(Math.max(0, rIn * rIn - (td ? td.hw * td.hw : 0)));
+    if (tray && yIn >= td.pr + td.rimT + 1) {
+      if (td.y1 > yIn) { td.y1 = yIn; td.y0 = yIn - td.hl; }
+      const hc = Math.max(b.puckH + 1, td.rimH + 0.5);
+      H = td.F + hc + seatD;
+      R = Math.max(rIn + 3, rs + 8, prop) + b.extra;
+      const shell = subtract(outer(R, H),
+        cylinder(rIn, td.F, H + 1),                    // the puck drops in from above
+        cylinder(rs, H - seatD, H + 1));               // collar seat
+      sdf = traySdf(td, shell, R + 10);
+      flip = false;
+      extraInfo = { tray: 'dropin', td, floor: td.F, rimH: td.rimH, cableHole: [td.cw, td.ch] };
+    } else if (tray) {
+      // The base: open underneath, with room round the puck for the cover's wall, which presses in
+      const cf = clampN(b.coverFit, 0, 1, 0.15);
+      const rc = pr + td.rimT + cf, hc = Math.max(b.puckH + 1, td.rimH + 0.5), floor = 2;
+      const rh = Math.max(8, Math.min(rIn, rc - 3));
+      const Hb = hc + floor + seatD;
+      R = Math.max(rc + 3, td.y1 + cf + 2.5, rs + 8, prop) + b.extra;
+      const baseOnly = subtract(outer(R, Hb),
+        cylinder(rc, -1, hc),                          // room for the puck and the cover's wall
+        box(-td.hw, td.hw, 0, td.y1 + cf, -1, hc),     // room for the cable over the plug hole
+        cylinder(rh, hc - 1, Hb + 1),                  // light shines up through here
+        cylinder(rs, Hb - seatD, Hb + 1));             // collar seat
+      const cover = traySdf(td, outer(R, td.F), R + 10);
+      const coverTop = td.F + td.rimH;
+      H = td.F + Hb;
+      // The base alone prints upside down; the cover prints as it sits (wall up)
+      parts = {
+        base: { sdf: baseOnly, bounds: { min: [-R, -R, 0], max: [R, R, Hb] }, flip: true },
+        cover: { sdf: cover, bounds: { min: [-R, -R, 0], max: [R, R, coverTop] }, flip: false },
+      };
+      // Put together, for the preview: overlapping a little, and the thin gap round the cover's
+      // wall filled, so it meshes cleanly
+      const gapFill = subtract(cylinder(rc + 0.5, td.F - 0.5, td.F + td.rimH), cylinder(pr, td.F - 1, td.F + td.rimH + 1), box(-td.hw, td.hw, 0, R, -1, H));
+      sdf = union(cover, raise(baseOnly, td.F - 0.2), gapFill);
+      flip = true;
+      extraInfo = { tray: 'cover', td, floor: td.F, rimH: td.rimH, cableHole: [td.cw, td.ch], baseHeight: Hb, coverHeight: coverTop };
+    } else {
+      const rc = pr, hc = b.puckH + 1, floor = 2;
+      const rh = Math.max(8, Math.min(rIn, rc - 3));
+      H = hc + floor + seatD;
+      R = Math.max(rc + 3, rs + 8, prop) + b.extra;
+      sdf = subtract(outer(R, H),
+        cylinder(rc, -1, hc),                          // the puck goes in from below
+        cylinder(rh, hc - 1, H + 1),                   // light shines up through here
+        cylinder(rs, H - seatD, H + 1),                // collar seat
+        notch(R, Math.min(b.cableH, hc)));
+      flip = true;
+    }
   }
 
   const top = riserTop ?? H;
+  const bounds = { min: [-R, -R, 0], max: [R, R, top] };
   return {
-    sdf,
-    bounds: { min: [-R, -R, 0], max: [R, R, top] },
+    sdf, bounds,
+    // the parts as they print: the base (and a bottom cover with a tray); each sits at z = 0
+    parts: parts || { base: { sdf, bounds, flip } },
     info: {
       light: b.light, square, width: 2 * R, height: H, totalHeight: top,
       seatR: rs, seatFloor: H - seatD, flip, ...extraInfo,
@@ -209,9 +299,9 @@ export function buildPanelBase(settings, panel) {
     return d;
   };
 
+  const bounds = { min: [x0, y0, 0], max: [x1, y1, H] };
   return {
-    sdf,
-    bounds: { min: [x0, y0, 0], max: [x1, y1, H] },
+    sdf, bounds, parts: { base: { sdf, bounds, flip: false } },
     info: {
       light: kind, panel: true, width: x1 - x0, depth: y1 - y0, height: H, totalHeight: H,
       seatFloor: zSlot, slotDepth, flip: false, stripW,

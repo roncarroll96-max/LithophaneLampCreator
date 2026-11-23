@@ -541,7 +541,7 @@ function el(tag, attrs = {}, ...kids) {
     else if (v === true) e.setAttribute(k, '');
     else if (v !== false && v != null) e.setAttribute(k, v);
   }
-  for (const k of kids.flat()) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
+  for (const k of kids.flat(Infinity)) if (k != null) e.append(k.nodeType ? k : document.createTextNode(k));
   return e;
 }
 const section = (title, ...kids) => el('div', { class: 'section' }, el('h3', {}, title), ...kids);
@@ -612,6 +612,7 @@ function aspectToggle() {
 }
 
 const mm = (v) => `${(+v).toFixed(1)} mm`;
+const mm2 = (v) => `${(+v).toFixed(2)} mm`; // fits in 0.05 mm steps
 const pct = (v) => `${Math.round(v * 100)}%`;
 const deg = (v) => `${Math.round(v)}°`;
 const num2 = (v) => (+v).toFixed(2);
@@ -934,9 +935,9 @@ function lanternSections() {
       slider('lantern.pillar', 'Pillar thickness', 14, 24, 0.5, { fmt: (v) => mm(Math.max(+v, geo.P)), group: 'shape' }),
       geo.P > L.pillar + 0.01 ? note(`The pillars are ${geo.P.toFixed(1)} mm thick at least, so these ${geo.T.toFixed(1)} mm panels sit 4 mm deep in their slots.`) : null,
       slider('lantern.baseH', 'Base height', 20, 50, 1, { fmt: mm, group: 'shape' }),
-      slider('lantern.slotFit', 'Slot fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm, group: 'shape' }),
+      slider('lantern.slotFit', 'Slot fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm2, group: 'shape' }),
       note(`The slots are ${geo.sw.toFixed(1)} mm wide for ${geo.T.toFixed(1)} mm panels; each panel edge goes ${geo.insert.toFixed(1)} mm into its slot.`),
-      slider('lantern.pegFit', 'Peg fit (extra room)', 0.05, 0.6, 0.05, { fmt: mm, group: 'shape' }),
+      slider('lantern.pegFit', 'Peg fit (extra room)', 0.05, 0.6, 0.05, { fmt: mm2, group: 'shape' }),
       note('Print the base and one pillar first to check the fit: too tight, add room; too loose, take some away.')),
     section('Theme',
       segmented('lantern.theme', [
@@ -1299,7 +1300,7 @@ function panelBaseTab() {
       info ? (() => { const f = fitCheck([info.width, info.depth, info.height]); return el('div', { class: 'fit ' + f.cls }, f.text); })() : null,
       info ? note('Prints standing up, as it sits on the table. No supports needed. Print it in dark, opaque filament.') : null,
       tipsLink(),
-      el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: exportBaseStl },
+      el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: () => exportBaseStl() },
         app.exporting ? 'Building…' : 'Export base STL'),
       progress,
       st ? el('div', { class: 'stats' },
@@ -1311,6 +1312,19 @@ function panelBaseTab() {
   ];
 }
 
+/** The puck tray's controls (version 1.9): the wall round the puck, the cable and its plug. */
+function trayControls() {
+  const b = app.settings.base;
+  return [
+    slider('base.rimH', 'Wall round the puck', 2, 15, 0.5, { fmt: mm }),
+    numberInput('base.cableD', 'Cable thickness (mm)', 1.5, 10),
+    slider('base.cableHoleH', 'Cable hole height', Math.max(2, b.cableD + 0.5), 20, 0.5, { fmt: mm }),
+    numberInput('base.plugW', 'Plug width (mm)', 4, 40),
+    numberInput('base.plugH', 'Plug height (mm)', 4, 40),
+    note(`Thread the plug (the biggest part on the cable) down through the ${(b.plugW + 1).toFixed(1)} × ${(b.plugH + 1).toFixed(1)} mm hole in the tray's floor at the back, then press the cable up into the channel underneath. Only a ${(b.cableD + 1).toFixed(1)} × ${(+b.cableHoleH).toFixed(1)} mm hole shows at the back.`),
+  ];
+}
+
 /** Base tab, lantern: the puck light and even glow (the frame parts export on the Export tab). */
 function lanternBaseTab() {
   const s = app.settings, geo = lanternGeometry(s);
@@ -1319,15 +1333,18 @@ function lanternBaseTab() {
       numberInput('base.puckD', 'Puck diameter (mm)', 30, 160),
       numberInput('base.puckH', 'Puck height (mm)', 5, 60),
       segmented('base.puckHold', [
+        { value: 'tray', label: 'Tray', title: 'A closed floor with a wall round the puck: the puck lifts with the lantern' },
         { value: 'hole', label: 'Hole in the floor', title: 'A round hole in the base\'s floor; the puck stands on the table' },
-        { value: 'tray', label: 'Tray', title: 'A closed floor with a low rim round the puck and a gap for the cord' },
       ], undefined, () => renderTab()),
       geo.tray
-        ? note(`Measure your puck with calipers. It sits in a tray on the base's closed floor: a ${geo.trayRim} mm rim keeps it in the middle, with a gap at the back for the cord. Lift the lantern off to switch it on or change its batteries.`)
+        ? note('Measure your puck with calipers. It sits in a tray on the base\'s closed floor, so it lifts with the lantern.')
         : note('Measure your puck with calipers. It sits on the table in the round hole in the base\'s floor, so you lift the lantern off to switch it on or change its batteries.'),
       geo.puckFits ? null : note(`This puck is too wide for the lantern (the inside is ${Math.round(2 * geo.inner)} mm across). Use a smaller puck or bigger panels.`, 'warn'),
-      slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }),
-      note('A USB puck\'s cable leaves through the notch at the back of the base.'),
+      geo.tray ? trayControls() : [
+        slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }),
+        slider('base.cableH', 'Cable notch height', 3, 20, 0.5, { fmt: mm }),
+        note('A USB puck\'s cable leaves through the notch at the back of the base.'),
+      ],
     ),
     section('Even glow',
       checkbox('evenGlow.on', 'Even glow (thinner plastic farther from the light)', 'field', () => renderTab()),
@@ -1356,6 +1373,20 @@ function baseTab() {
       numberInput('base.puckD', 'Puck diameter (mm)', 30, 160),
       numberInput('base.puckH', 'Puck height (mm)', 5, 60),
       note('Measure your puck with calipers. The base leaves a little room around it.'),
+      segmented('base.puckHold', [
+        { value: 'tray', label: 'Tray', title: 'The puck sits in a tray and lifts with the lamp' },
+        { value: 'hole', label: 'Open bottom', title: 'The puck goes in from below and stays on the table when you lift the lamp' },
+      ], undefined, () => renderTab()),
+      b.puckHold === 'tray' ? [
+        info && info.tray === 'cover'
+          ? note(`The puck can't pass through the ${(col.ri * 2).toFixed(0)} mm opening, so it sits in a separate bottom cover that presses into the base. Export both parts below.`)
+          : info && info.tray === 'dropin' ? note(`The puck drops into the tray from above, through the ${cyl ? 'cylinder' : 'opening'}. The base is one piece.`) : null,
+        trayControls(),
+        info && info.tray === 'cover' ? [
+          slider('base.coverFit', 'Cover fit (extra room)', 0, 0.6, 0.05, { fmt: mm2 }),
+          note('Too tight to press in? Add room. Falls out? Take some away.'),
+        ] : null,
+      ] : note('The puck stays on the table when you lift the lamp.'),
     ] : null,
     kind === 'strip' ? [
       slider('base.riserD', 'Riser diameter', 16, Math.floor(col.ri * 2 - 3), 0.5, { fmt: mm }),
@@ -1383,25 +1414,31 @@ function baseTab() {
       note(b.light === 'puck' ? 'The puck sits low, so the top of the cylinder gets the least light. Even glow makes the plastic thinner higher up to balance it.'
         : 'Even glow makes the plastic thinner where less light reaches it.')) : null,
     section('Fit and size',
-      slider('base.clearance', cyl ? 'Seat fit (extra room)' : 'Collar fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm }),
+      slider('base.clearance', cyl ? 'Seat fit (extra room)' : 'Collar fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm2 }),
       note('Too tight? Add room. Too loose? Take some away.'),
       el('div', { class: 'ctl' }, el('label', {}, 'Base shape')), shapeOpts,
       slider('base.extra', 'Extra width', 0, 40, 1, { fmt: mm }),
-      slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }),
-      slider('base.cableH', 'Cable notch height', 3, 20, 0.5, { fmt: mm }),
+      kind === 'puck' && b.puckHold === 'tray' ? null : [
+        slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }),
+        slider('base.cableH', 'Cable notch height', 3, 20, 0.5, { fmt: mm }),
+      ],
     ),
     section('Export base',
       info ? note(`Base: ${info.width.toFixed(0)} mm ${info.square ? 'square' : 'across'}, ${info.height.toFixed(0)} mm tall`
         + (info.riserHeight ? `, riser ${info.riserHeight.toFixed(0)} mm above it.` : '.')) : null,
       info && info.riserLimited ? note(`The riser was kept ${info.riserHeight.toFixed(0)} mm tall so it stays inside the lamp.`, 'warn') : null,
       info ? (() => { const f = fitCheck([info.width, info.width, info.totalHeight]); return el('div', { class: 'fit ' + f.cls }, f.text); })() : null,
-      info ? note(info.flip
-        ? 'Prints upside down (top on the bed): the STL is already turned. No supports needed.'
-        : 'Prints standing up, as it sits on the table. No supports needed.') : null,
+      info ? note(info.tray === 'cover'
+        ? 'The base prints upside down (top on the bed) and the bottom cover as it sits (wall up): the STLs are already turned. No supports needed.'
+        : info.flip
+          ? 'Prints upside down (top on the bed): the STL is already turned. No supports needed.'
+          : 'Prints standing up, as it sits on the table. No supports needed.') : null,
       info ? note('The base is not a lithophane: normal slicer settings are fine. Print it in dark, opaque filament.') : null,
       tipsLink(),
-      el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: exportBaseStl },
+      el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: () => exportBaseStl() },
         app.exporting ? 'Building…' : 'Export base STL'),
+      info && info.tray === 'cover' ? el('button', { class: 'btn block', style: 'margin-top:8px', id: 'btnExportCover', disabled: app.exporting || !app.shape, onclick: () => exportBaseStl('cover') },
+        app.exporting ? 'Building…' : 'Export bottom cover STL') : null,
       progress,
       st ? el('div', { class: 'stats' },
         'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
@@ -1598,7 +1635,7 @@ function cannotExport() {
   return false;
 }
 
-function exportBaseStl() {
+function exportBaseStl(part = 'base') {
   if (app.exporting || !app.shape || cannotExport()) return;
   const s = app.settings;
   app.exporting = true; renderTab();
@@ -1611,7 +1648,7 @@ function exportBaseStl() {
       const bar = document.getElementById('exportBar');
       if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
     } else if (msg.type === 'done') {
-      const fileName = `${projectBaseName()}-base-${isPanel() ? s.base.panelKind : s.base.light}.stl`;
+      const fileName = part === 'cover' ? `${projectBaseName()}-base-bottom-cover.stl` : `${projectBaseName()}-base-${isPanel() ? s.base.panelKind : s.base.light}.stl`;
       download(new Blob(msg.stl, { type: 'model/stl' }), fileName);
       app.lastBaseExport = { ...msg.stats, fileName };
       toast(`Saved ${fileName}`);
@@ -1625,7 +1662,7 @@ function exportBaseStl() {
     toast(await workerErrorText(workerUrl, e, 'Base export failed'), 'err');
     done();
   };
-  worker.postMessage({ kind: 'base', settings: structuredClone(s) });
+  worker.postMessage({ kind: 'base', part, settings: structuredClone(s) });
 }
 
 function exportStl() {

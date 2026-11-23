@@ -55,7 +55,7 @@ for (const style of ['carved', 'raised', 'off']) {
 
 test('football (ellipsoid lying on its side) shell is watertight', () => {
   const s = defaultSettings();
-  s.shape = 'football';
+  s.shape = 'football'; s.reliefSide = 'inside';
   s.markings.style = 'off';
   const { mesh } = build(s, 3);
   const wt = checkWatertight(mesh.indices, mesh.positions.length / 3);

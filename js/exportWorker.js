@@ -1,6 +1,6 @@
 // Builds the STL (or 3MF) in the background so the page stays responsive.
 // Message in:  { settings, photos: { [id]: { w, h, data, alpha? } }, textMasks | null, moon | null, stepInner, stepOuter }
-//   or { kind: 'base', settings }
+//   or { kind: 'base', part: 'base' | 'cover', settings }
 //   or { kind: 'lantern', part: 'panel' | 'pillar' | 'base' | 'top', side (0..3, for a panel), settings, photos, textMasks, stepInner, stepOuter }
 //   or { kind: '3mf', title, settings, photos, textMasks, moon, stepInner, stepOuter } (every part in one 3MF file)
 // Messages out: { type: 'progress', value } and { type: 'done', stl: [ArrayBuffer parts], stats } or { type: 'error', message }
@@ -40,8 +40,8 @@ self.onmessage = async (e) => {
       sendStl(lanternMesh(d, d.part, d.side, (v) => progress(v * 0.9)));
     } else if (d.kind === 'base') {
       progress(0.1);
-      const b = baseMesh(d.settings);
-      if (!b) throw new Error('No base is chosen for this panel.');
+      const b = baseMesh(d.settings, d.part || 'base');
+      if (!b) throw new Error(d.part === 'cover' ? 'This base has no bottom cover.' : 'No base is chosen for this panel.');
       progress(0.9);
       sendStl(b);
     } else {

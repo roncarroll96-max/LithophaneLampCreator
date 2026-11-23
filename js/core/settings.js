@@ -33,11 +33,11 @@ export function defaultLanternSettings() {
     side: 152.4,          // square, size 'custom' (mm)
     pillar: 16,           // pillar thickness, mm
     baseH: 24,            // base height, mm
-    top: 'classic',       // 'classic' (like the photo) | 'pagoda' | 'lid'
+    top: 'classic',       // 'classic' (standard roof) | 'pagoda' | 'lid'
     topH: 32,             // top height, mm
     overhang: 10,         // how far the top sticks out past the frame, mm
     slotFit: 0.4,         // extra room in the slots and grooves, mm
-    pegFit: 0.25,         // extra room round the pegs, mm (each side)
+    pegFit: 0.15,         // extra room round the pegs, mm (each side; 0.25 before version 1.9)
     theme: 'plain',       // 'plain' | 'christmas' (version 1.7)
     xRoof: 'low',         // Christmas roof: 'low' (photo 1) | 'tiered' (photo 2)
     topper: 'ring',       // Christmas topper: 'ring' | 'star'
@@ -57,7 +57,7 @@ export const DETAIL_PRESETS = {
 
 export function defaultSettings() {
   return {
-    version: 3,               // 2 (app 1.2): markings hidden under photos by default; 3 (app 1.3): reliefSide
+    version: 4,               // 2 (app 1.2): markings hidden under photos by default; 3 (app 1.3): reliefSide; 4 (app 1.9): new puck and peg defaults
     shape: 'basketball',
     sizePreset: 'M',
     diameter: 150,
@@ -65,7 +65,7 @@ export function defaultSettings() {
     footballWidth: 150,
     footballTip: 0.6,         // 0 = smooth oval .. 1 = most pointed (still printable)
     footballStripes: true,    // bright end stripes
-    reliefSide: 'inside',     // picture relief: 'inside' (smooth outside; a panel's back) | 'outside' (a panel's front)
+    reliefSide: 'outside',    // picture relief: 'inside' (smooth outside; a panel's back) | 'outside' (a panel's front); outside since 1.9
     tMin: 0.8,
     tMax: 3.0,
     opening: { diameter: 50, collarHeight: 5, collarWall: 2.0 },
@@ -93,8 +93,9 @@ export function defaultSettings() {
     lantern: defaultLanternSettings(), // lantern (see core/lantern.js)
     cylinder: { size: 'medium', diameter: 100, height: 150, wrap: 1, band: 12, rim: 3 }, // cylinder (see core/cylinder.js)
     base: {
-      light: 'puck', puckD: 70, puckH: 20, puckHold: 'hole', socket: 'E12', riserD: 30, riserH: 0,
+      light: 'puck', puckD: 59.5, puckH: 8, puckHold: 'tray', socket: 'E12', riserD: 30, riserH: 0,
       clearance: 0.4, shape: 'auto', extra: 0, cableW: 10, cableH: 8,
+      rimH: 5, cableD: 3, cableHoleH: 4, plugW: 15.5, plugH: 15, coverFit: 0.15, // puck tray (version 1.9)
       panelKind: 'lightbox', stripW: 10, // flat panel: 'lightbox' | 'stand' | 'none'; LED strip width (mm)
     },                        // the lamp or panel base (see core/base.js)
     moon: {
@@ -235,6 +236,12 @@ export function mergeSettings(saved) {
   // A 0.2.0 project may still say 'outside' from the option that was removed in 0.2.1
   if (!(saved.version >= 3)) d.reliefSide = 'inside';
   if (d.reliefSide !== 'outside') d.reliefSide = 'inside';
-  d.version = 3;
+  // Version 1.9 changed some defaults (2026-11-23): a 59.5 x 8 mm puck (was 70 x 20) and 0.15 mm peg
+  // fit (was 0.25). Older projects still at the old defaults get the new ones; sizes someone chose stay.
+  if (!(saved.version >= 4)) {
+    if (d.base.puckD === 70 && d.base.puckH === 20) { d.base.puckD = 59.5; d.base.puckH = 8; }
+    if (d.lantern.pegFit === 0.25) d.lantern.pegFit = 0.15;
+  }
+  d.version = 4;
   return d;
 }

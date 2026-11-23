@@ -64,13 +64,20 @@ export function lampMesh({ settings, photos, textMasks, moon, stepInner, stepOut
   return { mesh, label: `Lithophane ${settings.shape} ${Math.round(ax.a * 2)}x${Math.round(ax.b * 2)}x${Math.round(ax.c * 2)}mm` };
 }
 
-/** The base under a ball, cube or panel, or null when a panel has none. Returns { mesh, label, info }. */
-export function baseMesh(settings) {
+/**
+ * The base under a ball, cube, cylinder or panel, or null when a panel has none. part: 'base', or
+ * 'cover' (the bottom cover that holds the puck under a narrow opening; null when there is none).
+ * Returns { mesh, label, info }.
+ */
+export function baseMesh(settings, part = 'base') {
   const base = buildBase(settings, lampShape(settings));
   if (!base) return null;
-  const mesh = meshSdf(base.sdf, base.bounds, gridStep(base.bounds, BASE_STEP, BASE_MAX_CELLS));
-  if (base.info.flip) flipUpsideDown(mesh); // puck and bulb bases print with the top on the bed
-  return { mesh, label: base.info.panel ? `Panel ${base.info.light}` : `Lamp base ${base.info.light}`, info: base.info };
+  const p = base.parts[part];
+  if (!p) return null;
+  const mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, BASE_STEP, BASE_MAX_CELLS));
+  if (p.flip) flipUpsideDown(mesh); // puck and bulb bases print with the top on the bed
+  const label = base.info.panel ? `Panel ${base.info.light}` : part === 'cover' ? 'Lamp base bottom cover' : `Lamp base ${base.info.light}`;
+  return { mesh, label, info: base.info };
 }
 
 /**
@@ -119,6 +126,9 @@ export function partList(data) {
   const list = [{ name: isPanel(s) ? 'Panel' : isCylinder(s) ? 'Cylinder' : label, copies: 1, weight: 6, make: (p) => lampMesh(data, p).mesh }];
   if (!(isPanel(s) && (s.base?.panelKind || 'lightbox') === 'none')) {
     list.push({ name: 'Base', copies: 1, weight: 1, make: () => { const b = baseMesh(s); return b && b.mesh; } });
+    if (buildBase(s, lampShape(s))?.parts.cover) { // a puck tray under a narrow opening
+      list.push({ name: 'Base bottom cover', copies: 1, weight: 1, make: () => baseMesh(s, 'cover').mesh });
+    }
   }
   return list;
 }

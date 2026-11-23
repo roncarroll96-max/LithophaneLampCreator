@@ -95,7 +95,7 @@ test('a lantern 3MF holds all four panels, four pillars, the base and the top', 
   const s = defaultSettings(); s.shape = 'lantern'; s.tMax = 3; s.base.puckHold = 'tray';
   const data = { settings: s, photos: null, textMasks: null, stepInner: 1.2, stepOuter: 2 };
   assert.deepEqual(partList(data).map((p) => [p.name, p.copies]),
-    [['Front panel', 1], ['Right panel', 1], ['Back panel', 1], ['Left panel', 1], ['Pillar', 4], ['Base', 1], ['Top (Like the photo)', 1]]);
+    [['Front panel', 1], ['Right panel', 1], ['Back panel', 1], ['Left panel', 1], ['Pillar', 4], ['Base', 1], ['Top (Standard roof)', 1]]);
   const seen = [];
   const { parts, stats } = await build3MF(data, (v) => seen.push(v));
   assert.equal(stats.pieces, 10);
@@ -111,6 +111,9 @@ test('a lantern 3MF holds all four panels, four pillars, the base and the top', 
 
 test('a ball 3MF holds the ball and its base; a panel with no base holds just the panel', () => {
   const s = defaultSettings();
+  // the puck tray under a ball is a bottom cover, its own part
+  assert.deepEqual(partList({ settings: s }).map((p) => p.name), ['Basketball', 'Base', 'Base bottom cover']);
+  s.base.puckHold = 'hole';
   assert.deepEqual(partList({ settings: s }).map((p) => p.name), ['Basketball', 'Base']);
   s.shape = 'panel'; s.base.panelKind = 'none';
   assert.equal(partList({ settings: s }).length, 1);

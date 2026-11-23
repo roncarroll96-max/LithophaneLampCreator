@@ -32,8 +32,9 @@ import { createPanelField } from './panelField.js';
 import { preparePhotoLayer, LINE_EXTRA } from './field.js';
 import { defaultPhotoSettings, defaultLanternSettings } from './settings.js';
 import { cylinder, union, subtract } from './sdf.js';
+import { trayDims } from './base.js';
 
-export const LANTERN_TOPS = { classic: 'Like the photo', pagoda: 'Pagoda roof', lid: 'Simple lid' };
+export const LANTERN_TOPS = { classic: 'Standard roof', pagoda: 'Pagoda roof', lid: 'Simple lid' };
 export const LANTERN_SIDE_COUNTS = [3, 4, 5, 6];
 
 /** The names of the sides, front first, going round anticlockwise seen from above. */
@@ -135,13 +136,18 @@ export function lanternGeometry(settings) {
   const ph = Math.max(1.5, Math.min(0.175 * P, hFit));
   const peg = { h: ph, dp: E - ph, len: PEG_LEN };
   const pegFit = clamp(L.pegFit, 0, 1);
-  const puckD = settings.base?.puckD ?? 70, puckH = settings.base?.puckH ?? 20;
+  const puckD = settings.base?.puckD ?? 59.5, puckH = settings.base?.puckH ?? 8;
   const puckR = puckD / 2 + 1;
   const puckFits = puckR <= inner - 2;
-  // Puck holder: a round hole in the floor (the puck stands on the table) or a tray (a closed floor
-  // with a low rim round the puck and a gap in the rim for the cord)
+  // Puck holder: a round hole in the floor (the puck stands on the table) or a tray (version 1.9:
+  // a closed floor with a wall round the puck, a hole the cable's plug goes down through and a
+  // channel under the floor to a small hole in the back wall)
   const tray = settings.base?.puckHold === 'tray';
-  const trayFloor = 2, trayRim = Math.min(8, Math.max(3, Math.round(puckH * 0.4)));
+  const td = trayDims(settings.base || {}, Math.min(puckR, inner - 2.5));
+  // Near the frame's inside, the wall and the plug hole run into it (no thin slivers left between)
+  td.rimToWall = td.pr + td.rimT > inner - 2.5;
+  if (td.y1 > inner - 2.5) { td.y1 = inner + 1; td.y0 = td.y1 - td.hl; }
+  const trayFloor = tray ? td.F : 2, trayRim = td.rimH;
   const puckZ = tray ? trayFloor : 0;                  // where the puck's bottom sits
   // Christmas theme (version 1.7): its own roofs, a topper and trim pieces (core/christmas.js)
   const christmas = L.theme === 'christmas';
@@ -184,7 +190,7 @@ export function lanternGeometry(settings) {
   return {
     n, a, ca, sa, frames: sideFrames(n),
     W, H, T, sw, slotFit, sEnd, P, Dm, Dout: Dm + T / 2, half, inner, cP, Q, insert, hB, zG, zT, pillarL,
-    peg, pegFit, puckD, puckH, puckR, puckFits, tray, trayFloor, trayRim, puckZ, top: t, theme: christmas ? 'christmas' : 'plain', xmas,
+    peg, pegFit, puckD, puckH, puckR, puckFits, tray, td, trayFloor, trayRim, puckZ, top: t, theme: christmas ? 'christmas' : 'plain', xmas,
     notchSide: Math.floor(n / 2),                      // the cable leaves through this side's wall (the back)
     baseSize: boxSize(polyBox(n, half + FEET)),
     footBox, footprint: [fw, fd], width: Math.max(fw, fd), totalHeight: zT + t.height,
@@ -362,18 +368,25 @@ export function baseSdf(geo) {
   const { half, inner, P, cP, hB, zG } = geo, cd = cornerD(geo), pd = polyD(geo);
   const ring = (x, y, z) => { const d = pd(x, y); return Math.max(d - half, inner - d, zBand(z, 0, hB)); };
   const foot = (x, y, z) => Math.max(cornerShape(geo, cd, x, y, cP, P / 2 + FEET), zBand(z, 0, hB - 3));
-  const floorSlab = (x, y, z) => Math.max(pd(x, y) - (inner + 0.5), zBand(z, 0, 2));
-  const back = geo.notchSide * geo.a; // the cable notch (and the tray's cord gap) face this way
-  let floor;
+  const back = geo.notchSide * geo.a; // the cable notch (or the tray's cable hole) faces this way
+  const out = half + FEET + 2;
+  let floor, notch;
   if (geo.tray) {
-    // A closed floor with a rim round the puck; the rim has a gap toward the notch for the cord
-    const r = Math.min(geo.puckR, inner - 2.5), zr = geo.trayFloor + geo.trayRim;
-    const gap = rotA((x, y, z) => Math.max(Math.abs(x) - geo.cableW / 2, y, -y - (r + 3), zBand(z, 1, zr + 1)), back);
-    floor = union(floorSlab, subtract(cylinder(r + 2, 1.5, zr), cylinder(r, 1, zr + 1), gap));
+    // A closed floor with a wall round the puck. In the turned frame the back is -y: the plug hole
+    // cuts through the wall there, and the cable runs under the floor out through the back wall.
+    const { F, rimT, rimH, cw, ch, hw, y0, y1 } = geo.td, r = geo.td.pr;
+    const floorSlab = (x, y, z) => Math.max(pd(x, y) - (inner + 0.5), zBand(z, 0, F));
+    const rimOut = geo.td.rimToWall ? (x, y, z) => Math.max(pd(x, y) - (inner + 0.5), zBand(z, F - 0.5, F + rimH))
+      : cylinder(r + rimT, F - 0.5, F + rimH);
+    const rim = subtract(rimOut, cylinder(r, F - 1, F + rimH + 1));
+    const plugHole = rotA((x, y, z) => Math.max(Math.abs(x) - hw, y0 + y, -y - y1, zBand(z, -1, F + rimH + 1)), back);
+    floor = subtract(union(floorSlab, rim), plugHole);
+    notch = rotA((x, y, z) => Math.max(Math.abs(x) - cw / 2, (y0 + y1) / 2 + y, -y - out, zBand(z, -1, ch)), back);
   } else {
+    const floorSlab = (x, y, z) => Math.max(pd(x, y) - (inner + 0.5), zBand(z, 0, 2));
     floor = subtract(floorSlab, cylinder(Math.min(geo.puckR, inner - 3), -1, 3));
+    notch = rotA((x, y, z) => Math.max(Math.abs(x) - geo.cableW / 2, (inner - 1) + y, -y - out, zBand(z, -1, geo.cableH)), back);
   }
-  const notch = rotA((x, y, z) => Math.max(Math.abs(x) - geo.cableW / 2, (inner - 1) + y, -y - (half + FEET + 2), zBand(z, -1, geo.cableH)), back);
   const body = subtract(union(ring, floor, ...atCorners(geo, foot)), notch, ...allSides(geo, groove(geo, zG, hB + 1)));
   return union(body, ...atCorners(geo, move(pegSolid(geo, -0.5, geo.peg.len, true), 0, 0, hB)));
 }

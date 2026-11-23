@@ -130,11 +130,22 @@ test('panel, picture on the front: watertight, flat back, same thickness, frame 
   }
 });
 
-test('older projects open with the detail inside; a saved choice is kept', () => {
-  assert.equal(defaultSettings().reliefSide, 'inside');
+test('new projects put the detail outside (1.9); older projects keep what they had', () => {
+  assert.equal(defaultSettings().reliefSide, 'outside');
   assert.equal(mergeSettings({ reliefSide: 'outside' }).reliefSide, 'inside'); // a 0.2.0 project
   assert.equal(mergeSettings({ version: 2 }).reliefSide, 'inside');
   assert.equal(mergeSettings({ version: 3, reliefSide: 'outside' }).reliefSide, 'outside');
+  assert.equal(mergeSettings({ version: 3, reliefSide: 'inside' }).reliefSide, 'inside');
   assert.equal(mergeSettings({ version: 3, reliefSide: 'sideways' }).reliefSide, 'inside');
-  assert.equal(mergeSettings({ version: 3 }).version, 3);
+  assert.equal(mergeSettings({ version: 3 }).version, 4);
+});
+
+test('1.9 defaults: older projects at the old puck and peg defaults get the new ones; chosen sizes stay', () => {
+  const old = mergeSettings({ version: 3, base: { puckD: 70, puckH: 20 }, lantern: { pegFit: 0.25 } });
+  assert.equal(old.base.puckD, 59.5); assert.equal(old.base.puckH, 8); assert.equal(old.lantern.pegFit, 0.15);
+  const mine = mergeSettings({ version: 3, base: { puckD: 70, puckH: 12 }, lantern: { pegFit: 0.3 } });
+  assert.equal(mine.base.puckD, 70); assert.equal(mine.base.puckH, 12); assert.equal(mine.lantern.pegFit, 0.3);
+  const now = mergeSettings({ version: 4, base: { puckD: 70, puckH: 20 }, lantern: { pegFit: 0.25 } });
+  assert.equal(now.base.puckD, 70); assert.equal(now.lantern.pegFit, 0.25);
+  assert.equal(defaultSettings().lantern.pegFit, 0.15);
 });

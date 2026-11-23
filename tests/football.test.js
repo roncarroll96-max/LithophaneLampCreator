@@ -8,7 +8,7 @@ import { defaultSettings, bodyAxes, collarDims } from '../js/core/settings.js';
 
 function football(tip = 0.6) {
   const s = defaultSettings();
-  s.shape = 'football'; s.footballTip = tip;
+  s.shape = 'football'; s.footballTip = tip; s.reliefSide = 'inside'; // (outside detail presses into the surface)
   return { s, shape: buildEllipsoidShape(bodyAxes(s), collarDims(s).ro) };
 }
 
