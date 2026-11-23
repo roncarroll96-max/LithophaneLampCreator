@@ -44,10 +44,13 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    slot and peg fit, and the top (standard roof, pagoda roof or simple lid). Each photo fills one
    side; the Base tab takes your puck light's size, and whether it sits in a tray (it lifts with the lantern) or
    stands in a hole in the base's floor. **Theme: Christmas** gives the lantern a low or
-   two-tier roof, a ring or star on top, and flat trim pieces (side frames, base strips, snowflakes or holly, lattice)
+   two-tier roof (a sloped roof with a small square box and cap on top), a ring or star on top, and flat trim pieces
+   (side frames, base strips, snowflakes or holly with raised berries, lattice)
    to print in a second colour and glue on. The Export tab has a button for each panel, the pillar
    (print one per corner), the base and the top, each already turned for printing without supports.
-   On the Base tab, choose a light box (with an LED strip), a slot stand or none. The panel STL stands
+   On the Base tab, choose an **enclosed box** (the default: the panel slides down into a closed box behind a frame, with
+   your LED puck on the back facing it; the box and its back are two files),
+   a light box (with an LED strip), a slot stand or none. The panel STL stands
    on its bottom edge, ready to print without supports (use a brim).
 4. **Markings** tab: carved (dark lines), raised, or off; line width; turn the pattern.
 5. **Text** tab: add names, numbers or dates. Pick a font and style (carved, bright or raised),

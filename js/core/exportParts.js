@@ -78,7 +78,8 @@ export function baseMesh(settings, part = 'base') {
   if (!p) return null;
   const mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, BASE_STEP, BASE_MAX_CELLS));
   if (p.flip) flipUpsideDown(mesh); // puck and bulb bases print with the top on the bed
-  const label = base.info.panel ? `Panel ${base.info.light}` : part === 'cover' ? 'Lamp base bottom cover' : `Lamp base ${base.info.light}`;
+  const label = base.info.box ? (part === 'cover' ? 'Panel box back' : 'Panel box')
+    : base.info.panel ? `Panel ${base.info.light}` : part === 'cover' ? 'Lamp base bottom cover' : `Lamp base ${base.info.light}`;
   return { mesh, label, info: base.info };
 }
 
@@ -139,9 +140,10 @@ export function partList(data) {
     list.push({ name: `Lid (${LID_STYLES[s.cylinder.lid]})`, copies: 1, weight: 1, make: () => lidMesh(s).mesh });
   }
   if (!(isPanel(s) && (s.base?.panelKind || 'lightbox') === 'none')) {
-    list.push({ name: 'Base', copies: 1, weight: 1, make: () => { const b = baseMesh(s); return b && b.mesh; } });
-    if (buildBase(s, lampShape(s))?.parts.cover) { // a puck tray under a narrow opening
-      list.push({ name: 'Base bottom cover', copies: 1, weight: 1, make: () => baseMesh(s, 'cover').mesh });
+    const box = isPanel(s) && s.base?.panelKind === 'enclosure';
+    list.push({ name: box ? 'Box' : 'Base', copies: 1, weight: 1, make: () => { const b = baseMesh(s); return b && b.mesh; } });
+    if (buildBase(s, lampShape(s))?.parts.cover) { // a puck tray under a narrow opening, or the panel box's back
+      list.push({ name: box ? 'Box back' : 'Base bottom cover', copies: 1, weight: 1, make: () => baseMesh(s, 'cover').mesh });
     }
   }
   return list;

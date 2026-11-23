@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultSettings } from '../js/core/settings.js';
 import { lanternGeometry, lanternPart, topSdf, pillarSdf, baseSdf } from '../js/core/lantern.js';
-import { trimPieces, trimPart, trimPartList, trimPreviewMesh, TH, TT } from '../js/core/christmas.js';
+import { trimPieces, trimPart, trimPartList, trimPreviewMesh, hollySprig, TH, TT, BERRY_RISE } from '../js/core/christmas.js';
 import { partList } from '../js/core/exportParts.js';
 import { meshSdf } from '../js/core/sdf.js';
 import { checkWatertight } from '../js/core/mesh.js';
@@ -85,11 +85,58 @@ test('every trim piece is one closed piece, for every number of sides and design
       const m = meshSdf(p.sdf, p.bounds, 0.3);
       const tag = `${n} sides ${decor} ${xRoof} ${key}`;
       assert.ok(checkWatertight(m.indices, m.positions.length / 3).ok, `${tag}: closed`);
-      assert.ok(Math.abs(m.bbox.min[2]) < 0.2 && m.bbox.max[2] - m.bbox.min[2] <= (key === 'xtopper' ? TT : TH) + 0.2, `${tag}: flat on the bed`);
+      const tall = key === 'xtopper' ? TT : key === 'xdecor' && decor === 'holly' ? TH + BERRY_RISE : TH; // (the holly's berries stand up)
+      assert.ok(Math.abs(m.bbox.min[2]) < 0.2 && m.bbox.max[2] - m.bbox.min[2] <= tall + 0.2, `${tag}: flat on the bed`);
       const expect = key === 'xdecor' ? trimPieces(s).filter((q) => q.small).reduce((k, q) => k + q.copies, 0) : 1;
       assert.equal(pieces(m), expect, `${tag}: every piece in one part`);
     }
   }
+});
+
+test('the two-tier roof (1.11): a straight sloped roof, a square box and a flat cap, like the photo', () => {
+  for (const n of [3, 4, 6]) {
+    const g = lanternGeometry(xmas({ sides: n, xRoof: 'tiered' })), t = g.top, f = topSdf(g), F = g.frames[0];
+    const at = (d, z) => [d * F.nx, d * F.ny, z];
+    // straight slope: the surface height falls evenly from the box to the eaves (no upturned corners)
+    const top = (x, y) => { let z = t.height + 2; while (z > 0 && f(x, y, z) > 0) z -= 0.05; return z; }; // the highest solid point
+    const surf = (d) => top(...at(d, 0).slice(0, 2));
+    const d1 = t.rb + (t.edge - t.rb) * 0.3, d2 = t.rb + (t.edge - t.rb) * 0.6, d3 = t.rb + (t.edge - t.rb) * 0.9;
+    const z1 = surf(d1), z2 = surf(d2), z3 = surf(d3);
+    assert.ok(Math.abs((z1 - z2) - (z2 - z3)) < 0.4, `${n}: straight slope (${z1.toFixed(1)}, ${z2.toFixed(1)}, ${z3.toFixed(1)})`);
+    // the corners (hips) are no higher than the middle of a face at the same distance out: no upturn
+    const c = g.frames[0], c1 = g.frames[1], hx = (c.nx + c1.nx), hy = (c.ny + c1.ny), hl = Math.hypot(hx, hy);
+    const corner = (d) => { const k = d / Math.cos(g.a / 2); return top((hx / hl) * k, (hy / hl) * k); };
+    assert.ok(corner(d3) <= z3 + 0.5, `${n}: no upturned corners`);
+    // the box: upright sides from the roof up to the cap; the cap sticks out past the box with a flat top
+    assert.ok(f(...at(t.rb - 0.5, t.zB - 1)) < 0 && f(...at(t.rb + 0.6, t.zB - 1)) > 0, `${n}: the box's upright side`);
+    assert.ok(f(...at(t.rb + t.capOv - 0.4, t.height - 0.5)) < 0 && f(...at(t.rb + 1, t.height + 0.3)) > 0, `${n}: the flat cap sticks out past the box`);
+    assert.ok(Math.abs(t.height - (t.zB + t.capOv + t.capT)) < 1e-9);
+  }
+});
+
+test('holly (1.11): three spiky leaves with a vein, and six berries standing up', () => {
+  const size = 34, f = hollySprig(size);
+  assert.equal(f.height, TH + BERRY_RISE);
+  // count the berries standing up: separate tops above the leaves
+  const tops = [];
+  for (let u = -size / 2; u <= size / 2; u += 0.25) for (let v = -size / 2; v <= size / 2; v += 0.25) if (f.solid(u, v, TH + BERRY_RISE - 0.1) < 0) tops.push([u, v]);
+  assert.ok(tops.length > 20 && tops.every(([u, v]) => Math.hypot(u, v + size * 0.05) < size * 0.25), 'raised berries in a cluster in the middle');
+  assert.ok(f.solid(0, size * 0.3, TH + 0.3) > 0, 'the leaves stay flat');
+  // the top leaf: a slit down the middle (the vein) and points along its edges
+  let slit = 0, solid = 0;
+  for (let w = -1.5; w <= 1.5; w += 0.05) { if (f(w, size * 0.3) > 0) slit++; else solid++; }
+  assert.ok(slit > 0 && slit < 20 && solid > 20, `vein slit (${slit} open, ${solid} solid)`);
+  // along the top leaf, its half width rises and falls: a point between each pair of scallops
+  const a = Math.PI * 0.53, L = size * 0.46, dx = Math.cos(a), dy = Math.sin(a), b0 = size * 0.03;
+  const hw = [];
+  for (let k = 0.15; k <= 0.85; k += 0.01) {
+    let w = 0.5;
+    while (w < L && f((b0 + k * L) * dx - (w + 0.05) * dy, (b0 + k * L) * dy + (w + 0.05) * dx) < 0) w += 0.05;
+    hw.push(w);
+  }
+  let peaks = 0;
+  for (let i = 3; i < hw.length - 3; i++) if (hw[i] >= Math.max(...hw.slice(i - 3, i + 4)) && hw[i] > Math.min(...hw.slice(i - 3, i + 4)) + 0.15) peaks++;
+  assert.ok(peaks >= 2, `points along the edge (${peaks})`);
 });
 
 test('the trim fits its places on the lantern', () => {

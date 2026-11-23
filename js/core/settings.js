@@ -97,7 +97,8 @@ export function defaultSettings() {
       light: 'puck', puckD: 59.5, puckH: 8, puckHold: 'tray', socket: 'E12', riserD: 30, riserH: 0,
       clearance: 0.4, shape: 'auto', extra: 0, cableW: 10, cableH: 8,
       rimH: 5, cableD: 3, cableHoleH: 4, plugW: 15.5, plugH: 15, coverFit: 0.15, // puck tray (version 1.9)
-      panelKind: 'lightbox', stripW: 10, // flat panel: 'lightbox' | 'stand' | 'none'; LED strip width (mm)
+      panelKind: 'enclosure', stripW: 10, // flat panel: 'enclosure' (enclosed box, 1.11) | 'lightbox' | 'stand' | 'none'; LED strip width (mm)
+      boxCover: 6, boxDepth: 0, // enclosed box: frame over the picture (mm); puck to panel (mm, 0 = from the panel's size)
     },                        // the lamp or panel base (see core/base.js)
     moon: {
       mode: 'moon',           // 'moon' (Moon only) | 'photo' (photo in a front window, fading into the Moon)

@@ -271,7 +271,7 @@ def app_guide(path):
                             title='Lithophane Lamp Creator - Settings Guide')
     s = []
     s.append(P('Lithophane Lamp Creator', H1))
-    s.append(P('Settings guide for version 1.10: what every setting does, and how it changes the thickness of the '
+    s.append(P('Settings guide for version 1.11: what every setting does, and how it changes the thickness of the '
                'lamp\'s walls', SUB))
 
     s.append(P('The one idea behind everything', H2))
@@ -319,7 +319,7 @@ def app_guide(path):
         ['Collar', '"Collar wall"', '2.0 mm'],
         ['Flat panel: frame', '"Frame thickness" above Thickest, within "Frame width" of the edge, then a 45-degree slope '
          'down to the picture', '+2 mm (5.0 mm), 6 mm wide'],
-        ['Flat panel with the light box', 'Even glow: thinner higher up, farther from the LED strip', 'Strength 50%'],
+        ['Flat panel with the enclosed box or light box', 'Even glow: thinner where less light reaches (far from the puck, or higher up from the strip)', 'Strength 50%'],
         ['Lantern panels', 'Even glow: thinner higher up, farther from the puck in the base', 'Strength 50%'],
     ], [1.75 * inch, 3.75 * inch, 1.5 * inch]))
     s.append(P('"Picture detail on the" (Shape tab) changes which side is bumpy, never the thickness: the light and '
@@ -436,7 +436,8 @@ def app_guide(path):
          'lithophane.', '16 mm, 24 mm, 0.4 mm, 0.15 mm'],
         ['Lantern: top', 'Standard roof (crossed beams, capped posts, open lattice), Pagoda roof or Simple lid; top '
          'height and overhang.', 'None.', 'Standard roof, 32 mm, 10 mm'],
-        ['Lantern: Christmas theme', 'Low or two-tier roof, ring or star topper, snowflakes and trees or holly and berries; '
+        ['Lantern: Christmas theme', 'Low roof or two-tier roof (a sloped roof with a small square box and cap), ring or star '
+         'topper, snowflakes and trees or holly and berries (the berries stand up 1 mm); '
          'how far the side frames cover each picture; eaves; preview colours.', 'None, but the frames hide the outer edge '
          'of each picture.', 'Plain; frames 12 mm'],
     ],[1.35 * inch, 2.3 * inch, 2.15 * inch, 1.2 * inch]))
@@ -493,9 +494,11 @@ def app_guide(path):
          '<b>Open bottom</b>: the puck goes in from below and stays on the table.'],
         ['Cable notch', 'Open bottom, strip and bulb: width and height of the notch at the back.'],
         ['Export base STL', 'A separate file, already turned the right way up for printing.'],
-        ['Flat panel: base', '<b>Light box</b>: the panel stands in a slot; an LED strip on a leaning floor behind it '
-         'shines up its back (set the strip width; even glow on/off). <b>Slot stand</b>: just the slot. <b>None</b>: '
-         'feet, a window or a frame.'],
+        ['Flat panel: base', '<b>Enclosed box</b> (default): the panel slides down through a slot in the top into a closed '
+         'box behind a frame; your puck sits in a holder on the back, facing it (puck size, Frame over the picture 6 mm, '
+         'Puck to panel: Auto or set, cable thickness, Back fit 0.15 mm, even glow on/off; Export box STL and Export back '
+         'STL). <b>Light box</b>: an LED strip on a leaning floor behind the slot shines up the panel\'s back '
+         '(set the strip width). <b>Slot stand</b>: just the slot. <b>None</b>: feet, a window or a frame.'],
         ['Flat panel: slot fit', 'Extra room in the slot (default 0.4 mm). The app shows the slot width.'],
         ['Lantern: light', 'Your puck\'s diameter and height. Tray (default): the same tray as above in the base\'s '
          'floor, so the puck lifts with the lantern. Hole in the floor: the puck stands on the table (cable notch width and '
@@ -597,6 +600,7 @@ def printer_guide(path):
         ['Base: LED strip riser', 'Standing up, as it sits on the table. No supports.'],
         ['Flat panel', 'Standing up on its bottom edge, as exported, with the front facing the seam-free side. Brim on, '
          'no supports.'],
+        ['Panel enclosed box', 'The box face down (frame on the bed), the back flat (holder up), as exported. No supports.'],
         ['Panel light box, slot stand', 'Standing up, as it sits on the table. No supports.'],
         ['Cylinder', 'Standing up on its bottom edge, open top up, as exported. No supports.'],
         ['Cylinder lid', 'Upside down (the cap on the bed), as exported. No supports.'],

@@ -5,7 +5,7 @@ import { buildPanel, resolvePanelSize, panelFeet, panelEdgeThickness, IN } from 
 import { createPanelField } from '../js/core/panelField.js';
 import { buildPanelMesh } from '../js/core/panelMesh.js';
 import { checkWatertight } from '../js/core/mesh.js';
-import { buildBase } from '../js/core/base.js';
+import { buildBase, panelBoxLayout, panelBaseKind } from '../js/core/base.js';
 import { meshSdf } from '../js/core/sdf.js';
 import { defaultSettings } from '../js/core/settings.js';
 
@@ -132,4 +132,58 @@ test('light box and slot stand are closed solids with a slot that fits the panel
   const s = panelSettings({ outline: 'rect' });
   s.base.panelKind = 'none';
   assert.equal(buildBase(s, buildPanel(s)), null);
+});
+
+test('enclosed box (1.11): the default base; the panel stands in a closed box with the puck facing it', () => {
+  assert.equal(defaultSettings().base.panelKind, 'enclosure');
+  assert.equal(panelBaseKind({ base: {} }), 'enclosure');
+  for (const [outline, size] of [['rect', '4x6'], ['rect', '8x10'], ['heart', '6'], ['circle', '6'], ['square', '4']]) {
+    const s = panelSettings({ outline, size });
+    const panel = buildPanel(s), base = buildBase(s, panel), L = panelBoxLayout(s, panel), i = base.info, tag = `${outline} ${size}`;
+    assert.equal(i.light, 'enclosure'); assert.ok(i.box);
+    const f = base.sdf, T = panelEdgeThickness(s), c = s.base.clearance, zp = i.seatFloor, zm = zp + panel.H / 2;
+    // the panel's room: a groove behind the frame, open up through the top (it slides down into it)
+    assert.ok(f(0, T / 2, zm) > 0 && f(0, T / 2, L.outer.z - 0.5) > 0, `${tag}: groove open to the top`);
+    assert.ok(f(0, T / 2, zp - 0.5) < 0, `${tag}: the panel stands on the bottom`);
+    assert.ok(f(panel.W / 2 - 1, T / 2, zm) > 0 || outline !== 'rect', `${tag}: the groove is as wide as the panel`);
+    assert.ok(f(L.wi + 0.5, T / 2, zm) < 0, `${tag}: side wall`);
+    // the frame: open in the middle, covering the edge by boxCover (rectangles: check the sides)
+    assert.ok(f(0, L.y0 + 0.5, zm) > 0, `${tag}: window`);
+    if (outline === 'rect' || outline === 'square') {
+      assert.ok(f(panel.W / 2 - L.cover + 0.5, L.y0 + 0.5, zm) < 0 && f(panel.W / 2 - L.cover - 0.5, L.y0 + 0.5, zm) > 0, `${tag}: frame ${L.cover} mm over the edge`);
+      // behind the panel a ledge holds its back
+      assert.ok(f(panel.W / 2 - 1, T + c / 2 + 0.5, zm) < 0 && f(panel.W / 2 - L.ledge - 0.5, T + c / 2 + 0.5, zm) > 0, `${tag}: ledge behind the panel`);
+    }
+    if (outline === 'heart') assert.ok(f(panel.W / 2 - 3, L.y0 + 0.5, zp + 3) < 0, `${tag}: the frame covers outside the heart`);
+    // closed all round: top (apart from the groove's slot), bottom, sides; the back closes the rest
+    assert.ok(f(0, L.puck.y - 10, L.outer.z - 1) < 0 && f(0, L.puck.y - 10, 1) < 0, `${tag}: top and bottom`);
+    assert.ok(f(0, L.outer.y1 - 1, zm + L.puck.r + 8) < 0, `${tag}: the back`);
+    // the puck: in a holder on the back, at the middle of the panel, facing it from L.dist away
+    assert.ok(Math.abs(L.puck.z - zm) < 1e-9 && Math.abs(L.puck.y - L.s1 - L.dist) < 1e-9);
+    assert.ok(f(0, L.puck.y + L.puck.h / 2, L.puck.z) > 0 && f(L.puck.r - 1, L.puck.y + L.puck.h / 2, L.puck.z) > 0, `${tag}: room for the puck`);
+    assert.ok(f(L.puck.r + 1.4, L.puck.y + L.puck.h / 2, L.puck.z) < 0, `${tag}: the holder round it`);
+    assert.ok(f(0, L.yBack + 1, 2) > 0, `${tag}: the cable's slot at the bottom of the back`);
+    // the two printed parts: closed, flat on the bed
+    for (const [name, p] of [['box', base.parts.base], ['back', base.parts.cover]]) {
+      const m = meshSdf(p.sdf, p.bounds, 0.6);
+      assert.ok(checkWatertight(m.indices, m.positions.length / 3).ok, `${tag} ${name}: closed`);
+      assert.ok(Math.abs(m.bbox.min[2]) < 0.4, `${tag} ${name}: on the bed`);
+    }
+  }
+  // a puck too big for a small panel's box is flagged
+  const tiny = panelSettings({ outline: 'rect', size: 'custom', width: 120, height: 50 });
+  assert.equal(buildBase(tiny, buildPanel(tiny)).info.puckFits, false);
+  assert.equal(buildBase(panelSettings({ outline: 'rect', size: '4x6' }), buildPanel(panelSettings({ outline: 'rect', size: '4x6' }))).info.puckFits, true);
+  // farther puck: a deeper box; Auto is about a third of the panel's size
+  const s = panelSettings({ outline: 'rect', size: '4x6' });
+  const auto = buildBase(s, buildPanel(s));
+  assert.equal(auto.info.dist, Math.round(0.3 * 152.4));
+  s.base.boxDepth = 80;
+  assert.ok(buildBase(s, buildPanel(s)).info.depth > auto.info.depth + 30);
+  // even glow: the middle (facing the puck) gets the most light, so the plastic is thinner at the edges
+  s.base.boxDepth = 0; s.panel.frame = false;
+  const panel = buildPanel(s), field = createPanelField(s, panel, null), o = {};
+  field.evalUV(0, 0, o); const mid = o.t;
+  field.evalUV(0, panel.H * 0.4, o);
+  assert.ok(o.t < mid - 0.3, `thinner far from the puck (${o.t.toFixed(2)} vs ${mid.toFixed(2)})`);
 });

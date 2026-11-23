@@ -22,7 +22,7 @@ import { buildTextMasks, masksCurrent, loadAllFonts } from './text.js';
 import { loadMoon } from './moonData.js';
 import { moonMap } from './core/moon.js';
 import { APP_VERSION } from './version.js';
-import { buildBase, SOCKETS, PANEL_BASE_KINDS } from './core/base.js';
+import { buildBase, SOCKETS, PANEL_BASE_KINDS, panelBaseKind } from './core/base.js';
 import { buildPanel, resolvePanelSize, sizeLabel, RECT_SIZES, SIDE_SIZES, PANEL_OUTLINES, IN, panelEdgeThickness } from './core/panel.js';
 import { createPanelField } from './core/panelField.js';
 import { meshSdf, gridStep } from './core/sdf.js';
@@ -1309,7 +1309,7 @@ function numberInput(path, label, lo, hi) {
 /** Base tab, flat panel: light box, slot stand or none. */
 function panelBaseTab() {
   const s = app.settings, b = s.base, info = app.baseInfo;
-  const kind = b.panelKind || 'lightbox';
+  const kind = panelBaseKind(s);
   const progress = el('div', { class: 'progress', hidden: !app.exporting }, el('div', { id: 'exportBar' }));
   const st = app.lastBaseExport;
   const slotT = panelEdgeThickness(s);
@@ -1317,8 +1317,22 @@ function panelBaseTab() {
     section('Base for the panel',
       segmented('base.panelKind', Object.entries(PANEL_BASE_KINDS).map(([k, label]) => ({
         value: k, label,
-        title: { lightbox: 'A base with an LED strip inside that lights the panel from behind', stand: 'A small stand with a slot, no light', none: 'Just the panel (feet, a window or a frame)' }[k],
+        title: { enclosure: 'A closed box the panel stands in, with your LED puck on the back facing it', lightbox: 'A base with an LED strip inside that lights the panel from behind', stand: 'A small stand with a slot, no light', none: 'Just the panel (feet, a window or a frame)' }[k],
       })), undefined, () => renderTab()),
+      kind === 'enclosure' ? [
+        info && info.box && !info.puckFits ? note(`This puck is too big for this panel's box: the inside is ${Math.round(info.inside)} mm across. Use a bigger panel, a smaller puck, or another base.`, 'warn') : null,
+        info && info.curved ? note('The enclosed box holds a flat panel: set Curve to Flat on the Shape tab, or choose another base.', 'warn') : null,
+        note('A closed box the panel stands in: a frame across the front covers the picture\'s edge, the panel slides down through a slot in the top, and your puck sits in a holder on the back, facing the panel. The back presses on; take it off to switch the puck on or change it.'),
+        numberInput('base.puckD', 'Puck diameter (mm)', 30, 160),
+        numberInput('base.puckH', 'Puck height (mm)', 5, 60),
+        slider('base.boxCover', 'Frame over the picture', 2, 20, 0.5, { fmt: mm }),
+        slider('base.boxDepth', 'Puck to panel', 0, 120, 1, { fmt: (v) => (+v > 0 ? mm(v) : `Auto${info && info.dist ? ` (${Math.round(info.dist)} mm)` : ''}`) }),
+        note('Farther gives a more even glow but a deeper box. Auto is about a third of the panel\'s size.'),
+        numberInput('base.cableD', 'Cable thickness (mm)', 1.5, 10),
+        note('The cable runs down from the puck and out through a slot at the bottom of the back.'),
+        checkbox('evenGlow.on', 'Even glow (thinner plastic farther from the light)', 'field', () => renderTab()),
+        s.evenGlow.on ? slider('evenGlow.strength', 'Even glow strength', 0, 1, 0.01, { fmt: pct }) : null,
+      ] : null,
       kind === 'lightbox' ? [
         slider('base.stripW', 'LED strip width', 5, 20, 0.5, { fmt: mm }),
         note('Stick the LED strip on the leaning floor of the trough behind the slot; it shines up the back of the panel. A 10 mm USB strip works well. Its cable leaves through the notch at the back.'),
@@ -1329,18 +1343,27 @@ function panelBaseTab() {
       kind !== 'none' && s.panel.feet ? note('Turn the panel\'s feet off (Shape tab): they won\'t fit the slot.', 'warn') : null,
     ),
     kind === 'none' ? null : section('Fit and size',
-      slider('base.clearance', 'Slot fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm }),
+      slider('base.clearance', 'Slot fit (extra room)', 0.1, 1.2, 0.05, { fmt: mm2 }),
       note(`The slot is ${(slotT + b.clearance).toFixed(1)} mm wide for a ${slotT.toFixed(1)} mm panel edge. Too tight? Add room. Too loose? Take some away.`),
-      slider('base.extra', 'Extra width', 0, 40, 1, { fmt: mm }),
+      kind === 'enclosure' ? [
+        slider('base.coverFit', 'Back fit (extra room)', 0, 0.6, 0.05, { fmt: mm2 }),
+        note('Too tight to press the back on? Add room. Falls off? Take some away.'),
+      ] : slider('base.extra', 'Extra width', 0, 40, 1, { fmt: mm }),
       kind === 'lightbox' ? slider('base.cableW', 'Cable notch width', 4, 30, 0.5, { fmt: mm }) : null,
     ),
     kind === 'none' ? null : section('Export base',
-      info ? note(`Base: ${info.width.toFixed(0)} × ${info.depth.toFixed(0)} mm, ${info.height.toFixed(0)} mm tall. The panel sits ${info.slotDepth} mm deep in the slot.`) : null,
-      info ? (() => { const f = fitCheck([info.width, info.depth, info.height]); return el('div', { class: 'fit ' + f.cls }, f.text); })() : null,
-      info ? note('Prints standing up, as it sits on the table. No supports needed. Print it in dark, opaque filament.') : null,
+      info && info.box ? note(`Box: ${info.width.toFixed(0)} mm wide, ${info.height.toFixed(0)} mm tall and ${info.depth.toFixed(0)} mm deep.`)
+        : info ? note(`Base: ${info.width.toFixed(0)} × ${info.depth.toFixed(0)} mm, ${info.height.toFixed(0)} mm tall. The panel sits ${info.slotDepth} mm deep in the slot.`) : null,
+      // (the box prints face down, so on the bed it is as wide and tall as it stands)
+      info ? (() => { const f = fitCheck(info.box ? [info.width, info.height, info.depth] : [info.width, info.depth, info.height]); return el('div', { class: 'fit ' + f.cls }, f.text); })() : null,
+      info ? note(info.box
+        ? 'The box prints face down (the frame on the bed) and the back flat (the holder up): the STLs are already turned. No supports needed. Print them in dark, opaque filament.'
+        : 'Prints standing up, as it sits on the table. No supports needed. Print it in dark, opaque filament.') : null,
       tipsLink(),
       el('button', { class: 'btn primary block', id: 'btnExportBase', disabled: app.exporting || !app.shape, onclick: () => exportBaseStl() },
-        app.exporting ? 'Building…' : 'Export base STL'),
+        app.exporting ? 'Building…' : info && info.box ? 'Export box STL' : 'Export base STL'),
+      info && info.box ? el('button', { class: 'btn block', style: 'margin-top:8px', id: 'btnExportCover', disabled: app.exporting || !app.shape, onclick: () => exportBaseStl('cover') },
+        app.exporting ? 'Building…' : 'Export back STL') : null,
       progress,
       st ? el('div', { class: 'stats' },
         'File', el('b', {}, `${st.fileName} (${(st.bytes / 1e6).toFixed(1)} MB)`),
@@ -1694,6 +1717,7 @@ function exportBaseStl(part = 'base') {
       if (bar) bar.style.width = `${Math.round(msg.value * 100)}%`;
     } else if (msg.type === 'done') {
       const fileName = part === 'lid' ? `${projectBaseName()}-lid-${s.cylinder.lid}.stl`
+        : isPanel() && s.base.panelKind === 'enclosure' ? `${projectBaseName()}-panel-box${part === 'cover' ? '-back' : ''}.stl`
         : part === 'cover' ? `${projectBaseName()}-base-bottom-cover.stl` : `${projectBaseName()}-base-${isPanel() ? s.base.panelKind : s.base.light}.stl`;
       download(new Blob(msg.stl, { type: 'model/stl' }), fileName);
       if (part === 'lid') app.lastLidExport = { ...msg.stats, fileName }; else app.lastBaseExport = { ...msg.stats, fileName };

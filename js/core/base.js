@@ -39,6 +39,9 @@ export function defaultBaseSettings() {
     cableHoleH: 4,     // height of the cable's hole in the side, mm
     plugW: 15.5, plugH: 15, // the biggest part on the cable (the plug), mm
     coverFit: 0.15,    // balls and cube: extra room round the bottom cover's wall, mm (each side)
+    // Flat panel's enclosed box (version 1.11): the frame over the picture's edge, and how far the
+    // puck's face is from the panel (0 = worked out from the panel's size)
+    boxCover: 6, boxDepth: 0,
   };
 }
 
@@ -225,9 +228,12 @@ export function buildBase(settings, shape) {
 }
 
 // ---------------------------------------------------------------- flat panel bases
-// Both stand as they sit on the table (no supports) and hold the panel in a slot shaped like its
+// All stand as they sit on the table (no supports) and hold the panel in a slot shaped like its
 // bottom edge: straight for a flat panel, curved for a curved one. Coordinates match the panel's
 // (x right, y away from the viewer, front of the panel at y = 0 in the middle).
+//   Enclosed box (version 1.11, the default): a closed box the panel stands in. A frame across the
+//   front covers the picture's edge; the panel slides down through a slot in the top into a groove
+//   behind the frame; the puck sits in a holder on a back that presses on, facing the panel.
 //   Light box: a block as wide as the panel. Behind the slot, an open trough holds an LED strip on
 //   a floor that leans 30° toward the panel, so the strip shines up the panel's back.
 //   Slot stand: a shorter, deeper block with just the slot.
@@ -235,8 +241,39 @@ const TILT = Math.tan((30 * Math.PI) / 180);
 const COS_TILT = Math.cos((30 * Math.PI) / 180);
 
 export const PANEL_BASE_KINDS = {
-  lightbox: 'Light box', stand: 'Slot stand', none: 'None',
+  enclosure: 'Enclosed box', lightbox: 'Light box (LED strip)', stand: 'Slot stand', none: 'None',
 };
+
+/** The flat panel base's kind ('enclosure' to start). */
+export const panelBaseKind = (settings) => (PANEL_BASE_KINDS[settings.base?.panelKind] ? settings.base.panelKind : 'enclosure');
+
+const BOX = { wall: 3, lip: 2, ledge: 2.5, back: 3, rim: 5, rimT: 1.6, cupT: 2 };
+
+/**
+ * The enclosed box's layout (shared by the box and the panel's even glow). Panel-base coordinates:
+ * x right, y back (the panel's front at y = 0), z up (the box on the table at z = 0). Returns the
+ * box's insides { wi (half width), z0, z1 (the panel's bottom and top edges' room), y0 (front),
+ * slot [s0, s1] (the groove the panel stands in), yIn (behind the groove), yBack (where the back
+ * fits), ledge }, its outside, and the puck { x, y (its face), z, r, h }.
+ */
+export function panelBoxLayout(settings, panel) {
+  const b = { ...defaultBaseSettings(), ...(settings.base || {}) };
+  const clr = b.clearance, Tp = panelEdgeThickness(settings), t = BOX.wall;
+  const wi = panel.W / 2 + clr / 2, z0 = t, z1 = t + panel.H + clr;
+  const s0 = -clr / 2, s1 = Tp + clr / 2, y0 = s0 - BOX.lip;
+  const cover = clampN(b.boxCover, 2, 25, 6);
+  const puckR = clampN(b.puckD, 30, 160, 59.5) / 2, puckH = clampN(b.puckH, 5, 60, 8);
+  // how far the puck's face is from the panel: about a third of the panel's size (an even glow)
+  const auto = Math.round(Math.min(90, Math.max(30, 0.3 * Math.max(panel.W, panel.H))));
+  const dist = b.boxDepth > 0 ? clampN(b.boxDepth, 15, 150, auto) : auto;
+  const yFace = s1 + dist, yBack = yFace + puckH;     // the back's inside face, where the puck rests
+  return {
+    clr, Tp, t, wi, z0, z1, s0, s1, y0, yIn: s1, yBack, cover, dist, distAuto: !(b.boxDepth > 0),
+    ledge: BOX.ledge, outer: { x: wi + t, z: z1 + t, y0, y1: yBack + BOX.back },
+    puck: { x: 0, y: yFace, z: z0 + clr / 2 + panel.H / 2, r: puckR, h: puckH },
+    cableW: clampN(b.cableD, 1.5, 10, 3) + 1, fit: clampN(b.coverFit, 0, 1, 0.15),
+  };
+}
 
 /**
  * The panel's base, or null for 'none'. info: { light, width, depth, height, totalHeight,
@@ -244,7 +281,7 @@ export const PANEL_BASE_KINDS = {
  */
 export function buildPanelBase(settings, panel) {
   const b = { ...defaultBaseSettings(), ...(settings.base || {}) };
-  const kind = b.panelKind || 'lightbox';
+  const kind = panelBaseKind(settings);
   if (kind === 'none') return null;
   const clr = b.clearance;
   const Tp = panelEdgeThickness(settings);
@@ -257,6 +294,7 @@ export function buildPanelBase(settings, panel) {
     ? (x, y, o) => { o[0] = x; o[1] = y; }
     : (x, y, o) => { o[0] = R * Math.atan2(x, y + R); o[1] = Math.hypot(x, y + R) - R; };
   const toXY = (arc, dep) => (flat ? [arc, dep] : [(R + dep) * Math.sin(arc / R), (R + dep) * Math.cos(arc / R) - R]);
+  if (kind === 'enclosure') return buildPanelBox(settings, panel);
 
   const H = box ? 24 : 16;
   const slotDepth = box ? 10 : 8;
@@ -305,6 +343,89 @@ export function buildPanelBase(settings, panel) {
     info: {
       light: kind, panel: true, width: x1 - x0, depth: y1 - y0, height: H, totalHeight: H,
       seatFloor: zSlot, slotDepth, flip: false, stripW,
+    },
+  };
+}
+
+/**
+ * A signed distance to the panel's outline (u, v: panel coordinates; positive inside). Rectangles
+ * and circles have one already; the heart's is the same inside and out, so an inside/outside map
+ * (0.5 mm squares, from the outline) gives it its sign.
+ */
+function outlineSigned(panel) {
+  if (panel.outline !== 'heart') return panel.distEdge;
+  const pts = panel.pts.filter((_, i) => i % Math.max(1, Math.floor(panel.pts.length / 600)) === 0), n = pts.length;
+  const g = 0.5, x0 = -panel.W / 2 - 2, y0 = -panel.H / 2 - 2;
+  const nx = Math.ceil((panel.W + 4) / g) + 1, ny = Math.ceil((panel.H + 4) / g) + 1, inside = new Uint8Array(nx * ny);
+  for (let j = 0; j < ny; j++) {
+    const v = y0 + j * g, xs = [];
+    for (let k = 0; k < n; k++) {
+      const [ax, ay] = pts[k], [bx, by] = pts[(k + 1) % n];
+      if ((ay > v) !== (by > v)) xs.push(ax + ((v - ay) / (by - ay)) * (bx - ax));
+    }
+    xs.sort((a, b) => a - b);
+    for (let q = 0; q + 1 < xs.length; q += 2) {
+      for (let i = Math.max(0, Math.ceil((xs[q] - x0) / g)); i <= Math.min(nx - 1, Math.floor((xs[q + 1] - x0) / g)); i++) inside[j * nx + i] = 1;
+    }
+  }
+  return (u, v) => {
+    const i = Math.round((u - x0) / g), j = Math.round((v - y0) / g);
+    const ins = i >= 0 && j >= 0 && i < nx && j < ny && inside[j * nx + i];
+    return ins ? panel.distEdge(u, v) : -Math.max(0.01, panel.distEdge(u, v));
+  };
+}
+
+/**
+ * The enclosed box (see panelBoxLayout): the box itself, open at the back, and the back with the
+ * puck's holder. The box prints face down (the frame on the bed), the back flat, holder up.
+ */
+function buildPanelBox(settings, panel) {
+  const L = panelBoxLayout(settings, panel);
+  const { t, wi, z0, z1, s0, s1, y0, yBack, cover, ledge, outer, puck, cableW, fit } = L;
+  const zPanel = z0 + L.clr / 2;                       // where the panel's bottom edge sits
+  // The window in the frame: inside the panel's outline by `cover` (so a heart gets a heart window)
+  const edge = outlineSigned(panel);
+  const inWindow = (x, z) => edge(x, z - zPanel + panel.bottom) - cover;
+  // Behind the groove the inside is narrower by the ledge all round: the panel's back rests on it
+  const xi = wi - ledge, zi0 = z0 + ledge, zi1 = z1 - ledge;
+  const shell = (x, y, z) => Math.max(Math.abs(x) - outer.x, y0 - y, y - yBack, -z, z - outer.z);
+  const body = (x, y, z) => {
+    let d = shell(x, y, z);
+    d = Math.max(d, -Math.max(Math.abs(x) - wi, s0 - y, y - s1, z0 - z, z - (outer.z + 1)));   // the groove, open at the top
+    d = Math.max(d, -Math.max(Math.abs(x) - xi, s1 - 0.5 - y, y - (yBack + 1), zi0 - z, z - zi1)); // the inside, open at the back
+    if (y < s0 + 1) d = Math.max(d, -Math.max(-inWindow(x, z), y0 - 1 - y, y - (s0 + 0.5)));    // the window
+    return d;
+  };
+  // The back: a plate as big as the box, a rim that presses into the opening, and a cup for the puck
+  const pr = puck.r + 0.4, cupDepth = Math.max(3, puck.h - 2);
+  const back = (x, y, z) => {
+    const plate = Math.max(Math.abs(x) - outer.x, yBack - y, y - outer.y1, -z, z - outer.z);
+    const rimO = Math.max(Math.abs(x) - (xi - fit), zi0 + fit - z, z - (zi1 - fit));
+    const rimI = Math.max(Math.abs(x) - (xi - fit - BOX.rimT), zi0 + fit + BOX.rimT - z, z - (zi1 - fit - BOX.rimT));
+    const rim = Math.max(rimO, -rimI, yBack - BOX.rim - y, y - (yBack + 0.5));
+    const rr = Math.hypot(x - puck.x, z - puck.z);
+    const cup = Math.max(rr - (pr + BOX.cupT), pr - rr, yBack - cupDepth - y, y - (yBack + 0.5));
+    let d = Math.min(plate, rim, cup);
+    // the cable: a slot up from the bottom edge to the cup, through the plate and the rim
+    d = Math.max(d, -Math.max(Math.abs(x - puck.x) - cableW / 2, z - (puck.z - pr + 1), -1 - z, yBack - BOX.rim - 1 - y, y - (outer.y1 + 1)));
+    return d;
+  };
+  const W2 = outer.x, H = outer.z, Y0 = outer.y0, Y1 = outer.y1;
+  // printing: the box face down (front on the bed: z' = y - y0, y' = z), the back flat on its outside
+  return {
+    sdf: (x, y, z) => Math.min(body(x, y, z), back(x, y, z)),
+    bounds: { min: [-W2, Y0, 0], max: [W2, Y1, H] },
+    parts: {
+      // (each a turn, not a mirror image: x' = -x, y' = z, z' = y - y0 for the box)
+      base: { sdf: (x, y, z) => body(-x, Y0 + z, y), bounds: { min: [-W2, 0, 0], max: [W2, H, yBack - Y0] }, flip: false },
+      cover: { sdf: (x, y, z) => back(x, Y1 - z, y), bounds: { min: [-W2, 0, 0], max: [W2, H, BOX.back + Math.max(BOX.rim, cupDepth)] }, flip: false },
+    },
+    info: {
+      light: 'enclosure', panel: true, width: 2 * W2, depth: Y1 - Y0, height: H, totalHeight: H,
+      seatFloor: zPanel, slotDepth: 0, flip: false, box: true, cover, dist: L.dist, distAuto: L.distAuto,
+      curved: Number.isFinite(panel.R), tray: 'cover',
+      // the puck's holder has to fit inside, between the ledges
+      puckFits: 2 * (pr + BOX.cupT) <= Math.min(zi1 - zi0, 2 * xi), inside: Math.min(zi1 - zi0, 2 * xi),
     },
   };
 }

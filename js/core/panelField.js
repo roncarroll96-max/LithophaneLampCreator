@@ -13,6 +13,7 @@ import { defaultPhotoSettings } from './settings.js';
 import { defaultPanelSettings, panelEdgeThickness } from './panel.js';
 import { MU } from './previewData.js';
 import { createPanelPattern } from './patterns.js';
+import { panelBaseKind, panelBoxLayout } from './base.js';
 
 const STRIP_TILT = (30 * Math.PI) / 180; // the light box's LED strip leans 30° toward the panel
 
@@ -21,6 +22,27 @@ export function lightBoxStrip(settings, panel) {
   const T = panelEdgeThickness(settings) + (settings.base?.clearance ?? 0.4);
   const stripW = settings.base?.stripW ?? 10;
   return { v: panel.bottom - 2, depth: T + 2.5 + (stripW + 3) / 2 };
+}
+
+/**
+ * How much light from the enclosed box's puck reaches a spot (u, v) on the panel's back, compared
+ * with the panel's middle. The puck faces the panel from the back of the box; its face is a disc:
+ * a few points across it, each shining most straight out of the face; the panel catches light best
+ * when it arrives head-on.
+ */
+export function panelBoxLight(settings, panel) {
+  const L = panelBoxLayout(settings, panel), r = L.puck.r * 0.6, gap = L.puck.y - L.Tp;
+  const pts = [[0, 0], [-r, 0], [r, 0], [0, -r], [0, r]];
+  const irr = (u, v) => {
+    let sum = 0;
+    for (const [px, pz] of pts) {
+      const d2 = (u - px) ** 2 + (v - pz) ** 2 + gap * gap;
+      sum += (gap * gap) / (d2 * d2); // (cos out of the puck) x (cos into the panel) / distance squared
+    }
+    return sum;
+  };
+  const ref = irr(0, 0);
+  return (u, v) => irr(u, v) / ref;
 }
 
 /**
@@ -67,9 +89,12 @@ export function createPanelField(settings, panel, photos, textMasks = null, opts
   const frameOn = !!pp.frame;
   const fw = Math.max(0, pp.frameWidth), tF = tMax + Math.max(0, pp.frameExtra);
 
-  // ---- Even glow (light box): an LED strip along the bottom, behind the panel, leaning toward it
-  const lightFn = opts.light || null;
-  const lightBox = !lightFn && (settings.base?.panelKind ?? 'lightbox') === 'lightbox';
+  // ---- Even glow (light box): an LED strip along the bottom, behind the panel, leaning toward it;
+  // or (puck box, version 1.11) a puck low behind the panel, tilted toward it
+  const kind = panelBaseKind(settings);
+  const puckFn = !opts.light && kind === 'enclosure' ? panelBoxLight(settings, panel) : null;
+  const lightFn = opts.light || puckFn;
+  const lightBox = !lightFn && kind === 'lightbox';
   const glowOn = (lightBox || !!lightFn) && settings.evenGlow?.on !== false;
   const glowK = glowOn ? Math.max(0, Math.min(1, settings.evenGlow?.strength ?? 0.5)) / MU : 0;
   const strip = lightBox ? lightBoxStrip(settings, panel) : null;

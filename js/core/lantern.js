@@ -466,18 +466,17 @@ export function topSdf(geo) {
 // bridge). The outside is a low roof (about 30 degrees; steeper only when a big lantern needs it to
 // keep that ceiling short). A socket in the flat peak takes the topper's tab.
 const XR = { rPeak: 7, socketD: 6.5, socketW: 6.4, socketT: 3.4, wall: 2.5, capMax: 15 };
-const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** A Christmas roof's sizes: style 'low' (photo 1) or 'tiered' (photo 2, upturned corners). */
+/**
+ * A Christmas roof's sizes: style 'low' (photo 1) or 'tiered' (version 1.11, like the lantern photo
+ * of 2026-11-23: a straight sloped roof up to a small square box, with a flat cap on the box).
+ */
 function christmasRoofSizes({ half, inner, ov: ov0 }, style) {
   const ov = clamp(ov0, 3, 30), edge = half + ov, hcb = FRAME_H[style];
   const s = { ov, edge, R: edge, hcb, rPeak: XR.rPeak, socketD: XR.socketD, socketW: XR.socketW, socketT: XR.socketT };
   if (style === 'tiered') {
-    Object.assign(s, {
-      ef: 3.5, rb: Math.max(XR.rPeak + 12, half * 0.5), hb: 12, ov2: clamp(ov * 0.6, 4, 10), ef2: 3,
-    });
-    s.U1 = Math.min(6, ov * 0.5); s.W1 = ov + 10;     // upturned corners: how high, over how far in
-    s.U2 = Math.min(4, s.ov2 * 0.5); s.W2 = s.ov2 + 5;
+    // rb: the box's half width; hb: its height; the cap sticks out capOv past it and is capT thick
+    Object.assign(s, { ef: 3.5, rb: Math.max(XR.rPeak + 9, half * 0.42), hb: 9, capOv: 3, capT: 2.5 });
   } else s.ef = 4;
   // The pitch: 30 degrees, steeper only if the flat ceiling inside would get too wide
   for (let k = Math.tan(Math.PI / 6); ; k += 0.01) {
@@ -485,9 +484,8 @@ function christmasRoofSizes({ half, inner, ov: ov0 }, style) {
     if (style === 'tiered') {
       const zL = (r) => ov + s.ef + (edge - r) * k;
       const zB = zL(s.rb) + s.hb;
-      const zU = (r) => zB + s.ov2 + s.ef2 + (s.rb + s.ov2 - Math.max(r, s.rPeak)) * k;
-      zTop = zU(0);
-      cav = (r) => (r <= s.rb ? zU(r) : zL(r)); // the lowest solid top above the hollow
+      zTop = zB + s.capOv + s.capT;
+      cav = (r) => (r <= s.rb ? zTop : zL(r)); // the lowest solid top above the hollow
       Object.assign(s, { zB, zLb: zL(s.rb) });
     } else {
       zTop = ov + s.ef + (edge - s.rPeak) * k;
@@ -528,16 +526,14 @@ function christmasRoofSdf(geo) {
   let solid;
   if (t.style === 'tiered') {
     solid = (x, y, z) => {
-      // the upturn rises toward each corner and levels off there (a peak right on the corner would
-      // leave a thin crest)
-      const { r, lat } = where(x, y), q = clamp01((lat - 0.35) / 0.65), l4 = q * q * (3 - 2 * q);
-      const e1 = clamp01((r - (t.edge - t.W1)) / t.W1), e2 = clamp01((r - (t.rb + t.ov2 - t.W2)) / t.W2);
-      const zL = Math.min(t.ov + t.ef + (t.edge - r) * t.k + t.U1 * l4 * e1 * e1, t.zB);
+      // a straight sloped roof, a square box on it, and a flat cap on the box whose underside is
+      // cut at 45 degrees (so it prints without supports)
+      const { r } = where(x, y);
+      const zL = Math.min(t.ov + t.ef + (t.edge - r) * t.k, t.zB);
       const lower = Math.max(r - t.edge, (r - half - z) / SQ2, (z - zL) / norm, -z);
-      const band = Math.max(r - t.rb, z - t.zB, -z);
-      const zU = t.zB + t.ov2 + t.ef2 + (t.rb + t.ov2 - Math.max(r, t.rPeak)) * t.k + t.U2 * l4 * e2 * e2;
-      const upper = Math.max(r - (t.rb + t.ov2), (t.zB + (r - t.rb) - z) / SQ2, (z - zU) / norm);
-      return Math.min(lower, band, upper);
+      const box = Math.max(r - t.rb, z - t.zB, -z);
+      const cap = Math.max(r - (t.rb + t.capOv), (t.zB + (r - t.rb) - z) / SQ2, z - t.height);
+      return Math.min(lower, box, cap);
     };
   } else {
     solid = (x, y, z) => {

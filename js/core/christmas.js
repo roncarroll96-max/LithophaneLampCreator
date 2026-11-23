@@ -5,7 +5,7 @@
 // Pieces are drawn in 2D (u across, v up, in mm; negative inside) and given a thickness: TH for
 // trim, TT for the topper. To print they lie flat (x = u, y = v, z = thickness). On the lantern
 // they sit on a face: the side frames on the pillars' outer faces, the base strips on the base's
-// walls, the lattice strips on the two-tier roof's band, the snowflakes or holly on the roof
+// walls, the lattice strips on the two-tier roof's box, the snowflakes or holly on the roof
 // faces, and the topper stands in the socket at the roof's peak.
 //
 // Shapes are joined with a smooth union, so where two strokes meet (or a stroke meets a rim) the
@@ -131,33 +131,71 @@ export function snowflake(R) {
   };
 }
 
-/** A holly leaf L long and W wide along +u from the origin (three points each side). */
+/**
+ * A holly leaf L long and W wide along +u from the origin (version 1.11, like the holly photo of
+ * 2026-11-23): pointed, with deep scallops between spiky points along both edges (a little
+ * staggered side to side), and a slit down the middle for the vein. Small leaves get fewer points
+ * and no vein (they would be too fine to print).
+ */
 function hollyLeaf(L, W) {
-  const Rc = (L * L / 4 + (W / 2) ** 2) / W, off = Rc - W / 2, rb = L / 7;
+  const Rc = (L * L / 4 + (W / 2) ** 2) / W, off = Rc - W / 2;
+  const n = L >= 16 ? 4 : L >= 9 ? 3 : 2, rb = L * ({ 4: 0.1, 3: 0.12, 2: 0.15 }[n]);
   const edgeY = (x) => Math.sqrt(Math.max(0, Rc * Rc - (x - L / 2) ** 2)) - off;
   const bites = [];
-  for (const fx of [0.33, 0.66]) { const x = L * fx, y = edgeY(x) + rb * 0.45; bites.push([x, y], [x, -y]); }
+  for (let i = 0; i < n; i++) {
+    for (const side of [1, -1]) {
+      const fx = n === 2 ? 0.33 + 0.33 * i : 0.22 + (0.56 / (n - 1)) * i + (side < 0 ? 0.05 : 0);
+      const x = L * fx, y = edgeY(x) + rb * (n === 2 ? 0.35 : 0.3);
+      bites.push([x, side * y]);
+    }
+  }
+  const vein = L >= 12 ? { u0: L * 0.16, u1: L * 0.74, w: 0.7 } : null;
   return (u, v) => {
     // smooth intersections round the tips and points a little (sharp points don't print or mesh well)
     let d = smax(Math.hypot(u - L / 2, v - off) - Rc, Math.hypot(u - L / 2, v + off) - Rc, 1);
-    for (const [bx, by] of bites) d = smax(d, rb - Math.hypot(u - bx, v - by), 0.8);
+    for (const [bx, by] of bites) d = smax(d, rb - Math.hypot(u - bx, v - by), 0.5);
+    if (vein) d = Math.max(d, -Math.max(Math.abs(v) - vein.w / 2, vein.u0 - u, u - vein.u1));
     return d;
   };
 }
-/** Three berries round a point. */
-function berries(r) {
-  const pts = [0, 1, 2].map((i) => [r * 1.05 * Math.cos(Math.PI / 2 + (i * 2 * Math.PI) / 3), r * 1.05 * Math.sin(Math.PI / 2 + (i * 2 * Math.PI) / 3)]);
-  return (u, v) => sminAll(pts.map(([x, y]) => Math.hypot(u - x, v - y) - r), 0.5);
+/** A cluster of berries round a point: six (like the photo), or three on the frames' small sprigs. */
+function berries(r, six = false) {
+  const pts = six
+    ? [[-1, 1], [1, 0.95], [0, 0], [-1.85, -0.55], [1.6, -0.75], [-0.2, -1.85]].map(([x, y]) => [x * r * 0.9, y * r * 0.9]) // (overlapping, so no pinholes between them)
+    : [0, 1, 2].map((i) => [r * 1.05 * Math.cos(Math.PI / 2 + (i * 2 * Math.PI) / 3), r * 1.05 * Math.sin(Math.PI / 2 + (i * 2 * Math.PI) / 3)]);
+  const f = (u, v) => sminAll(pts.map(([x, y]) => Math.hypot(u - x, v - y) - r), 0.5);
+  f.pts = pts; f.r = r;
+  return f;
 }
-/** A holly sprig about `size` across: two leaves and a cluster of berries. */
-export function hollySprig(size) {
-  const L = size * 0.46, W = L * 0.46, leaf = hollyLeaf(L, W), br = berries(clamp(size * 0.07, 1.4, 3.2));
-  // three leaves in a fan, berries where they meet
-  const angs = [Math.PI * 0.2, Math.PI * 0.8, -Math.PI * 0.5];
-  return (u, v) => {
-    const ds = angs.map((a) => { const [x, y] = rot(u, v + size * 0.04, a); return leaf(x - size * 0.03, y); });
-    return sminAll([...ds, br(u, v + size * 0.04)], 0.6);
+export const BERRY_RISE = 1; // the sprigs' berries stand this far above the leaves, mm
+
+/**
+ * The sprigs' berries stand up as round buttons BERRY_RISE above a piece TH thick (so each one
+ * shows, as in the photo). Each button is a little inside its berry's outline, with straight
+ * sides and a flat top: rounded domes left surfaces too close together for a clean mesh.
+ * f(u, v, z), negative inside.
+ */
+function berryButtons(pts, r) {
+  const rb = r - Math.max(0.4, 0.2 * r), top = TH + BERRY_RISE;
+  return (u, v, z) => {
+    let d = Infinity;
+    for (const [x, y] of pts) d = smin(d, Math.hypot(u - x, v - y) - rb, 0.8); // (no narrow notch where two meet)
+    return Math.max(d, TH - 0.5 - z, z - top);
   };
+}
+
+/** A holly sprig about `size` across: three leaves (one up, two out to the sides and down) and six berries where they meet. */
+export function hollySprig(size) {
+  const L = size * 0.46, W = L * 0.48, leaf = hollyLeaf(L, W), br = berries(clamp(size * 0.07, 1.3, 3), true);
+  const angs = [Math.PI * 0.53, Math.PI * 1.1, -Math.PI * 0.1], bv = -size * 0.05;
+  const f = (u, v) => {
+    const ds = angs.map((a) => { const [x, y] = rot(u, v, a); return leaf(x - size * 0.03, y); });
+    return sminAll([...ds, br(u, v - bv)], 0.9); // (fills the tiny gaps where a berry just touches a leaf)
+  };
+  const buttons = berryButtons(br.pts.map(([x, y]) => [x, y + bv]), br.r);
+  f.solid = (u, v, z) => Math.min(Math.max(f(u, v), -z, z - TH), buttons(u, v, z));
+  f.height = TH + BERRY_RISE;
+  return f;
 }
 
 /** A five-pointed star (outer radius R, inner r), one point up, its points rounded. */
@@ -219,7 +257,7 @@ export function trimLayout(geo) {
     const Ul = t.rb * ta - 0.6, zl0 = t.zLb + 0.8, Hl = t.zB - 0.8 - zl0;
     L.lattice = { Ul, zl0, Hl };
   }
-  // Roof decorations on each face: one big and two small (the two-tier roof: one small up top too)
+  // Roof decorations on each face: one big and two small
   const r0 = t.style === 'tiered' ? t.rb : t.rPeak, r1 = t.edge;
   const dBig = r0 + 0.5 * (r1 - r0), dSmall = r0 + 0.72 * (r1 - r0);
   const big = clamp(Math.min(0.62 * (r1 - r0), 0.9 * dBig * ta), 14, 46);
@@ -227,19 +265,13 @@ export function trimLayout(geo) {
   const spots = [{ d: dBig, s: 0, size: big }];
   const sSmall = dSmall * ta * 0.62;
   if (sSmall > small * 0.6) spots.push({ d: dSmall, s: -sSmall, size: small }, { d: dSmall, s: sSmall, size: small });
-  if (t.style === 'tiered') {
-    const dU = t.rPeak + 0.55 * (t.rb + t.ov2 - t.rPeak);
-    spots.push({ d: dU, s: 0, size: clamp(0.75 * (t.rb + t.ov2 - t.rPeak), 9, small), upper: true });
-  }
   L.spots = spots;
   return L;
 }
 
 /** The roof's height (top coordinates) at distance r out on a face, for placing decorations. */
-function roofZ(t, r, upper) {
-  if (t.style === 'tiered') {
-    return upper ? t.zB + t.ov2 + t.ef2 + (t.rb + t.ov2 - Math.max(r, t.rPeak)) * t.k : t.ov + t.ef + (t.edge - r) * t.k;
-  }
+function roofZ(t, r) {
+  if (t.style === 'tiered') return t.ov + t.ef + (t.edge - r) * t.k;
   return t.height - Math.max(0, r - t.rPeak) * t.k;
 }
 
@@ -317,13 +349,13 @@ export function trimPieces(settings, geo = lanternGeometry(settings)) {
       places: sidePlaces(geo.half, Lo.base.zb0),
     });
   }
-  // Lattice strips round the two-tier roof's band (holly design)
+  // Lattice strips round the two-tier roof's box (holly design)
   if (Lo.lattice && holly) {
     const { Ul, Hl } = Lo.lattice;
     out.push({
       key: 'xlattice', name: 'Roof lattice', copies: geo.n, thick: TH, box: [-Ul, Ul, 0, Hl],
       d2: framed(-Ul, Ul, 0, Hl, [{ f: lattice(Math.max(5, (Hl - 2 * RIM) * 0.9)), box: [-Ul + RIM, Ul - RIM, RIM, Hl - RIM] }]),
-      how: `Print ${geo.n}, flat. Glue one onto each side of the band between the two roofs.`,
+      how: `Print ${geo.n}, flat. Glue one onto each side of the box on top of the roof.`,
       places: sidePlaces(t.rb, geo.zT + Lo.lattice.zl0),
     });
   }
@@ -335,7 +367,7 @@ export function trimPieces(settings, geo = lanternGeometry(settings)) {
     const places = [];
     for (const fr of F) for (const sp of spots) {
       const k = t.k, cph = 1 / Math.sqrt(1 + k * k), sph = k * cph;
-      const z = geo.zT + roofZ(t, sp.d, sp.upper);
+      const z = geo.zT + roofZ(t, sp.d);
       places.push({
         origin: [fr.nx * sp.d + fr.tx * sp.s, fr.ny * sp.d + fr.ty * sp.s, z],
         ex: [fr.tx, fr.ty, 0], ey: [-fr.nx * cph, -fr.ny * cph, sph], ez: [fr.nx * sph, fr.ny * sph, cph],
@@ -345,6 +377,7 @@ export function trimPieces(settings, geo = lanternGeometry(settings)) {
     out.push({
       key: `xdecor${out.filter((p) => p.key.startsWith('xdecor')).length}`, name: holly ? 'Holly sprig' : 'Snowflake',
       copies: places.length, thick: TH, box: [-half, half, -half, half], d2: f, places, small: true, size,
+      solid: f.solid, height: f.height, // (holly: berries standing up as domes)
     });
   }
   // Topper
@@ -369,8 +402,10 @@ export function trimPieces(settings, geo = lanternGeometry(settings)) {
   return out;
 }
 
-/** A piece as a solid lying flat on the bed: f(x, y, z), z from 0 to its thickness. */
-export const flatSolid = (p) => (x, y, z) => Math.max(p.d2(x, y), -z, z - p.thick);
+/** A piece as a solid lying flat on the bed: f(x, y, z), z from 0 to its thickness (or its own solid: the holly's domed berries). */
+export const flatSolid = (p) => p.solid || ((x, y, z) => Math.max(p.d2(x, y), -z, z - p.thick));
+/** How tall a piece is lying flat. */
+const pieceH = (p) => p.height || p.thick;
 
 /**
  * The trim parts to export: 'xframe', 'xbase', 'xlattice', 'xtopper' (one piece each), and
@@ -384,8 +419,8 @@ export function trimPart(settings, part, geo = lanternGeometry(settings)) {
     if (!p) return null;
     const [u0, u1, v0, v1] = p.box;
     return {
-      sdf: flatSolid(p), bounds: { min: [u0 - 0.5, v0 - 0.5, 0], max: [u1 + 0.5, v1 + 0.5, p.thick] },
-      size: [u1 - u0, v1 - v0, p.thick], how: p.how, copies: p.copies,
+      sdf: flatSolid(p), bounds: { min: [u0 - 0.5, v0 - 0.5, 0], max: [u1 + 0.5, v1 + 0.5, pieceH(p)] },
+      size: [u1 - u0, v1 - v0, pieceH(p)], how: p.how, copies: p.copies,
     };
   }
   // All the small decorations, side by side in rows across the bed
@@ -396,15 +431,15 @@ export function trimPart(settings, part, geo = lanternGeometry(settings)) {
   const cells = items.map((p) => {
     const w = p.box[1] - p.box[0], h = p.box[3] - p.box[2];
     if (x > 0 && x + w > bedX) { x = 0; y += rowH + gap; rowH = 0; }
-    const c = { p, x0: x, y0: y, x1: x + w, y1: y + h, dx: x - p.box[0], dy: y - p.box[2] };
+    const c = { p, solid: flatSolid(p), x0: x, y0: y, x1: x + w, y1: y + h, dx: x - p.box[0], dy: y - p.box[2] };
     x += w + gap; rowH = Math.max(rowH, h); maxX = Math.max(maxX, c.x1);
     return c;
   });
-  const maxY = y + rowH;
+  const maxY = y + rowH, maxH = Math.max(...items.map(pieceH));
   const sdf = (px, py, pz) => {
     for (const c of cells) {
       if (px >= c.x0 - gap / 2 && px <= c.x1 + gap / 2 && py >= c.y0 - gap / 2 && py <= c.y1 + gap / 2) {
-        return Math.max(c.p.d2(px - c.dx, py - c.dy), -pz, pz - TH);
+        return c.solid(px - c.dx, py - c.dy, pz);
       }
     }
     return gap / 2;
@@ -413,7 +448,7 @@ export function trimPart(settings, part, geo = lanternGeometry(settings)) {
   for (const p of items) counts.set(p.name, (counts.get(p.name) || 0) + 1);
   const what = [...counts].map(([k, v]) => `${v} × ${k.toLowerCase()}`).join(', ');
   return {
-    sdf, bounds: { min: [-0.5, -0.5, 0], max: [maxX + 0.5, maxY + 0.5, TH] }, size: [maxX, maxY, TH], copies: 1,
+    sdf, bounds: { min: [-0.5, -0.5, 0], max: [maxX + 0.5, maxY + 0.5, maxH] }, size: [maxX, maxY, maxH], copies: 1,
     how: `Print 1 (${what}), flat. Glue them onto the roof's faces: the big one in the middle of each face, the small ones lower down.`,
   };
 }
@@ -443,7 +478,7 @@ export function trimPreviewMesh(settings, meshSdf, geo = lanternGeometry(setting
   for (const p of pieces) {
     const [u0, u1, v0, v1] = p.box;
     const s = p.small ? Math.min(step, Math.max(0.35, p.size / 40)) : step;
-    const m = meshSdf(flatSolid(p), { min: [u0 - 0.5, v0 - 0.5, 0], max: [u1 + 0.5, v1 + 0.5, p.thick] }, s);
+    const m = meshSdf(flatSolid(p), { min: [u0 - 0.5, v0 - 0.5, 0], max: [u1 + 0.5, v1 + 0.5, pieceH(p)] }, s);
     meshes.push({ m, p });
     nv += m.positions.length * p.places.length; ni += m.indices.length * p.places.length;
   }
