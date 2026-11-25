@@ -18,6 +18,7 @@ import { ThreeMFWriter } from './threemf.js';
 import { trimPart, trimPartList, ROOF_LABELS } from './christmas.js';
 import { buildCylinder, createCylinderField, buildCylinderMesh } from './cylinder.js';
 import { buildLid, LID_STYLES } from './lid.js';
+import { simplifyMesh } from './simplify.js';
 
 export const TRIM_STEP = 0.3; // mm grid for the trim pieces (fine filigree)
 
@@ -26,6 +27,27 @@ export const BASE_MAX_CELLS = 2e8; // a bigger base gets a slightly coarser grid
 export const FRAME_STEP = 0.4;     // mm grid for the lantern's frame parts (pegs and slots need a fine fit)
 export const LID_STEP = 0.4;       // mm grid for the cylinder's lid (its lip needs a fine fit)
 
+// After meshing, triangles are merged wherever that moves the surface by less than this (mm).
+// The grid-built parts (base, lid, frames) have big flat faces made of thousands of tiny
+// triangles: merging them makes the file 85-99% smaller. The lamp keeps a tighter limit so the
+// picture is untouched (its plain areas and smooth side still shrink, about half the file).
+export const PART_TOL = 0.02;
+export const LAMP_TOL = 0.01;
+
+/**
+ * The simplified mesh, or the original if simplifying fails (it needs extra memory, which a
+ * phone may not have for a very big lamp). onProgress gets 0..1.
+ */
+function slim(mesh, tol, onProgress = () => {}) {
+  try {
+    return simplifyMesh(mesh, tol, onProgress);
+  } catch {
+    return mesh;
+  }
+}
+/** Progress for the meshing (0..split) and the simplifying (split..1). */
+const stages = (onProgress, split = 0.6) => [(v) => onProgress(v * split), (v) => onProgress(split + v * (1 - split))];
+
 const isPanel = (settings) => SHAPES[settings.shape]?.body === 'panel';
 const isLantern = (settings) => SHAPES[settings.shape]?.body === 'lantern';
 const isCylinder = (settings) => SHAPES[settings.shape]?.body === 'cylinder';
@@ -33,7 +55,15 @@ const lampShape = (settings) => (isPanel(settings) ? buildPanel(settings) : isCy
   : buildEllipsoidShape(bodyAxes(settings), collarDims(settings).ro));
 
 /** The lamp itself: a ball, cube, flat panel or cylinder. Returns { mesh, label }. */
-export function lampMesh({ settings, photos, textMasks, moon, stepInner, stepOuter }, onProgress = () => {}) {
+export function lampMesh(data, onProgress = () => {}) {
+  const [meshing, slimming] = stages(onProgress);
+  const r = rawLampMesh(data, meshing);
+  r.mesh = slim(r.mesh, LAMP_TOL, slimming);
+  if (r.flip) flipUpsideDown(r.mesh);
+  return { mesh: r.mesh, label: r.label };
+}
+
+function rawLampMesh({ settings, photos, textMasks, moon, stepInner, stepOuter }, onProgress) {
   if (isCylinder(settings)) {
     // Standing on its bottom edge; the picture side gets the fine spacing
     const shape = buildCylinder(settings);
@@ -61,9 +91,9 @@ export function lampMesh({ settings, photos, textMasks, moon, stepInner, stepOut
     stepInner: out ? stepOuter : stepInner,
     stepOuter: field.hasRaised || out ? stepInner : stepOuter,
   });
-  if (shape.kind === 'cube') flipUpsideDown(mesh); // prints with its top face on the bed
+  const flip = shape.kind === 'cube'; // prints with its top face on the bed
   const ax = bodyAxes(settings);
-  return { mesh, label: `Lithophane ${settings.shape} ${Math.round(ax.a * 2)}x${Math.round(ax.b * 2)}x${Math.round(ax.c * 2)}mm` };
+  return { mesh, flip, label: `Lithophane ${settings.shape} ${Math.round(ax.a * 2)}x${Math.round(ax.b * 2)}x${Math.round(ax.c * 2)}mm` };
 }
 
 /**
@@ -76,7 +106,7 @@ export function baseMesh(settings, part = 'base') {
   if (!base) return null;
   const p = base.parts[part];
   if (!p) return null;
-  const mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, BASE_STEP, BASE_MAX_CELLS));
+  const mesh = slim(meshSdf(p.sdf, p.bounds, gridStep(p.bounds, BASE_STEP, BASE_MAX_CELLS)), PART_TOL);
   if (p.flip) flipUpsideDown(mesh); // puck and bulb bases print with the top on the bed
   const label = base.info.box ? (part === 'cover' ? 'Panel box back' : 'Panel box')
     : base.info.panel ? `Panel ${base.info.light}` : part === 'cover' ? 'Lamp base bottom cover' : `Lamp base ${base.info.light}`;
@@ -88,7 +118,7 @@ export function lidMesh(settings) {
   if (!isCylinder(settings)) return null;
   const lid = buildLid(settings, buildCylinder(settings));
   if (!lid) return null;
-  const mesh = meshSdf(lid.sdf, lid.bounds, gridStep(lid.bounds, LID_STEP, BASE_MAX_CELLS));
+  const mesh = slim(meshSdf(lid.sdf, lid.bounds, gridStep(lid.bounds, LID_STEP, BASE_MAX_CELLS)), PART_TOL);
   return { mesh, label: `Cylinder lid ${lid.info.style}`, info: lid.info };
 }
 
@@ -102,14 +132,15 @@ export function lanternMesh({ settings, photos, textMasks, stepInner, stepOuter 
     const field = createLanternField(settings, strip, photos || null, textMasks || null);
     const panel = lanternSidePanel(settings, geo);
     // The picture faces out (the front), so the front gets the fine spacing
-    const mesh = buildPanelMesh({ panel, field: field.sideField(side, panel), stepInner: stepOuter, stepOuter: stepInner, onProgress });
+    const [meshing, slimming] = stages(onProgress);
+    const mesh = slim(buildPanelMesh({ panel, field: field.sideField(side, panel), stepInner: stepOuter, stepOuter: stepInner, onProgress: meshing }), LAMP_TOL, slimming);
     return { mesh, label: `Lantern ${lanternSideNames(geo.n)[side].toLowerCase()} panel ${Math.round(geo.W)}x${Math.round(geo.H)}mm` };
   }
   const trim = part.startsWith('x');
   const p = trim ? trimPart(settings, part, geo) : lanternPart(settings, part, geo);
   if (!p) throw new Error('This lantern has no such part.');
   onProgress(0.1);
-  const mesh = meshSdf(p.sdf, p.bounds, gridStep(p.bounds, trim ? TRIM_STEP : FRAME_STEP, BASE_MAX_CELLS));
+  const mesh = slim(meshSdf(p.sdf, p.bounds, gridStep(p.bounds, trim ? TRIM_STEP : FRAME_STEP, BASE_MAX_CELLS)), PART_TOL, (v) => onProgress(0.5 + v * 0.5));
   onProgress(1);
   return { mesh, label: `Lantern ${part}` };
 }

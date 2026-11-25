@@ -1549,7 +1549,7 @@ function lanternExportTab() {
     radio.addEventListener('change', () => { s.detail = k; scheduleAutosave(); renderTab(); });
     const desc = { draft: 'Quick test prints', standard: 'Best for most prints', fine: 'Close-up portraits; big file' }[k];
     return el('label', { class: 'detail-opt' + (s.detail === k ? ' active' : '') },
-      radio, el('span', {}, `${d.label} (${d.step} mm)`, el('small', {}, desc)), el('span', { class: 'size' }, `≈ ${(estBytes(d) / 1e6).toFixed(0)} MB each`));
+      radio, el('span', {}, `${d.label} (${d.step} mm)`, el('small', {}, desc)), el('span', { class: 'size' }, `up to ${(estBytes(d) / 1e6).toFixed(0)} MB each`));
   });
   const busy = app.exporting;
   const fitEl = (size) => { const f = fitCheck(size); return el('div', { class: 'fit ' + f.cls }, f.text); };
@@ -1630,7 +1630,7 @@ function exportTab() {
   const estBytes = (d) => stlBytes(cylShape ? estimateCylinderTriangles(cylShape, outside ? d.step : OUTER_STEP, outside ? OUTER_STEP : d.step)
     : estimateTriangles(app.shape, outside ? OUTER_STEP : d.step, raised || outside ? d.step : OUTER_STEP));
   const opts = Object.entries(DETAIL_PRESETS).map(([k, d]) => {
-    const sizeText = app.shape ? `≈ ${(estBytes(d) / 1e6).toFixed(0)} MB` : '';
+    const sizeText = app.shape ? `up to ${(estBytes(d) / 1e6).toFixed(0)} MB` : '';
     const radio = el('input', { type: 'radio', name: 'detail', value: k });
     radio.checked = s.detail === k;
     radio.addEventListener('change', () => { s.detail = k; scheduleAutosave(); renderTab(); });

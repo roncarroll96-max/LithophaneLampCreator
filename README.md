@@ -61,7 +61,7 @@ Double-click **start.bat**. It starts a tiny local web server and opens
    table in the open bottom. The tray has a wall round the puck, a hole in its floor for the cable's plug and a
    channel underneath, so only a small cable hole shows at the back. Under a ball or the cube the tray is a
    separate **bottom cover** that presses into the base: export it too (**Export bottom cover STL**).
-7. **Export** tab: check the bed fit, pick a detail level (each shows its file size; very big files get a warning),
+7. **Export** tab: check the bed fit, pick a detail level (each shows the largest its file can be; flat and plain areas are merged into bigger triangles, so files usually come out smaller; very big files get a warning),
    **Export ball STL** (or **Export panel STL**), or **Export all parts as one 3MF**: the lamp and its base (or every lantern
    part) in one much smaller file, each part named and turned for printing. In your slicer, press Arrange to place them.
 8. Print opening-down, with slicer supports for the curve just above the collar.
